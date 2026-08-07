@@ -27,5 +27,5 @@ EXPOSE 5000
 
 ENV NODE_ENV=production
 
-# Run migrations and start server
-CMD ["sh", "-c", "npx sequelize-cli db:migrate && node dist/server.js"]
+# Start server
+CMD ["node", "dist/server.js"]
