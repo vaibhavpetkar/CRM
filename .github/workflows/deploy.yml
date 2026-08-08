@@ -3,7 +3,7 @@ name: CI/CD Deploy to VPS
 on:
   push:
     branches:
-      - main
+      - master
     tags:
       - 'v*'
   workflow_dispatch:
@@ -28,7 +28,7 @@ jobs:
             
             # Pull the latest changes from Git
             git fetch --all
-            git reset --hard origin/main
+            git reset --hard origin/master
             
             # Rebuild and restart the Docker containers
             docker compose -f docker-compose.yml -f docker-compose.prod.yml down
