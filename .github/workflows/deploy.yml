@@ -31,8 +31,8 @@ jobs:
             git reset --hard origin/master
             
             # Rebuild and restart the Docker containers
-            sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml down
-            sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+            sudo docker compose down
+            sudo docker compose up -d --build
             
             # Prune unused images to save disk space
             sudo docker image prune -f
