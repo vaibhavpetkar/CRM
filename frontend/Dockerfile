@@ -8,6 +8,12 @@ RUN npm ci
 
 COPY . .
 
+# Accept build-time public env vars (Next.js bakes NEXT_PUBLIC_* at build time)
+ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_GOOGLE_CLIENT_ID
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_GOOGLE_CLIENT_ID=$NEXT_PUBLIC_GOOGLE_CLIENT_ID
+
 # Pass build environment variables if needed
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
