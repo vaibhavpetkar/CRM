@@ -37,3 +37,7 @@ jobs:
             
             # Prune unused images to save disk space
             sudo docker image prune -f
+
+            # Update and reload host Nginx config automatically
+            sudo cp /var/www/crm/nginx/crm.eleviq.buzz.conf /etc/nginx/sites-available/crm.eleviq.buzz
+            sudo nginx -t && sudo systemctl reload nginx
