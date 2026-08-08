@@ -8,7 +8,7 @@ export function getAuthToken(): string | null {
 export function setAuthToken(token: string) {
   if (typeof window !== 'undefined') {
     localStorage.setItem('crm_token', token);
-    // Mirrored into a cookie (readable by middleware.ts) so unauthenticated users
+    // Mirrored into a cookie (readable by proxy.ts) so unauthenticated users
     // are redirected to /login before any protected page ever renders.
     document.cookie = `crm_token=${token}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
   }
