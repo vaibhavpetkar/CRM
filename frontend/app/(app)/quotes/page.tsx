@@ -11,7 +11,7 @@ import { QUOTE_FIELDS } from '@/lib/import-export/field-configs';
 import { formatCurrency } from '@/lib/utils';
 import { quotesApi } from '@/lib/api';
 import Link from 'next/link';
-import { PlusIcon, XMarkIcon, TrashIcon, PaperAirplaneIcon, ChatBubbleOvalLeftEllipsisIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, XMarkIcon, TrashIcon, PaperAirplaneIcon } from '@heroicons/react/24/outline';
 import { useToast } from '@/components/ui/toast';
 
 const emptyForm = { deal: '', client: '', amount: 10000, status: 'draft', validUntil: '' };

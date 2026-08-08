@@ -16,6 +16,9 @@ import { useKeyboardShortcuts } from '@/lib/hooks/useKeyboardShortcuts';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { PlusIcon, FunnelIcon, XMarkIcon, PencilSquareIcon, TrashIcon, EyeIcon, Squares2X2Icon, ListBulletIcon } from '@heroicons/react/24/outline';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { useToast } from '@/components/ui/toast';
 
 const emptyForm = {
@@ -62,6 +65,16 @@ const emptyForm = {
   nextFollowUp: '',
 };
 
+const leadSchema = z.object({
+  firstName: z.string().min(1, 'First name is required'),
+  lastName: z.string().min(1, 'Last name is required'),
+  email: z.string().email('Valid email is required'),
+  company: z.string().optional(),
+  leadSource: z.string().optional(),
+  assignedToName: z.string().optional(),
+});
+type LeadFormValues = z.infer<typeof leadSchema>;
+
 export default function LeadsPage() {
   const toast = useToast();
   const [search, setSearch] = useState('');
@@ -82,12 +95,22 @@ export default function LeadsPage() {
   const [dragOverStatus, setDragOverStatus] = useState<string | null>(null);
   const [selectedLeadIds, setSelectedLeadIds] = useState<(string | number)[]>([]);
 
-  const [formData, setFormData] = useState(emptyForm);
-  const [submitting, setSubmitting] = useState(false);
-  // Typed value for the "Assign To" datalist field in the create/edit modal —
-  // resolved to a user ID on submit.
-  const [assignedToName, setAssignedToName] = useState('');
-
+  const {
+    register,
+    handleSubmit: hookFormSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<LeadFormValues>({
+    resolver: zodResolver(leadSchema),
+    defaultValues: {
+      firstName: '',
+      lastName: '',
+      email: '',
+      company: '',
+      leadSource: 'Website',
+      assignedToName: '',
+    },
+  });
   // Users available to assign leads to (name typeahead datalist)
   const [assignableUsers, setAssignableUsers] = useState<{ id: number; name: string }[]>([]);
 
@@ -102,8 +125,14 @@ export default function LeadsPage() {
   useEffect(() => {
     if (searchParams.get('quickCreate')) {
       setEditingId(null);
-      setFormData(emptyForm);
-      setAssignedToName('');
+      reset({
+        firstName: '',
+        lastName: '',
+        email: '',
+        company: '',
+        leadSource: 'Website',
+        assignedToName: '',
+      });
       setIsModalOpen(true);
       router.replace('/leads');
     }
@@ -169,8 +198,14 @@ export default function LeadsPage() {
 
   const openCreate = () => {
     setEditingId(null);
-    setFormData(emptyForm);
-    setAssignedToName('');
+    reset({
+      firstName: '',
+      lastName: '',
+      email: '',
+      company: '',
+      leadSource: 'Website',
+      assignedToName: '',
+    });
     setIsModalOpen(true);
   };
 
@@ -178,12 +213,9 @@ export default function LeadsPage() {
     router.push(`/leads/${lead.id}`);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    // Resolve the typed "Assign To" name into a user ID via the datalist options.
-    let resolvedAssignedToId: number | null = formData.assignedToId ? Number(formData.assignedToId) : null;
-    const typedAssignee = assignedToName.trim();
+  const onSubmitForm = async (data: LeadFormValues) => {
+    let resolvedAssignedToId: number | null = null;
+    const typedAssignee = (data.assignedToName || '').trim();
     if (typedAssignee) {
       const match = assignableUsers.find((u) => u.name.toLowerCase() === typedAssignee.toLowerCase());
       if (!match) {
@@ -191,54 +223,18 @@ export default function LeadsPage() {
         return;
       }
       resolvedAssignedToId = match.id;
-    } else {
-      resolvedAssignedToId = null;
     }
 
-    setSubmitting(true);
     const payload = {
-      // Lead Information
-      prefix: formData.prefix,
-      firstName: formData.firstName,
-      lastName: formData.lastName,
-      email: formData.email,
-      phone: formData.phone,
-      fax: formData.fax,
-      mobile: formData.mobile,
-      company: formData.company,
-      website: formData.website,
-      jobTitle: formData.jobTitle,
-      leadSource: formData.leadSource.toLowerCase().replace(/\s+/g, '-'),
-      status: formData.status,
-      industry: formData.industry,
-      noOfEmployees: formData.noOfEmployees ? Number(formData.noOfEmployees) : null,
-      annualRevenue: formData.annualRevenue ? Number(formData.annualRevenue) : null,
-      rating: formData.rating,
-      emailOptOut: formData.emailOptOut,
-      skypeId: formData.skypeId,
-      secondaryEmail: formData.secondaryEmail,
-      leadImage: formData.leadImage,
-      leadOwnerId: formData.leadOwnerId ? Number(formData.leadOwnerId) : null,
-      // Address Information
-      country: formData.country,
-      state: formData.state,
-      city: formData.city,
-      street: formData.street,
-      zipCode: formData.zipCode,
-      latitude: formData.latitude ? Number(formData.latitude) : null,
-      longitude: formData.longitude ? Number(formData.longitude) : null,
-      // Description
-      description: formData.description,
-      // Scoring & Value
-      score: Number(formData.score),
-      value: Number(formData.value),
-      // System fields
-      notes: formData.notes,
+      ...emptyForm,
+      firstName: data.firstName,
+      lastName: data.lastName,
+      email: data.email,
+      company: data.company,
+      leadSource: (data.leadSource || 'Website').toLowerCase().replace(/\s+/g, '-'),
       assignedToId: resolvedAssignedToId,
-      sourceDetails: formData.sourceDetails,
-      lastContacted: formData.lastContacted,
-      nextFollowUp: formData.nextFollowUp,
     };
+
     try {
       if (editingId) {
         await leadsApi.updateLead(editingId, payload);
@@ -246,13 +242,11 @@ export default function LeadsPage() {
         await leadsApi.createLead(payload);
       }
       setIsModalOpen(false);
-      setFormData(emptyForm);
+      reset();
       setEditingId(null);
       fetchLeads();
     } catch (err: any) {
       toast.error(err.message || 'Failed to save lead');
-    } finally {
-      setSubmitting(false);
     }
   };
 
@@ -283,7 +277,7 @@ export default function LeadsPage() {
       if (isModalOpen) setIsModalOpen(false);
     },
     onSave: () => {
-      if (isModalOpen) handleSubmit({ preventDefault: () => {} } as React.FormEvent);
+      if (isModalOpen) hookFormSubmit(onSubmitForm)();
     },
     onDelete: () => {
       if (isModalOpen) return;
@@ -501,7 +495,7 @@ export default function LeadsPage() {
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+            <form onSubmit={hookFormSubmit(onSubmitForm)} className="mt-4 space-y-4">
               <div className="border-b border-slate-200 pb-4">
                 <h4 className="text-sm font-medium text-slate-700 mb-3">Mandatory Lead Details</h4>
                 
@@ -510,47 +504,42 @@ export default function LeadsPage() {
                     <label className="block text-xs font-medium text-slate-700">First Name *</label>
                     <input
                       type="text"
-                      required
-                      value={formData.firstName}
-                      onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                      className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                      {...register('firstName')}
+                      className={`mt-1 w-full rounded-md border-0 bg-slate-100/50 p-2 text-sm focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)] ${errors.firstName ? 'ring-1 ring-red-500 bg-red-50' : ''}`}
                     />
+                    {errors.firstName && <p className="mt-1 text-[10px] text-red-500">{errors.firstName.message}</p>}
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-slate-700">Last Name *</label>
                     <input
                       type="text"
-                      required
-                      value={formData.lastName}
-                      onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-                      className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                      {...register('lastName')}
+                      className={`mt-1 w-full rounded-md border-0 bg-slate-100/50 p-2 text-sm focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)] ${errors.lastName ? 'ring-1 ring-red-500 bg-red-50' : ''}`}
                     />
+                    {errors.lastName && <p className="mt-1 text-[10px] text-red-500">{errors.lastName.message}</p>}
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-slate-700">Email *</label>
                     <input
                       type="email"
-                      required
-                      value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                      {...register('email')}
+                      className={`mt-1 w-full rounded-md border-0 bg-slate-100/50 p-2 text-sm focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)] ${errors.email ? 'ring-1 ring-red-500 bg-red-50' : ''}`}
                     />
+                    {errors.email && <p className="mt-1 text-[10px] text-red-500">{errors.email.message}</p>}
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-slate-700">Company</label>
                     <input
                       type="text"
-                      value={formData.company}
-                      onChange={(e) => setFormData({ ...formData, company: e.target.value })}
-                      className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                      {...register('company')}
+                      className="mt-1 w-full rounded-md border-0 bg-slate-100/50 p-2 text-sm focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
                     />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-slate-700">Lead Source</label>
                     <select
-                      value={formData.leadSource}
-                      onChange={(e) => setFormData({ ...formData, leadSource: e.target.value })}
-                      className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                      {...register('leadSource')}
+                      className="mt-1 w-full rounded-md border-0 bg-slate-100/50 p-2 text-sm focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
                     >
                       <option value="Website">Website</option>
                       <option value="LinkedIn">LinkedIn</option>
@@ -567,10 +556,9 @@ export default function LeadsPage() {
                     <input
                       type="text"
                       list="assignable-users-list-modal"
-                      value={assignedToName}
-                      onChange={(e) => setAssignedToName(e.target.value)}
+                      {...register('assignedToName')}
                       placeholder="Start typing a name..."
-                      className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                      className="mt-1 w-full rounded-md border-0 bg-slate-100/50 p-2 text-sm focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
                     />
                     <datalist id="assignable-users-list-modal">
                       {assignableUsers.map((u) => (
@@ -586,8 +574,8 @@ export default function LeadsPage() {
                 <Button type="button" variant="secondary" size="sm" onClick={() => setIsModalOpen(false)}>
                   Cancel
                 </Button>
-                <Button type="submit" size="sm" disabled={submitting}>
-                  {submitting ? 'Saving...' : editingId ? 'Update Lead' : 'Save Lead'}
+                <Button type="submit" size="sm" disabled={isSubmitting}>
+                  {isSubmitting ? 'Saving...' : editingId ? 'Update Lead' : 'Save Lead'}
                 </Button>
               </div>
             </form>

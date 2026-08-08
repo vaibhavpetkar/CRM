@@ -599,9 +599,9 @@ export default function DataTable<T>({
         <table className="w-full border-collapse text-sm">
           {/* Header */}
           <thead>
-            <tr className="border-b-2 border-slate-800/10 bg-slate-700 text-left text-xs font-bold uppercase tracking-wider text-white">
+            <tr className="border-b border-slate-200 bg-slate-50/80 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">
               {selectable && (
-                <th className="w-10 border-r border-slate-600 px-3 py-3">
+                <th className="w-10 px-4 py-3">
                   <input
                     type="checkbox"
                     checked={allSelected}
@@ -614,7 +614,7 @@ export default function DataTable<T>({
                   />
                 </th>
               )}
-              <th className="w-14 border-r border-slate-600 px-3 py-3 text-center">
+              <th className="w-14 px-4 py-3 text-center">
                 Sr.&nbsp;No.
               </th>
 
@@ -626,7 +626,7 @@ export default function DataTable<T>({
                     key={i}
                     onClick={() => handleHeaderClick(i)}
                     className={cn(
-                      'group cursor-pointer select-none border-r border-slate-600 px-4 py-3 transition hover:bg-slate-600/80 last:border-r-0',
+                      'group cursor-pointer select-none px-4 py-3 transition hover:bg-slate-100',
                       col.headerClassName
                     )}
                     title="Click to sort Ascending / Descending"
@@ -650,14 +650,14 @@ export default function DataTable<T>({
               })}
 
               {actions && (
-                <th className="border-r border-slate-600 px-4 py-3 text-right">Actions</th>
+                <th className="px-4 py-3 text-right">Actions</th>
               )}
               {expandedRowContent && <th className="w-10 px-3 py-3" />}
             </tr>
           </thead>
 
           {/* Body */}
-          <tbody className="divide-y divide-slate-200">
+          <tbody className="divide-y divide-slate-100">
             {displayData.length === 0 ? (
               <tr>
                 <td colSpan={colSpanTotal} className="py-10 text-center text-slate-400">
@@ -685,17 +685,17 @@ export default function DataTable<T>({
                       className={cn(
                         'transition-colors duration-150',
                         isSelected
-                          ? 'bg-[#168eea]/5'
+                          ? 'bg-[var(--sidebar-active-bg)]'
                           : isEven
-                          ? 'bg-white hover:bg-slate-50'
-                          : 'bg-slate-50/60 hover:bg-slate-100/60',
+                          ? 'bg-white hover:bg-slate-50/50'
+                          : 'bg-white hover:bg-slate-50/50',
                         (onRowClick || expandedRowContent) && 'cursor-pointer'
                       )}
                     >
                       {/* Checkbox */}
                       {selectable && (
                         <td
-                          className="border-r border-slate-100 px-3 py-3"
+                          className="px-4 py-3"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <input
@@ -709,7 +709,7 @@ export default function DataTable<T>({
                       )}
 
                       {/* Sr. No. */}
-                      <td className="border-r border-slate-100 px-3 py-3 text-center font-semibold text-slate-500">
+                      <td className="px-4 py-3 text-center text-sm text-slate-400">
                         {index + 1}
                       </td>
 
@@ -719,7 +719,7 @@ export default function DataTable<T>({
                           key={i}
                           onContextMenu={(e) => handleContextMenu(e, row, i)}
                           className={cn(
-                            'border-r border-slate-100 px-4 py-3 last:border-r-0',
+                            'px-4 py-3',
                             col.className
                           )}
                         >
@@ -743,7 +743,7 @@ export default function DataTable<T>({
                       {/* Actions */}
                       {actions && (
                         <td
-                          className="border-r border-slate-100 px-4 py-3 text-right"
+                          className="px-4 py-3 text-right"
                           onClick={(e) => e.stopPropagation()}
                         >
                           {actions(row)}

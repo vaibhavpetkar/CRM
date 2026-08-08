@@ -1,9 +1,9 @@
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen">
-      <div className="hidden w-1/2 flex-col justify-between bg-[#1a2332] p-12 lg:flex">
+      <div className="hidden w-1/2 flex-col justify-between bg-slate-900 p-8 md:p-10 lg:flex lg:p-12">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#168eea] text-lg font-bold text-white">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--primary)] text-lg font-bold text-white">
             Z
           </div>
           <span className="text-xl font-semibold text-white">CRM Pro</span>
@@ -18,7 +18,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           <div className="mt-8 grid grid-cols-2 gap-4">
             {['Lead Management', 'Sales Pipeline', 'Marketing Automation', 'Team Collaboration'].map((feature) => (
               <div key={feature} className="flex items-center gap-2 text-sm text-slate-300">
-                <div className="h-1.5 w-1.5 rounded-full bg-[#168eea]" />
+                <div className="h-1.5 w-1.5 rounded-full bg-[var(--primary)]" />
                 {feature}
               </div>
             ))}
@@ -26,9 +26,10 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         </div>
         <p className="text-xs text-slate-500">&copy; {new Date().getFullYear()} CRM Pro. All rights reserved.</p>
       </div>
-      <div className="flex w-full flex-col items-center justify-center bg-[#f0f4f8] px-6 py-12 lg:w-1/2">
+      <div className="flex w-full flex-col items-center justify-center bg-[var(--background)] px-4 py-8 sm:px-6 sm:py-12 lg:w-1/2">
         {children}
       </div>
     </div>
   );
 }
+

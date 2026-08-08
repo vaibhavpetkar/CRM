@@ -11,6 +11,9 @@ import { campaignsApi } from '@/lib/api';
 import { PlusIcon, XMarkIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { useToast } from '@/components/ui/toast';
 
+import FormField, { getInputClassName } from '@/components/ui/form-field';
+import { campaignSchema, validateForm, FieldErrors } from '@/lib/validation';
+
 const emptyForm = { name: '', type: 'email', status: 'draft', startDate: '' };
 
 export default function CampaignsPage() {
@@ -22,6 +25,7 @@ export default function CampaignsPage() {
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState(emptyForm);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
 
   const fetchAll = useCallback(async () => {
@@ -48,11 +52,26 @@ export default function CampaignsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFieldErrors({});
+
+    const validation = validateForm(campaignSchema, {
+      name: formData.name,
+      type: formData.type,
+      status: formData.status,
+      startDate: formData.startDate,
+    });
+
+    if (!validation.success) {
+      setFieldErrors(validation.errors);
+      return;
+    }
+
     setSubmitting(true);
     try {
       await campaignsApi.createCampaign(formData);
       setIsModalOpen(false);
       setFormData(emptyForm);
+      setFieldErrors({});
       fetchAll();
     } catch (err: any) {
       toast.error(err.message || 'Failed to create campaign');
@@ -87,7 +106,7 @@ export default function CampaignsPage() {
       <PageHeader
         title="Campaigns"
         description="Create and manage email & SMS marketing campaigns"
-        actions={<Button size="sm" onClick={() => setIsModalOpen(true)}><PlusIcon className="h-4 w-4" /> New Campaign</Button>}
+        actions={<Button size="sm" onClick={() => { setFieldErrors({}); setIsModalOpen(true); }}><PlusIcon className="h-4 w-4" /> New Campaign</Button>}
       />
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-4">
@@ -103,7 +122,7 @@ export default function CampaignsPage() {
             key={status}
             onClick={() => setFilter(status)}
             className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-              filter === status ? 'bg-[#168eea] text-white' : 'border-2 border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+              filter === status ? 'bg-[var(--primary)] text-white border border-transparent' : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
             }`}
           >
             {status.charAt(0).toUpperCase() + status.slice(1)}
@@ -138,52 +157,51 @@ export default function CampaignsPage() {
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="mt-4 space-y-3">
-              <div>
-                <label className="block text-xs font-medium text-slate-700">Campaign Name</label>
+            <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+              <FormField label="Campaign Name" required error={fieldErrors.name}>
                 <input
                   type="text"
-                  required
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                  className={getInputClassName(!!fieldErrors.name)}
+                  placeholder="Spring Promo 2026"
                 />
-              </div>
+              </FormField>
+
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-slate-700">Type</label>
+                <FormField label="Type">
                   <select
                     value={formData.type}
                     onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                    className={getInputClassName()}
                   >
                     <option value="email">Email</option>
                     <option value="sms">SMS</option>
                   </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-700">Status</label>
+                </FormField>
+
+                <FormField label="Status">
                   <select
                     value={formData.status}
                     onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                    className={getInputClassName()}
                   >
                     <option value="draft">Draft</option>
                     <option value="scheduled">Scheduled</option>
                     <option value="active">Active</option>
                     <option value="completed">Completed</option>
                   </select>
-                </div>
+                </FormField>
               </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-700">Start Date</label>
+
+              <FormField label="Start Date" error={fieldErrors.startDate}>
                 <input
                   type="date"
                   value={formData.startDate}
                   onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                  className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                  className={getInputClassName(!!fieldErrors.startDate)}
                 />
-              </div>
+              </FormField>
 
               <div className="mt-4 flex justify-end gap-2 pt-2">
                 <Button type="button" variant="secondary" size="sm" onClick={() => setIsModalOpen(false)}>Cancel</Button>
@@ -196,3 +214,4 @@ export default function CampaignsPage() {
     </>
   );
 }
+

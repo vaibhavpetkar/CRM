@@ -22,6 +22,9 @@ import {
 } from '@heroicons/react/24/outline';
 import { useToast } from '@/components/ui/toast';
 
+import FormField, { getInputClassName } from '@/components/ui/form-field';
+import { itemSchema, validateForm, FieldErrors } from '@/lib/validation';
+
 const UNITS = ['Nos', 'Kg', 'Gram', 'Litre', 'ML', 'Box', 'Piece', 'Hour', 'Day', 'Meter', 'Dozen'];
 
 const emptyForm = {
@@ -48,6 +51,7 @@ export default function ItemsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | number | null>(null);
   const [formData, setFormData] = useState(emptyForm);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
 
   const fetchAll = useCallback(async () => {
@@ -79,6 +83,7 @@ export default function ItemsPage() {
   const openCreate = () => {
     setEditingId(null);
     setFormData(emptyForm);
+    setFieldErrors({});
     setIsModalOpen(true);
   };
 
@@ -95,11 +100,35 @@ export default function ItemsPage() {
       purchasePrice: item.purchasePrice !== null && item.purchasePrice !== undefined ? String(item.purchasePrice) : '',
       description: item.description || '',
     });
+    setFieldErrors({});
     setIsModalOpen(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFieldErrors({});
+
+    const validation = validateForm(itemSchema, {
+      name: formData.itemName,
+      sku: formData.sku,
+      sellingPrice: formData.sellingPrice,
+      purchasePrice: formData.purchasePrice,
+      description: formData.description,
+      category: formData.categoryId,
+      unit: formData.unit,
+      hsnCode: formData.hsnCode,
+      taxId: formData.taxId,
+    });
+
+    if (!validation.success) {
+      const mappedErrors: FieldErrors = {};
+      if (validation.errors.name) mappedErrors.itemName = validation.errors.name;
+      if (validation.errors.sellingPrice) mappedErrors.sellingPrice = validation.errors.sellingPrice;
+      if (validation.errors.purchasePrice) mappedErrors.purchasePrice = validation.errors.purchasePrice;
+      setFieldErrors(mappedErrors);
+      return;
+    }
+
     setSubmitting(true);
     try {
       const payload = {
@@ -200,7 +229,7 @@ export default function ItemsPage() {
           emptyMessage='No items found. Click "Add Item" to create one.'
           actions={(item) => (
             <div className="flex justify-end gap-3">
-              <button onClick={() => openEdit(item)} className="text-slate-400 hover:text-[#168eea]" aria-label="Edit">
+              <button onClick={() => openEdit(item)} className="text-slate-400 hover:text-[var(--primary)]" aria-label="Edit">
                 <PencilSquareIcon className="h-4 w-4" />
               </button>
               <button onClick={() => handleDelete(item)} className="text-slate-400 hover:text-red-600" aria-label="Delete">
@@ -221,116 +250,114 @@ export default function ItemsPage() {
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="mt-4 space-y-3">
-              <div>
-                <label className="block text-xs font-medium text-slate-700">Item Name</label>
+            <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+              <FormField label="Item Name" required error={fieldErrors.itemName}>
                 <input
                   type="text"
-                  required
                   value={formData.itemName}
                   onChange={(e) => setFormData({ ...formData, itemName: e.target.value })}
-                  className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                  className={getInputClassName(!!fieldErrors.itemName)}
+                  placeholder="Product or service name"
                 />
-              </div>
+              </FormField>
 
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-slate-700">Category</label>
+                <FormField label="Category">
                   <select
                     value={formData.categoryId}
                     onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                    className={getInputClassName()}
                   >
                     <option value="">Uncategorized</option>
                     {categories.map((c) => (
                       <option key={c.id} value={c.id}>{c.name}</option>
                     ))}
                   </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-700">Unit</label>
+                </FormField>
+
+                <FormField label="Unit">
                   <select
                     value={formData.unit}
                     onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                    className={getInputClassName()}
                   >
                     {UNITS.map((u) => (
                       <option key={u} value={u}>{u}</option>
                     ))}
                   </select>
-                </div>
+                </FormField>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-slate-700">Tax</label>
+                <FormField label="Tax">
                   <select
                     value={formData.taxId}
                     onChange={(e) => setFormData({ ...formData, taxId: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                    className={getInputClassName()}
                   >
                     <option value="">No tax</option>
                     {taxes.map((t) => (
                       <option key={t.id} value={t.id}>{t.name} ({Number(t.rate).toFixed(2)}%)</option>
                     ))}
                   </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-700">HSN/SAC Code</label>
+                </FormField>
+
+                <FormField label="HSN/SAC Code">
                   <input
                     type="text"
                     value={formData.hsnCode}
                     onChange={(e) => setFormData({ ...formData, hsnCode: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                    className={getInputClassName()}
+                    placeholder="e.g. 998311"
                   />
-                </div>
+                </FormField>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-slate-700">Selling Price</label>
+                <FormField label="Selling Price" required error={fieldErrors.sellingPrice}>
                   <input
                     type="number"
                     min={0}
                     step="0.01"
-                    required
                     value={formData.sellingPrice}
                     onChange={(e) => setFormData({ ...formData, sellingPrice: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                    className={getInputClassName(!!fieldErrors.sellingPrice)}
+                    placeholder="0.00"
                   />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-700">Purchase Price</label>
+                </FormField>
+
+                <FormField label="Purchase Price" error={fieldErrors.purchasePrice}>
                   <input
                     type="number"
                     min={0}
                     step="0.01"
                     value={formData.purchasePrice}
                     onChange={(e) => setFormData({ ...formData, purchasePrice: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                    className={getInputClassName(!!fieldErrors.purchasePrice)}
+                    placeholder="0.00"
                   />
-                </div>
+                </FormField>
               </div>
 
-              <div>
-                <label className="block text-xs font-medium text-slate-700">SKU</label>
+              <FormField label="SKU">
                 <input
                   type="text"
                   value={formData.sku}
                   onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-                  className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                  className={getInputClassName()}
+                  placeholder="Stock Keeping Unit"
                 />
-              </div>
+              </FormField>
 
-              <div>
-                <label className="block text-xs font-medium text-slate-700">Description</label>
+              <FormField label="Description">
                 <textarea
                   rows={2}
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                  className={getInputClassName()}
+                  placeholder="Item details or specifications"
                 />
-              </div>
+              </FormField>
 
               <div className="mt-4 flex justify-end gap-2 pt-2">
                 <Button type="button" variant="secondary" size="sm" onClick={() => setIsModalOpen(false)}>
@@ -347,3 +374,4 @@ export default function ItemsPage() {
     </>
   );
 }
+
