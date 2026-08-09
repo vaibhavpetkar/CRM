@@ -13,7 +13,7 @@ import leadRepository from '../repositories/LeadRepository';
 import { ListQueryParams } from '../repositories/BaseRepository';
 import { generateCode } from '../utils/codeGenerator';
 import { logActivity, getTimeline, diffFields, computeChanges } from './activityLogger';
-import { sanitizeDateFields } from '../utils/sanitize';
+import { sanitizeDateFields, sanitizeNumericFields } from '../utils/sanitize';
 import { notifyUser } from '../utils/notificationService';
 import { getOrSetCache } from '../utils/cache';
 import { NotFoundError, ConflictError, ValidationError } from '../errors/AppError';
@@ -103,6 +103,10 @@ class LeadService {
     }
 
     data = sanitizeDateFields(data, ['date', 'lastContacted', 'nextFollowUp']);
+    data = sanitizeNumericFields(data, [
+      'noOfEmployees', 'leadOwnerId', 'assignedToId', 'qualifiedById',
+      'latitude', 'longitude', 'value', 'score',
+    ]);
 
     // '' is falsy but not null/undefined, so the `??` defaults below wouldn't
     // catch it — Sequelize's isEmail validator rejects an empty string even
@@ -225,6 +229,10 @@ class LeadService {
     if (!lead) throw new NotFoundError('Lead', id);
 
     data = sanitizeDateFields(data, ['date', 'lastContacted', 'nextFollowUp']);
+    data = sanitizeNumericFields(data, [
+      'noOfEmployees', 'leadOwnerId', 'assignedToId', 'qualifiedById',
+      'latitude', 'longitude', 'value', 'score',
+    ]);
 
     if (data.email === '') data.email = null;
     if (data.secondaryEmail === '') data.secondaryEmail = null;

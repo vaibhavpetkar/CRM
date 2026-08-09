@@ -276,7 +276,18 @@ export default function LeadsPage() {
       company: data.company,
       leadSource: (data.leadSource || 'Website').toLowerCase().replace(/\s+/g, '-'),
       assignedToId: resolvedAssignedToId,
-    };
+    } as Record<string, any>;
+
+    // emptyForm defaults numeric fields to '' so the inputs render blank —
+    // but '' sent to a Postgres INTEGER column 500s ("invalid input syntax
+    // for type integer"). Convert to a number when filled, or drop the key
+    // (-> backend defaults it to null) when left blank. Mirrors the same
+    // sanitization already applied on the CSV import path below.
+    ['noOfEmployees', 'latitude', 'longitude', 'leadOwnerId'].forEach((key) => {
+      if (payload[key] !== undefined && payload[key] !== '') payload[key] = Number(payload[key]);
+      else delete payload[key];
+    });
+    if (payload.assignedToId === '') delete payload.assignedToId;
 
     try {
       if (editingId) {
