@@ -30,6 +30,7 @@ const emptyForm = {
   dueTime: '',
   status: 'pending',
   relatedTo: '',
+  leadId: '',
   description: '',
   assignedToId: '',
 };
@@ -47,6 +48,7 @@ export default function TasksPage() {
   const [submitting, setSubmitting] = useState(false);
   const [users, setUsers] = useState<any[]>([]);
   const [companyOptions, setCompanyOptions] = useState<string[]>([]);
+  const [leadOptions, setLeadOptions] = useState<{ id: number; label: string }[]>([]);
   const [openMenuId, setOpenMenuId] = useState<number | string | null>(null);
   const currentUser = getStoredUser();
   const isMgrOrAdmin = ['Administrator', 'Sales Manager'].includes(currentUser?.role?.name);
@@ -97,17 +99,24 @@ export default function TasksPage() {
   }, [isMgrOrAdmin]);
 
   // Task 4.5: Company Name search/typeahead sourced from existing Leads (company + contact person).
+  // Also build a real Lead picker (id-backed) so a task can be linked to an
+  // actual Lead record instead of only a free-typed company name — this is
+  // what actually gives Lead -> Task a real relation (leadId), not just text
+  // that happens to match.
   useEffect(() => {
     leadsApi
       .getLeads({ limit: 200 } as any)
       .then((res) => {
         const opts = new Set<string>();
+        const leads: { id: number; label: string }[] = [];
         (res.leads || []).forEach((l: any) => {
           if (l.company) opts.add(l.company);
           const contact = l.name || `${l.firstName || ''} ${l.lastName || ''}`.trim();
           if (l.company && contact) opts.add(`${l.company} — ${contact}`);
+          leads.push({ id: l.id, label: contact ? `${l.company || 'Unnamed'} — ${contact}` : (l.company || `Lead #${l.id}`) });
         });
         setCompanyOptions(Array.from(opts));
+        setLeadOptions(leads);
       })
       .catch(() => {});
   }, []);
@@ -124,6 +133,7 @@ export default function TasksPage() {
     try {
       await tasksApi.createTask({
         ...formData,
+        leadId: formData.leadId ? Number(formData.leadId) : undefined,
         // Task 4.6: "Assign to Me" explicitly assigns to the current user
         // rather than leaving assignedToId empty/unassigned.
         assignedToId: formData.assignedToId ? Number(formData.assignedToId) : currentUser?.id || undefined,
@@ -248,7 +258,21 @@ export default function TasksPage() {
                   </p>
                   <p className="text-xs text-slate-500">
                     {task.type && <span className="capitalize">{TASK_TYPES.find((t) => t.value === task.type)?.label || task.type}</span>}
-                    {task.relatedTo && ` · ${task.relatedTo}`}
+                    {task.lead ? (
+                      <>
+                        {' · '}
+                        <a
+                          href={`/leads/${task.leadId}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-[#168eea] hover:underline"
+                          title="Linked Lead — opens Lead record"
+                        >
+                          🔗 {task.lead.company || `${task.lead.firstName || ''} ${task.lead.lastName || ''}`.trim()}
+                        </a>
+                      </>
+                    ) : (
+                      task.relatedTo && ` · ${task.relatedTo}`
+                    )}
                     {task.dueDate && ` · Due ${String(task.dueDate).split('T')[0]}`}
                     {task.dueTime && ` ${task.dueTime}`}
                     {task.assignedTo && ` · 👤 ${task.assignedTo}`}
@@ -314,13 +338,39 @@ export default function TasksPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-700">Company Name</label>
+                <label className="block text-xs font-medium text-slate-700">Link to Lead</label>
+                <select
+                  value={formData.leadId}
+                  onChange={(e) => {
+                    const id = e.target.value;
+                    const picked = leadOptions.find((l) => String(l.id) === id);
+                    setFormData({
+                      ...formData,
+                      leadId: id,
+                      // Keep relatedTo in sync so search/back-compat display still works.
+                      relatedTo: picked ? picked.label : formData.relatedTo,
+                    });
+                  }}
+                  className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                >
+                  <option value="">— Not linked to a Lead —</option>
+                  {leadOptions.map((l) => (
+                    <option key={l.id} value={l.id}>{l.label}</option>
+                  ))}
+                </select>
+                <p className="mt-1 text-[11px] text-slate-400">
+                  Linking a Lead lets this task show up on that Lead&apos;s timeline.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-700">Company Name {formData.leadId && <span className="font-normal text-slate-400">(auto-filled from linked Lead)</span>}</label>
                 <input
                   type="text"
                   list="task-company-options"
                   placeholder="Search company or contact person..."
                   value={formData.relatedTo}
-                  onChange={(e) => setFormData({ ...formData, relatedTo: e.target.value })}
+                  onChange={(e) => setFormData({ ...formData, relatedTo: e.target.value, leadId: '' })}
                   className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
                 />
                 <datalist id="task-company-options">

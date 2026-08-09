@@ -72,9 +72,26 @@ Role.hasMany(User, { foreignKey: 'roleId', as: 'users' });
 Task.belongsTo(User, { foreignKey: 'assignedToId', as: 'assignedTo' });
 User.hasMany(Task, { foreignKey: 'assignedToId', as: 'assignedTasks' });
 
+// Real relation into the Lead → Deal → Quote → Invoice chain, instead of only
+// the free-text `relatedTo` label a user typed by hand.
+Task.belongsTo(Lead, { foreignKey: 'leadId', as: 'lead' });
+Lead.hasMany(Task, { foreignKey: 'leadId', as: 'tasks' });
+Task.belongsTo(Deal, { foreignKey: 'dealId', as: 'deal' });
+Deal.hasMany(Task, { foreignKey: 'dealId', as: 'tasks' });
+Task.belongsTo(Contact, { foreignKey: 'contactId', as: 'contact' });
+Contact.hasMany(Task, { foreignKey: 'contactId', as: 'tasks' });
+
 // ─── Meeting Associations ─────────────────────────────────────────────────────
 Meeting.belongsTo(User, { foreignKey: 'assignedToId', as: 'assignedTo' });
 User.hasMany(Meeting, { foreignKey: 'assignedToId', as: 'assignedMeetings' });
+
+// Same real relation for Meetings — was only a free-text `client` string before.
+Meeting.belongsTo(Lead, { foreignKey: 'leadId', as: 'lead' });
+Lead.hasMany(Meeting, { foreignKey: 'leadId', as: 'meetings' });
+Meeting.belongsTo(Deal, { foreignKey: 'dealId', as: 'deal' });
+Deal.hasMany(Meeting, { foreignKey: 'dealId', as: 'meetings' });
+Meeting.belongsTo(Contact, { foreignKey: 'contactId', as: 'contact' });
+Contact.hasMany(Meeting, { foreignKey: 'contactId', as: 'meetings' });
 
 // ─── Quote Associations ───────────────────────────────────────────────────────
 Quote.belongsTo(User, { foreignKey: 'assignedToId', as: 'assignedTo' });

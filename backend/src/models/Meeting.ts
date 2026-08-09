@@ -4,7 +4,10 @@ import sequelize from '../config/database';
 interface MeetingAttributes {
   id: number;
   title: string;
-  client?: string | null;
+  client?: string | null; // legacy free-text label, kept for display/back-compat
+  leadId?: number | null; // real FK link into the Lead → Deal → Quote → Invoice chain
+  dealId?: number | null;
+  contactId?: number | null;
   date: Date;
   time?: string | null;
   duration?: string | null;
@@ -20,6 +23,9 @@ class Meeting extends Model<MeetingAttributes, MeetingCreationAttributes> implem
   public id!: number;
   public title!: string;
   public client?: string | null;
+  public leadId?: number | null;
+  public dealId?: number | null;
+  public contactId?: number | null;
   public date!: Date;
   public time?: string | null;
   public duration?: string | null;
@@ -37,6 +43,9 @@ Meeting.init(
     id: { type: DataTypes.INTEGER.UNSIGNED, autoIncrement: true, primaryKey: true },
     title: { type: DataTypes.STRING(255), allowNull: false },
     client: { type: DataTypes.STRING(255), allowNull: true },
+    leadId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: true, references: { model: 'leads', key: 'id' } },
+    dealId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: true, references: { model: 'deals', key: 'id' } },
+    contactId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: true, references: { model: 'contacts', key: 'id' } },
     date: { type: DataTypes.DATEONLY, allowNull: false },
     time: { type: DataTypes.STRING(20), allowNull: true },
     duration: { type: DataTypes.STRING(20), allowNull: true },

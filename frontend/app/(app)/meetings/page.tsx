@@ -6,7 +6,7 @@ import StatusBadge from '@/components/ui/status-badge';
 import Button from '@/components/ui/button';
 import Card from '@/components/ui/card';
 import LoadingSpinner from '@/components/ui/loading-spinner';
-import { meetingsApi } from '@/lib/api';
+import { meetingsApi, leadsApi } from '@/lib/api';
 import { useRouter, useSearchParams } from 'next/navigation';
 import ImportExportButtons from '@/components/ui/import-export-buttons';
 import { MEETING_FIELDS } from '@/lib/import-export/field-configs';
@@ -16,6 +16,7 @@ import { useToast } from '@/components/ui/toast';
 const emptyForm = {
   title: '',
   client: '',
+  leadId: '',
   date: '',
   time: '',
   duration: '30 min',
@@ -33,6 +34,22 @@ export default function MeetingsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState(emptyForm);
   const [submitting, setSubmitting] = useState(false);
+  const [leadOptions, setLeadOptions] = useState<{ id: number; label: string }[]>([]);
+
+  // Real Lead picker so a meeting can be linked to an actual Lead record
+  // (leadId) instead of only a free-typed "client" string with no relation.
+  useEffect(() => {
+    leadsApi
+      .getLeads({ limit: 200 } as any)
+      .then((res) => {
+        const leads = (res.leads || []).map((l: any) => {
+          const contact = l.name || `${l.firstName || ''} ${l.lastName || ''}`.trim();
+          return { id: l.id, label: contact ? `${l.company || 'Unnamed'} — ${contact}` : (l.company || `Lead #${l.id}`) };
+        });
+        setLeadOptions(leads);
+      })
+      .catch(() => {});
+  }, []);
 
   // Support deep-linking from the topbar's Quick Create menu (/meetings?quickCreate=1)
   useEffect(() => {
@@ -66,7 +83,10 @@ export default function MeetingsPage() {
     e.preventDefault();
     setSubmitting(true);
     try {
-      await meetingsApi.createMeeting(formData);
+      await meetingsApi.createMeeting({
+        ...formData,
+        leadId: formData.leadId ? Number(formData.leadId) : undefined,
+      });
       setIsModalOpen(false);
       setFormData(emptyForm);
       fetchMeetings();
@@ -132,7 +152,17 @@ export default function MeetingsPage() {
                   </div>
                   <div>
                     <p className="text-sm font-medium text-slate-900">{meeting.title}</p>
-                    <p className="text-xs text-slate-500">{meeting.client || 'No client set'}</p>
+                    {meeting.lead ? (
+                      <a
+                        href={`/leads/${meeting.leadId}`}
+                        className="text-xs text-[#168eea] hover:underline"
+                        title="Linked Lead — opens Lead record"
+                      >
+                        🔗 {meeting.lead.company || `${meeting.lead.firstName || ''} ${meeting.lead.lastName || ''}`.trim()}
+                      </a>
+                    ) : (
+                      <p className="text-xs text-slate-500">{meeting.client || 'No client set'}</p>
+                    )}
                     <p className="mt-1 text-xs text-slate-400">
                       {meeting.date ? String(meeting.date).split('T')[0] : 'N/A'} at {meeting.time || '—'} &middot; {meeting.duration || '—'}
                     </p>
@@ -172,11 +202,35 @@ export default function MeetingsPage() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-700">Client</label>
+                <label className="block text-xs font-medium text-slate-700">Link to Lead</label>
+                <select
+                  value={formData.leadId}
+                  onChange={(e) => {
+                    const id = e.target.value;
+                    const picked = leadOptions.find((l) => String(l.id) === id);
+                    setFormData({
+                      ...formData,
+                      leadId: id,
+                      client: picked ? picked.label : formData.client,
+                    });
+                  }}
+                  className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                >
+                  <option value="">— Not linked to a Lead —</option>
+                  {leadOptions.map((l) => (
+                    <option key={l.id} value={l.id}>{l.label}</option>
+                  ))}
+                </select>
+                <p className="mt-1 text-[11px] text-slate-400">
+                  Linking a Lead lets this meeting show up on that Lead&apos;s timeline.
+                </p>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-700">Client {formData.leadId && <span className="font-normal text-slate-400">(auto-filled from linked Lead)</span>}</label>
                 <input
                   type="text"
                   value={formData.client}
-                  onChange={(e) => setFormData({ ...formData, client: e.target.value })}
+                  onChange={(e) => setFormData({ ...formData, client: e.target.value, leadId: '' })}
                   className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
                 />
               </div>

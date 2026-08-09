@@ -2,10 +2,22 @@ import { Request, Response } from 'express';
 import { Op } from 'sequelize';
 import Task from '../models/Task';
 import User from '../models/User';
+import Lead from '../models/Lead';
+import Deal from '../models/Deal';
+import Contact from '../models/Contact';
 import ActivityLog from '../models/ActivityLog';
 import Role from '../models/Role';
 import Notification from '../models/Notification';
 import { notifyUser } from '../utils/notificationService';
+
+// Included whenever a Task is fetched so the API returns the linked
+// Lead/Deal/Contact record itself, not just a typed-in "relatedTo" string.
+const relationIncludes = [
+  { model: User, attributes: ['id', 'firstName', 'lastName'], as: 'assignedTo', required: false },
+  { model: Lead, attributes: ['id', 'firstName', 'lastName', 'company'], as: 'lead', required: false },
+  { model: Deal, attributes: ['id', 'title'], as: 'deal', required: false },
+  { model: Contact, attributes: ['id', 'firstName', 'lastName'], as: 'contact', required: false },
+];
 
 const serialize = (task: any) => {
   const plain = task.toJSON ? task.toJSON() : task;
@@ -36,7 +48,7 @@ export const getTasks = async (req: Request & { user?: any }, res: Response) => 
 
     const tasks = await Task.findAll({
       where: whereClause,
-      include: [{ model: User, attributes: ['id', 'firstName', 'lastName'], as: 'assignedTo', required: false }],
+      include: relationIncludes,
       order: [['dueDate', 'ASC']],
     });
 
@@ -49,7 +61,7 @@ export const getTasks = async (req: Request & { user?: any }, res: Response) => 
 
 export const createTask = async (req: Request & { user?: any }, res: Response) => {
   try {
-    const { title, type, priority, dueDate, dueTime, status, relatedTo, description, assignedToId } = req.body;
+    const { title, type, priority, dueDate, dueTime, status, relatedTo, leadId, dealId, contactId, description, assignedToId } = req.body;
     if (!title) return res.status(400).json({ message: 'Title is required' });
 
     const task = await Task.create({
@@ -60,9 +72,14 @@ export const createTask = async (req: Request & { user?: any }, res: Response) =
       dueDate: dueDate || null,
       dueTime: dueTime || null,
       relatedTo: relatedTo || null,
+      leadId: leadId || null,
+      dealId: dealId || null,
+      contactId: contactId || null,
       description: description || null,
       assignedToId: assignedToId || req.user?.id || null,
     });
+
+    await task.reload({ include: relationIncludes });
 
     await ActivityLog.create({
       action: 'assigned',
@@ -95,7 +112,7 @@ export const updateTask = async (req: Request & { user?: any }, res: Response) =
     const task = await Task.findByPk(req.params.id);
     if (!task) return res.status(404).json({ message: 'Task not found' });
 
-    const { title, type, priority, dueDate, dueTime, status, relatedTo, description, assignedToId } = req.body;
+    const { title, type, priority, dueDate, dueTime, status, relatedTo, leadId, dealId, contactId, description, assignedToId } = req.body;
     const previousAssigneeId = task.assignedToId;
 
     await task.update({
@@ -106,11 +123,14 @@ export const updateTask = async (req: Request & { user?: any }, res: Response) =
       dueDate: dueDate ?? task.dueDate,
       dueTime: dueTime ?? task.dueTime,
       relatedTo: relatedTo ?? task.relatedTo,
+      leadId: leadId ?? task.leadId,
+      dealId: dealId ?? task.dealId,
+      contactId: contactId ?? task.contactId,
       description: description ?? task.description,
       assignedToId: assignedToId ?? task.assignedToId,
     });
 
-    await task.reload({ include: [{ model: User, attributes: ['id', 'firstName', 'lastName'], as: 'assignedTo', required: false }] });
+    await task.reload({ include: relationIncludes });
 
     await ActivityLog.create({
       action: 'updated',

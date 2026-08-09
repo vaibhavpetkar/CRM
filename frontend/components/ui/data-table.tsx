@@ -263,7 +263,10 @@ export default function DataTable<T>({
   const [hiddenColumnIds, setHiddenColumnIds] = useState<Set<string>>(
     () => new Set(initialColumns.filter((c) => c.optional).map((c, idx) => c.id || c.header || String(idx)))
   );
-  const [frozenUpToId, setFrozenUpToId] = useState<string | null>(null);
+  // Which columns are individually pinned/frozen. Any column can be pinned on
+  // its own (or several at once) — this is NOT a contiguous "freeze everything
+  // up to here" range.
+  const [frozenColumnIds, setFrozenColumnIds] = useState<Set<string>>(new Set());
   const [isSettingsOpen, setIsSettingsOpen]  = useState(false);
   const settingsModalRef = useRef<HTMLDivElement>(null);
 
@@ -276,9 +279,17 @@ export default function DataTable<T>({
       const savedKey = `crm_table_settings_${tableId}`;
       const savedData = localStorage.getItem(savedKey);
       if (savedData) {
-        const { order, hidden, frozenUpToId: savedFrozen } = JSON.parse(savedData);
+        const { order, hidden, frozenColumnIds: savedFrozen, frozenUpToId: legacyFrozen } = JSON.parse(savedData);
         setHiddenColumnIds(Array.isArray(hidden) ? new Set(hidden) : defaultHidden);
-        setFrozenUpToId(typeof savedFrozen === 'string' ? savedFrozen : null);
+        if (Array.isArray(savedFrozen)) {
+          setFrozenColumnIds(new Set(savedFrozen));
+        } else if (typeof legacyFrozen === 'string' && legacyFrozen) {
+          // Back-compat: older saved settings used a single "freeze up to"
+          // pin point. Migrate it to the new per-column set on first load.
+          setFrozenColumnIds(new Set([legacyFrozen]));
+        } else {
+          setFrozenColumnIds(new Set());
+        }
         if (Array.isArray(order)) {
           const colMap = new Map(initialColumns.map((col, idx) => [col.id || col.header || String(idx), col]));
           const reordered: DataTableColumn<T>[] = [];
@@ -306,13 +317,14 @@ export default function DataTable<T>({
   const saveColumnSettings = (
     newOrder: DataTableColumn<T>[],
     newHidden: Set<string>,
-    newFrozenUpToId: string | null = frozenUpToId
+    newFrozenColumnIds: Set<string> = frozenColumnIds
   ) => {
     try {
       const savedKey = `crm_table_settings_${tableId}`;
       const order = newOrder.map((col, idx) => col.id || col.header || String(idx));
       const hidden = Array.from(newHidden);
-      localStorage.setItem(savedKey, JSON.stringify({ order, hidden, frozenUpToId: newFrozenUpToId }));
+      const frozenColumnIds = Array.from(newFrozenColumnIds);
+      localStorage.setItem(savedKey, JSON.stringify({ order, hidden, frozenColumnIds }));
     } catch {
       // Ignore
     }
@@ -337,20 +349,25 @@ export default function DataTable<T>({
     saveColumnSettings(next, hiddenColumnIds);
   };
 
-  // Freeze columns: pins the checkbox/Sr.No columns plus every visible
-  // column up to and including `colId` so they stay in view while the rest
-  // of the table scrolls horizontally (Excel/Sheets-style "freeze panes").
-  // Toggling the already-frozen column's pin again clears the freeze.
-  const toggleFreezeUpTo = (colId: string) => {
-    const next = frozenUpToId === colId ? null : colId;
-    setFrozenUpToId(next);
-    saveColumnSettings(orderedColumns, hiddenColumnIds, next);
+  // Freeze columns: pins any individual column (or several independently) so
+  // it stays in view while the rest of the table scrolls horizontally
+  // (Excel/Sheets-style "freeze panes"), plus the checkbox/Sr.No columns
+  // whenever at least one column is pinned. Toggling a pinned column again
+  // un-freezes just that column — it does NOT touch any other pin.
+  const toggleFreezeColumn = (colId: string) => {
+    setFrozenColumnIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(colId)) next.delete(colId);
+      else next.add(colId);
+      saveColumnSettings(orderedColumns, hiddenColumnIds, next);
+      return next;
+    });
   };
 
   const resetColumnSettings = () => {
     setOrderedColumns(initialColumns);
     setHiddenColumnIds(new Set(initialColumns.filter((c) => c.optional).map((c, idx) => c.id || c.header || String(idx))));
-    setFrozenUpToId(null);
+    setFrozenColumnIds(new Set());
     try {
       localStorage.removeItem(`crm_table_settings_${tableId}`);
     } catch {
@@ -411,18 +428,35 @@ export default function DataTable<T>({
   }, []);
 
   // ── 4. Frozen (sticky) Columns — Excel/Sheets-style "freeze panes" ──
-  // Freezes the checkbox + Sr. No. columns plus every visible column up to
-  // and including `frozenUpToId`, so they stay put while the rest of the
-  // table scrolls horizontally. Offsets are measured from the actual
-  // rendered header cell widths (rather than assumed/fixed widths) so this
-  // keeps working regardless of column content or screen size.
+  // Pins the checkbox + Sr. No. columns (whenever any freeze is active) plus
+  // any individual column(s) the user picked in `frozenColumnIds` — these do
+  // NOT need to be contiguous or start from the left edge. Offsets are
+  // measured from the actual rendered header cell widths (rather than
+  // assumed/fixed widths) so this keeps working regardless of column content
+  // or screen size.
+  //
+  // IMPORTANT: only keys that are actually frozen get an entry in
+  // `stickyLefts` — this was the bug in the old "freeze up to" implementation,
+  // which built an offset for every single column (frozen or not), so
+  // `position: sticky` ended up applied to the whole table and nothing
+  // behaved like a freeze at all.
   const headerCellRefs = useRef<Map<string, HTMLTableCellElement>>(new Map());
   const [stickyLefts, setStickyLefts] = useState<Map<string, number>>(new Map());
 
-  const frozenUpToVisibleIdx = frozenUpToId
-    ? visibleColumns.findIndex((col, idx) => (col.id || col.header || String(idx)) === frozenUpToId)
-    : -1;
-  const isFreezeActive = frozenUpToVisibleIdx >= 0;
+  const isFreezeActive = frozenColumnIds.size > 0;
+
+  // Order in which frozen columns should stack from the left: utility
+  // columns first, then whichever data columns are frozen, in their normal
+  // visible order (not the order they were pinned in).
+  const frozenKeysInOrder = isFreezeActive
+    ? [
+        '__checkbox',
+        '__srno',
+        ...visibleColumns
+          .map((c, i) => c.id || c.header || String(i))
+          .filter((key) => frozenColumnIds.has(key)),
+      ]
+    : [];
 
   const recomputeStickyOffsets = useCallback(() => {
     if (!isFreezeActive) {
@@ -431,15 +465,14 @@ export default function DataTable<T>({
     }
     const next = new Map<string, number>();
     let cumulative = 0;
-    const order = ['__checkbox', '__srno', ...visibleColumns.map((c, i) => c.id || c.header || String(i))];
-    for (const key of order) {
+    for (const key of frozenKeysInOrder) {
       const el = headerCellRefs.current.get(key);
       next.set(key, cumulative);
       if (el) cumulative += el.offsetWidth;
     }
     setStickyLefts(next);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isFreezeActive, frozenUpToVisibleIdx, visibleColumns.length]);
+  }, [isFreezeActive, frozenKeysInOrder.join('|')]);
 
   useLayoutEffect(() => {
     recomputeStickyOffsets();
@@ -448,9 +481,10 @@ export default function DataTable<T>({
     return () => window.removeEventListener('resize', recomputeStickyOffsets);
   }, [recomputeStickyOffsets, isFreezeActive, data]);
 
-  // Sticky style helper — applied to both header <th> and body <td> for every
-  // cell within the frozen range. `isLastFrozen` gets a shadow divider so the
-  // freeze boundary reads clearly against the scrollable columns behind it.
+  // Sticky style helper — applied to both header <th> and body <td>, but only
+  // for columns that are actually frozen (stickyLefts only contains frozen
+  // keys now). `isLastFrozen` gets a shadow divider so the freeze boundary
+  // reads clearly against the scrollable columns behind it.
   const getStickyStyle = (key: string, bg: string): React.CSSProperties | undefined => {
     if (!isFreezeActive || !stickyLefts.has(key)) return undefined;
     return {
@@ -463,8 +497,7 @@ export default function DataTable<T>({
 
   const isLastFrozenKey = (key: string) => {
     if (!isFreezeActive) return false;
-    const order = ['__checkbox', '__srno', ...visibleColumns.map((c, i) => c.id || c.header || String(i))];
-    return order[order.length - 1] === key || order.indexOf(key) === frozenUpToVisibleIdx + 2;
+    return frozenKeysInOrder[frozenKeysInOrder.length - 1] === key;
   };
 
   // Reset selection when dataset changes
@@ -619,14 +652,14 @@ export default function DataTable<T>({
                   </div>
 
                   <p className="mb-2 text-[11px] leading-snug text-slate-400">
-                    Check a column to show it. Pin <MapPinIcon className="inline h-3 w-3 -translate-y-px" /> a column to freeze everything up to it while scrolling.
+                    Check a column to show it. Pin <MapPinIcon className="inline h-3 w-3 -translate-y-px" /> a column to freeze just that column while scrolling — pin as many as you like.
                   </p>
 
                   <div className="max-h-60 space-y-1.5 overflow-y-auto pr-1">
                     {orderedColumns.map((col, idx) => {
                       const colId = col.id || col.header || String(idx);
                       const isHidden = hiddenColumnIds.has(colId);
-                      const isFrozenHere = frozenUpToId === colId;
+                      const isFrozenHere = frozenColumnIds.has(colId);
 
                       return (
                         <div
@@ -653,12 +686,12 @@ export default function DataTable<T>({
                           <div className="flex items-center gap-1">
                             <button
                               disabled={isHidden}
-                              onClick={() => toggleFreezeUpTo(colId)}
+                              onClick={() => toggleFreezeColumn(colId)}
                               className={cn(
                                 'rounded p-0.5 disabled:opacity-30',
                                 isFrozenHere ? 'text-[#168eea]' : 'text-slate-400 hover:bg-slate-200 hover:text-slate-700'
                               )}
-                              title={isFrozenHere ? 'Unfreeze' : 'Freeze columns up to here'}
+                              title={isFrozenHere ? 'Unfreeze this column' : 'Freeze this column'}
                             >
                               {isFrozenHere ? (
                                 <MapPinIconSolid className="h-3 w-3" />

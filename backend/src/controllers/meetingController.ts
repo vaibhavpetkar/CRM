@@ -2,6 +2,18 @@ import { Request, Response } from 'express';
 import { Op } from 'sequelize';
 import Meeting from '../models/Meeting';
 import User from '../models/User';
+import Lead from '../models/Lead';
+import Deal from '../models/Deal';
+import Contact from '../models/Contact';
+
+// Included whenever a Meeting is fetched so the API returns the linked
+// Lead/Deal/Contact record itself, not just a typed-in "client" string.
+const relationIncludes = [
+  { model: User, attributes: ['id', 'firstName', 'lastName'], as: 'assignedTo', required: false },
+  { model: Lead, attributes: ['id', 'firstName', 'lastName', 'company'], as: 'lead', required: false },
+  { model: Deal, attributes: ['id', 'title'], as: 'deal', required: false },
+  { model: Contact, attributes: ['id', 'firstName', 'lastName'], as: 'contact', required: false },
+];
 
 const serialize = (meeting: any) => {
   const plain = meeting.toJSON ? meeting.toJSON() : meeting;
@@ -26,7 +38,7 @@ export const getMeetings = async (req: Request, res: Response) => {
 
     const meetings = await Meeting.findAll({
       where: whereClause,
-      include: [{ model: User, attributes: ['id', 'firstName', 'lastName'], as: 'assignedTo', required: false }],
+      include: relationIncludes,
       order: [['date', 'ASC']],
     });
 
@@ -39,12 +51,15 @@ export const getMeetings = async (req: Request, res: Response) => {
 
 export const createMeeting = async (req: Request, res: Response) => {
   try {
-    const { title, client, date, time, duration, type, status, notes, assignedToId } = req.body;
+    const { title, client, leadId, dealId, contactId, date, time, duration, type, status, notes, assignedToId } = req.body;
     if (!title || !date) return res.status(400).json({ message: 'Title and date are required' });
 
     const meeting = await Meeting.create({
       title,
       client: client || null,
+      leadId: leadId || null,
+      dealId: dealId || null,
+      contactId: contactId || null,
       date,
       time: time || null,
       duration: duration || null,
@@ -54,6 +69,7 @@ export const createMeeting = async (req: Request, res: Response) => {
       assignedToId: assignedToId || null,
     });
 
+    await meeting.reload({ include: relationIncludes });
     return res.status(201).json({ message: 'Meeting scheduled successfully', meeting: serialize(meeting) });
   } catch (error) {
     console.error('Create meeting error:', error);
@@ -66,10 +82,13 @@ export const updateMeeting = async (req: Request, res: Response) => {
     const meeting = await Meeting.findByPk(req.params.id);
     if (!meeting) return res.status(404).json({ message: 'Meeting not found' });
 
-    const { title, client, date, time, duration, type, status, notes, assignedToId } = req.body;
+    const { title, client, leadId, dealId, contactId, date, time, duration, type, status, notes, assignedToId } = req.body;
     await meeting.update({
       title: title ?? meeting.title,
       client: client ?? meeting.client,
+      leadId: leadId ?? meeting.leadId,
+      dealId: dealId ?? meeting.dealId,
+      contactId: contactId ?? meeting.contactId,
       date: date ?? meeting.date,
       time: time ?? meeting.time,
       duration: duration ?? meeting.duration,
@@ -79,7 +98,7 @@ export const updateMeeting = async (req: Request, res: Response) => {
       assignedToId: assignedToId ?? meeting.assignedToId,
     });
 
-    await meeting.reload({ include: [{ model: User, attributes: ['id', 'firstName', 'lastName'], as: 'assignedTo', required: false }] });
+    await meeting.reload({ include: relationIncludes });
     return res.json({ message: 'Meeting updated successfully', meeting: serialize(meeting) });
   } catch (error) {
     console.error('Update meeting error:', error);
