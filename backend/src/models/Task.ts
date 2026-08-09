@@ -4,11 +4,12 @@ import sequelize from '../config/database';
 interface TaskAttributes {
   id: number;
   title: string;
-  type: string; // 'call' | 'email' | 'meeting' | 'task'
+  type: string; // 'call' | 'email' | 'online-meeting' | 'in-person-meeting' | 'field-visit' (Task 4.8)
   priority: string; // 'low' | 'medium' | 'high'
-  status: string; // 'pending' | 'in-progress' | 'completed'
+  status: string; // 'pending' | 'in-progress' | 'completed' | 'rescheduled' | 'disconnected-call' (Task 4.3)
   dueDate?: Date | null;
-  relatedTo?: string | null;
+  dueTime?: string | null; // "HH:MM" (Task 4.7)
+  relatedTo?: string | null; // a.k.a "Company Name" (Task 4.5)
   description?: string | null;
   assignedToId?: number | null;
   deletedAt?: Date | null;
@@ -23,6 +24,7 @@ class Task extends Model<TaskAttributes, TaskCreationAttributes> implements Task
   public priority!: string;
   public status!: string;
   public dueDate?: Date | null;
+  public dueTime?: string | null;
   public relatedTo?: string | null;
   public description?: string | null;
   public assignedToId?: number | null;
@@ -40,6 +42,7 @@ Task.init(
     priority: { type: DataTypes.STRING(10), allowNull: false, defaultValue: 'medium' },
     status: { type: DataTypes.STRING(20), allowNull: false, defaultValue: 'pending' },
     dueDate: { type: DataTypes.DATE, allowNull: true },
+    dueTime: { type: DataTypes.STRING(8), allowNull: true },
     relatedTo: { type: DataTypes.STRING(255), allowNull: true },
     description: { type: DataTypes.TEXT, allowNull: true },
     assignedToId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: true, references: { model: 'users', key: 'id' } },

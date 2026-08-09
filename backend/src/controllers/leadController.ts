@@ -13,6 +13,13 @@ export const getLeadById = asyncHandler(async (req: AuthRequest, res: Response) 
   return res.json(lead);
 });
 
+// Task 2.6: GET /api/leads/check-duplicate?email=&mobile=&excludeId=
+export const checkDuplicateLead = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const { email, mobile, excludeId } = req.query as { email?: string; mobile?: string; excludeId?: string };
+  const result = await leadService.checkDuplicate(email || null, mobile || null, excludeId);
+  return res.json(result);
+});
+
 export const createLead = asyncHandler(async (req: AuthRequest, res: Response) => {
   const lead = await leadService.create(req.body, req.user?.id);
   return res.status(201).json({ message: 'Lead created successfully', lead });

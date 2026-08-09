@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import type { FormEvent } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { leadsApi, contactsApi, usersApi, quotesApi, itemsApi } from '@/lib/api';
-import PageHeader from '@/components/ui/page-header';
+import { ANNUAL_TURNOVER_OPTIONS, INDUSTRY_OPTIONS, DESIGNATION_OPTIONS, TERRITORY_OPTIONS } from '@/lib/lead-options';
 import Button from '@/components/ui/button';
 import Card from '@/components/ui/card';
 import DataTable from '@/components/ui/data-table';
@@ -19,15 +19,12 @@ export default function LeadDetailsPage() {
   const leadId = params.id as string;
 
   const [lead, setLead] = useState<any>(null);
-  const [contacts, setContacts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState<any>({});
   const [activeTab, setActiveTab] = useState('lead-form');
-  const [isContactModalOpen, setIsContactModalOpen] = useState(false);
-  const [contactForm, setContactForm] = useState({ firstName: '', lastName: '', email: '', phone: '' });
   const [timeline, setTimeline] = useState<any[]>([]);
   const [timelineLoading, setTimelineLoading] = useState(false);
   const [revertingId, setRevertingId] = useState<number | string | null>(null);
@@ -77,7 +74,6 @@ export default function LeadDetailsPage() {
   useEffect(() => {
     if (leadId) {
       fetchLead();
-      fetchContacts();
     }
   }, [leadId]);
 
@@ -102,15 +98,6 @@ export default function LeadDetailsPage() {
       setError(err.message || 'Failed to fetch lead details');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchContacts = async () => {
-    try {
-      const res = await contactsApi.getContacts({ leadId: leadId, limit: 100 });
-      setContacts(res.contacts || []);
-    } catch (err: any) {
-      console.error(err);
     }
   };
 
@@ -148,6 +135,15 @@ export default function LeadDetailsPage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Task 2.7: Mobile Number is mandatory. The bottom form-submit button also
+    // gets this for free via the input's `required` attribute + native HTML5
+    // validation, but the toolbar "Save" button above calls handleSave directly
+    // (not a real form submit), so it needs its own explicit check too.
+    if (!String(formData.mobile || '').trim()) {
+      toast.warning('Mobile Number is required.');
+      return;
+    }
 
     // Resolve the typed "Assign To" name into a user ID via the datalist options.
     let resolvedAssignedToId: number | null = formData.assignedToId ?? null;
@@ -210,32 +206,13 @@ export default function LeadDetailsPage() {
     }
   };
 
-  const handleCreateContact = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
-    try {
-      await contactsApi.createContact({ ...contactForm, leadId: Number(leadId) });
-      setIsContactModalOpen(false);
-      setContactForm({ firstName: '', lastName: '', email: '', phone: '' });
-      fetchContacts();
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to add contact');
-    } finally {
-      setSaving(false);
-    }
-  };
-
   useKeyboardShortcuts({
     enabled: !loading && !error && !!lead,
     onEscape: () => {
-      if (isContactModalOpen) {
-        setIsContactModalOpen(false);
-      } else {
-        router.push('/leads');
-      }
+      router.push('/leads');
     },
     onSave: () => {
-      if (!isContactModalOpen) handleSave({ preventDefault: () => {} } as FormEvent);
+      handleSave({ preventDefault: () => {} } as FormEvent);
     },
   });
 
@@ -287,7 +264,7 @@ export default function LeadDetailsPage() {
           {lead.firstName} {lead.lastName}
         </h1>
         <Button type="button" variant="secondary" size="sm" onClick={handleSendQuotation} disabled={saving}>
-          Send Quotation
+          Create Quotation
         </Button>
         <Button type="button" variant="secondary" size="sm" onClick={handleConvertToDeal} disabled={saving || lead?.isConverted}>
           {lead?.isConverted ? 'Converted to Deal' : 'Convert to Deal'}
@@ -320,14 +297,6 @@ export default function LeadDetailsPage() {
           RFQ Details
         </button>
         <button
-          onClick={() => setActiveTab('contacts')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 ${
-            activeTab === 'contacts' ? 'border-[#168eea] text-[#168eea]' : 'border-transparent text-slate-500 hover:text-slate-700'
-          }`}
-        >
-          Contacts
-        </button>
-        <button
           onClick={() => setActiveTab('activity')}
           className={`px-4 py-2 text-sm font-medium border-b-2 ${
             activeTab === 'activity' ? 'border-[#168eea] text-[#168eea]' : 'border-transparent text-slate-500 hover:text-slate-700'
@@ -352,7 +321,7 @@ export default function LeadDetailsPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700">Series</label>
+                <label className="block text-sm font-medium text-slate-700">Series ID</label>
                 <input
                   type="text"
                   readOnly
@@ -369,10 +338,10 @@ export default function LeadDetailsPage() {
                 >
                   <option value="new">New</option>
                   <option value="contacted">Contacted</option>
+                  <option value="working">Working / In Progress</option>
                   <option value="qualified">Qualified</option>
-                  <option value="proposal">Proposal</option>
-                  <option value="negotiation">Negotiation</option>
-                  <option value="won">Won</option>
+                  <option value="unqualified">Unqualified / Disqualified</option>
+                  <option value="converted">Converted</option>
                   <option value="lost">Lost</option>
                 </select>
               </div>
@@ -402,12 +371,16 @@ export default function LeadDetailsPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700">Annual Turnover</label>
-                  <input
-                    type="number"
-                    value={formData.annualRevenue ?? ''}
+                  <select
+                    value={formData.annualRevenue || ''}
                     onChange={(e) => setFormData({ ...formData, annualRevenue: e.target.value })}
                     className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
-                  />
+                  >
+                    <option value="">— Select —</option>
+                    {ANNUAL_TURNOVER_OPTIONS.map((opt) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700">Source</label>
@@ -428,12 +401,16 @@ export default function LeadDetailsPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700">Industry</label>
-                  <input
-                    type="text"
+                  <select
                     value={formData.industry || ''}
                     onChange={(e) => setFormData({ ...formData, industry: e.target.value })}
                     className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
-                  />
+                  >
+                    <option value="">— Select —</option>
+                    {INDUSTRY_OPTIONS.map((opt) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700">Next Follow-up Schedule</label>
@@ -449,10 +426,17 @@ export default function LeadDetailsPage() {
                   <label className="block text-sm font-medium text-slate-700">Territory</label>
                   <input
                     type="text"
+                    list="territory-options"
+                    placeholder="Search district..."
                     value={formData.territory || ''}
                     onChange={(e) => setFormData({ ...formData, territory: e.target.value })}
                     className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
                   />
+                  <datalist id="territory-options">
+                    {TERRITORY_OPTIONS.map((opt) => (
+                      <option key={opt} value={opt} />
+                    ))}
+                  </datalist>
                 </div>
               </div>
             </div>
@@ -506,15 +490,19 @@ export default function LeadDetailsPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700">Designation</label>
-                  <input
-                    type="text"
+                  <select
                     value={formData.jobTitle || ''}
                     onChange={(e) => setFormData({ ...formData, jobTitle: e.target.value })}
                     className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
-                  />
+                  >
+                    <option value="">— Select —</option>
+                    {DESIGNATION_OPTIONS.map((opt) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700">Phone</label>
+                  <label className="block text-sm font-medium text-slate-700">Telephone</label>
                   <input
                     type="tel"
                     value={formData.phone || ''}
@@ -523,9 +511,10 @@ export default function LeadDetailsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700">Mobile Number</label>
+                  <label className="block text-sm font-medium text-slate-700">Mobile Number <span className="text-red-500">*</span></label>
                   <input
                     type="tel"
+                    required
                     value={formData.mobile || ''}
                     onChange={(e) => setFormData({ ...formData, mobile: e.target.value })}
                     className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
@@ -619,12 +608,22 @@ export default function LeadDetailsPage() {
           <form onSubmit={handleSave} className="space-y-6">
             <div className="grid grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-slate-700">Interested In</label>
+                <label className="block text-sm font-medium text-slate-700">Interested In — Our Services</label>
                 <input
                   type="text"
-                  value={formData.interestedIn || ''}
-                  onChange={(e) => setFormData({ ...formData, interestedIn: e.target.value })}
-                  placeholder="e.g. Product / service they're interested in"
+                  value={formData.interestedInServices || ''}
+                  onChange={(e) => setFormData({ ...formData, interestedInServices: e.target.value })}
+                  placeholder="e.g. Implementation, Support, Consulting"
+                  className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700">Interested In — Our Products</label>
+                <input
+                  type="text"
+                  value={formData.interestedInProducts || ''}
+                  onChange={(e) => setFormData({ ...formData, interestedInProducts: e.target.value })}
+                  placeholder="e.g. Product names or SKUs"
                   className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
                 />
               </div>
@@ -667,119 +666,14 @@ export default function LeadDetailsPage() {
                   className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
                 >
                   <option value="">—</option>
-                  <option value="not-scheduled">Not Scheduled</option>
+                  <option value="unassigned">Default / Unassigned</option>
+                  <option value="pending">Pending / Requested</option>
                   <option value="scheduled">Scheduled</option>
-                  <option value="held">Held</option>
+                  <option value="completed">Completed</option>
+                  <option value="rescheduled">Rescheduled</option>
+                  <option value="cancelled">Cancelled</option>
                   <option value="no-show">No Show</option>
                 </select>
-              </div>
-              <div className="col-span-2">
-                <div className="mb-2 flex items-center justify-between">
-                  <label className="block text-sm font-medium text-slate-700">Interested Items</label>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setInterestedItems([...interestedItems, { itemId: '', productName: '', quantity: 1, unit: 'Nos', expectedPrice: 0 }])
-                    }
-                    className="flex items-center gap-1 text-xs font-medium text-[#168eea] hover:underline"
-                  >
-                    <PlusIcon className="h-3.5 w-3.5" /> Add Item
-                  </button>
-                </div>
-                {interestedItems.length === 0 ? (
-                  <p className="rounded-md border-2 border-dashed border-slate-200 p-4 text-center text-xs text-slate-400">
-                    No items yet. These auto-populate any quotation generated from this lead.
-                  </p>
-                ) : (
-                  <div className="overflow-x-auto rounded-md border border-slate-200">
-                    <table className="w-full text-sm">
-                      <thead className="bg-slate-50 text-xs font-semibold uppercase text-slate-500">
-                        <tr>
-                          <th className="p-2 text-left">Item</th>
-                          <th className="p-2 text-left">Qty</th>
-                          <th className="p-2 text-left">Unit</th>
-                          <th className="p-2 text-left">Expected Price</th>
-                          <th className="p-2 text-left">Tax</th>
-                          <th className="p-2"></th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {interestedItems.map((row, idx) => {
-                          const catalogItem = itemCatalog.find((c) => c.id === row.itemId);
-                          return (
-                            <tr key={idx}>
-                              <td className="p-2">
-                                <select
-                                  value={row.itemId}
-                                  onChange={(e) => {
-                                    const id = e.target.value ? Number(e.target.value) : '';
-                                    const match = itemCatalog.find((c) => c.id === id);
-                                    const next = [...interestedItems];
-                                    next[idx] = {
-                                      ...next[idx],
-                                      itemId: id,
-                                      productName: match?.itemName || next[idx].productName,
-                                      unit: match?.unit || next[idx].unit,
-                                      expectedPrice: match ? match.sellingPrice : next[idx].expectedPrice,
-                                    };
-                                    setInterestedItems(next);
-                                  }}
-                                  className="w-full rounded-md border border-slate-200 p-1.5 text-sm focus:border-[#168eea] focus:outline-none"
-                                >
-                                  <option value="">Select an item...</option>
-                                  {itemCatalog.map((c) => (
-                                    <option key={c.id} value={c.id}>
-                                      {c.itemName}
-                                    </option>
-                                  ))}
-                                </select>
-                              </td>
-                              <td className="p-2">
-                                <input
-                                  type="number"
-                                  min={1}
-                                  value={row.quantity}
-                                  onChange={(e) => {
-                                    const next = [...interestedItems];
-                                    next[idx] = { ...next[idx], quantity: Number(e.target.value) };
-                                    setInterestedItems(next);
-                                  }}
-                                  className="w-20 rounded-md border border-slate-200 p-1.5 text-sm focus:border-[#168eea] focus:outline-none"
-                                />
-                              </td>
-                              <td className="p-2 text-slate-500">{row.unit}</td>
-                              <td className="p-2">
-                                <input
-                                  type="number"
-                                  value={row.expectedPrice}
-                                  onChange={(e) => {
-                                    const next = [...interestedItems];
-                                    next[idx] = { ...next[idx], expectedPrice: Number(e.target.value) };
-                                    setInterestedItems(next);
-                                  }}
-                                  className="w-28 rounded-md border border-slate-200 p-1.5 text-sm focus:border-[#168eea] focus:outline-none"
-                                />
-                              </td>
-                              <td className="p-2 text-slate-500">{catalogItem?.taxRate != null ? `${catalogItem.taxRate}%` : '—'}</td>
-                              <td className="p-2 text-right">
-                                <button
-                                  type="button"
-                                  onClick={() => setInterestedItems(interestedItems.filter((_, i) => i !== idx))}
-                                  className="text-slate-400 hover:text-red-600"
-                                >
-                                  <TrashIcon className="h-4 w-4" />
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-                <p className="mt-1 text-[11px] text-slate-400">
-                  Each item's tax is applied automatically when a quotation or invoice is generated from this lead.
-                </p>
               </div>
               <div className="col-span-2">
                 <label className="block text-sm font-medium text-slate-700">Notes</label>
@@ -798,28 +692,6 @@ export default function LeadDetailsPage() {
               </Button>
             </div>
           </form>
-        </Card>
-      )}
-
-      {activeTab === 'contacts' && (
-        <Card>
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-medium text-slate-900">Associated Contacts</h3>
-            <Button size="sm" onClick={() => setIsContactModalOpen(true)}>
-              <PlusIcon className="h-4 w-4" /> Add Contact
-            </Button>
-          </div>
-          
-          <DataTable
-            columns={[
-              { header: 'Name', accessor: (c) => <span className="font-medium text-slate-900">{c.firstName} {c.lastName}</span> },
-              { header: 'Email', accessor: (c) => <span className="text-slate-600">{c.email || '—'}</span> },
-              { header: 'Phone', accessor: (c) => <span className="text-slate-600">{c.phone || '—'}</span> },
-            ]}
-            data={contacts}
-            rowKey={(c) => c.id}
-            emptyMessage="No contacts associated with this lead."
-          />
         </Card>
       )}
 
@@ -874,35 +746,6 @@ export default function LeadDetailsPage() {
             </div>
           )}
         </Card>
-      )}
-      {isContactModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
-            <h3 className="text-lg font-semibold text-slate-900 border-b border-slate-100 pb-3 mb-4">Add Contact</h3>
-            <form onSubmit={handleCreateContact} className="space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-slate-700">First Name *</label>
-                <input type="text" required value={contactForm.firstName} onChange={e => setContactForm({...contactForm, firstName: e.target.value})} className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-700">Last Name *</label>
-                <input type="text" required value={contactForm.lastName} onChange={e => setContactForm({...contactForm, lastName: e.target.value})} className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-700">Email</label>
-                <input type="email" value={contactForm.email} onChange={e => setContactForm({...contactForm, email: e.target.value})} className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-700">Phone</label>
-                <input type="tel" value={contactForm.phone} onChange={e => setContactForm({...contactForm, phone: e.target.value})} className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none" />
-              </div>
-              <div className="mt-4 flex justify-end gap-2 pt-2">
-                <Button type="button" variant="secondary" size="sm" onClick={() => setIsContactModalOpen(false)}>Cancel</Button>
-                <Button type="submit" size="sm" disabled={saving}>{saving ? 'Saving...' : 'Add Contact'}</Button>
-              </div>
-            </form>
-          </div>
-        </div>
       )}
     </div>
   );

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import {
   ChevronDownIcon,
@@ -14,7 +14,9 @@ import {
   EyeIcon,
   XMarkIcon,
   ArrowPathIcon,
+  MapPinIcon,
 } from '@heroicons/react/24/outline';
+import { MapPinIcon as MapPinIconSolid } from '@heroicons/react/24/solid';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -38,6 +40,16 @@ export type DataTableColumn<T> = {
   editType?: 'text' | 'date';
   className?: string;
   headerClassName?: string;
+  /**
+   * Marks a column as hidden by default, only appearing in the table once the
+   * user explicitly adds it from the "Arrange & Hide Columns" panel. Use this
+   * for fields that exist on the record but were deliberately trimmed off the
+   * default table view (e.g. Task 2.16 removed Phone/Email/Industry/etc. from
+   * the main Leads table) — they stay available on request instead of being
+   * gone entirely. Ignored if the user's saved column settings already say
+   * otherwise (so once added, it stays added).
+   */
+  optional?: boolean;
 };
 
 type DataTableProps<T> = {
@@ -248,20 +260,25 @@ export default function DataTable<T>({
 
   // ── 1. Column Reordering & Visibility State ──
   const [orderedColumns, setOrderedColumns] = useState<DataTableColumn<T>[]>(initialColumns);
-  const [hiddenColumnIds, setHiddenColumnIds] = useState<Set<string>>(new Set());
+  const [hiddenColumnIds, setHiddenColumnIds] = useState<Set<string>>(
+    () => new Set(initialColumns.filter((c) => c.optional).map((c, idx) => c.id || c.header || String(idx)))
+  );
+  const [frozenUpToId, setFrozenUpToId] = useState<string | null>(null);
   const [isSettingsOpen, setIsSettingsOpen]  = useState(false);
   const settingsModalRef = useRef<HTMLDivElement>(null);
 
   // Initialize and load saved column preferences from localStorage
   useEffect(() => {
+    const defaultHidden = new Set(
+      initialColumns.filter((c) => c.optional).map((c, idx) => c.id || c.header || String(idx))
+    );
     try {
       const savedKey = `crm_table_settings_${tableId}`;
       const savedData = localStorage.getItem(savedKey);
       if (savedData) {
-        const { order, hidden } = JSON.parse(savedData);
-        if (Array.isArray(hidden)) {
-          setHiddenColumnIds(new Set(hidden));
-        }
+        const { order, hidden, frozenUpToId: savedFrozen } = JSON.parse(savedData);
+        setHiddenColumnIds(Array.isArray(hidden) ? new Set(hidden) : defaultHidden);
+        setFrozenUpToId(typeof savedFrozen === 'string' ? savedFrozen : null);
         if (Array.isArray(order)) {
           const colMap = new Map(initialColumns.map((col, idx) => [col.id || col.header || String(idx), col]));
           const reordered: DataTableColumn<T>[] = [];
@@ -275,20 +292,27 @@ export default function DataTable<T>({
           setOrderedColumns(reordered);
           return;
         }
+      } else {
+        setHiddenColumnIds(defaultHidden);
       }
     } catch {
-      // Fallback to default
+      setHiddenColumnIds(defaultHidden);
     }
     setOrderedColumns(initialColumns);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialColumns, tableId]);
 
   // Save column preferences to localStorage
-  const saveColumnSettings = (newOrder: DataTableColumn<T>[], newHidden: Set<string>) => {
+  const saveColumnSettings = (
+    newOrder: DataTableColumn<T>[],
+    newHidden: Set<string>,
+    newFrozenUpToId: string | null = frozenUpToId
+  ) => {
     try {
       const savedKey = `crm_table_settings_${tableId}`;
       const order = newOrder.map((col, idx) => col.id || col.header || String(idx));
       const hidden = Array.from(newHidden);
-      localStorage.setItem(savedKey, JSON.stringify({ order, hidden }));
+      localStorage.setItem(savedKey, JSON.stringify({ order, hidden, frozenUpToId: newFrozenUpToId }));
     } catch {
       // Ignore
     }
@@ -313,9 +337,20 @@ export default function DataTable<T>({
     saveColumnSettings(next, hiddenColumnIds);
   };
 
+  // Freeze columns: pins the checkbox/Sr.No columns plus every visible
+  // column up to and including `colId` so they stay in view while the rest
+  // of the table scrolls horizontally (Excel/Sheets-style "freeze panes").
+  // Toggling the already-frozen column's pin again clears the freeze.
+  const toggleFreezeUpTo = (colId: string) => {
+    const next = frozenUpToId === colId ? null : colId;
+    setFrozenUpToId(next);
+    saveColumnSettings(orderedColumns, hiddenColumnIds, next);
+  };
+
   const resetColumnSettings = () => {
     setOrderedColumns(initialColumns);
-    setHiddenColumnIds(new Set());
+    setHiddenColumnIds(new Set(initialColumns.filter((c) => c.optional).map((c, idx) => c.id || c.header || String(idx))));
+    setFrozenUpToId(null);
     try {
       localStorage.removeItem(`crm_table_settings_${tableId}`);
     } catch {
@@ -374,6 +409,63 @@ export default function DataTable<T>({
     window.addEventListener('click', closeMenu);
     return () => window.removeEventListener('click', closeMenu);
   }, []);
+
+  // ── 4. Frozen (sticky) Columns — Excel/Sheets-style "freeze panes" ──
+  // Freezes the checkbox + Sr. No. columns plus every visible column up to
+  // and including `frozenUpToId`, so they stay put while the rest of the
+  // table scrolls horizontally. Offsets are measured from the actual
+  // rendered header cell widths (rather than assumed/fixed widths) so this
+  // keeps working regardless of column content or screen size.
+  const headerCellRefs = useRef<Map<string, HTMLTableCellElement>>(new Map());
+  const [stickyLefts, setStickyLefts] = useState<Map<string, number>>(new Map());
+
+  const frozenUpToVisibleIdx = frozenUpToId
+    ? visibleColumns.findIndex((col, idx) => (col.id || col.header || String(idx)) === frozenUpToId)
+    : -1;
+  const isFreezeActive = frozenUpToVisibleIdx >= 0;
+
+  const recomputeStickyOffsets = useCallback(() => {
+    if (!isFreezeActive) {
+      setStickyLefts(new Map());
+      return;
+    }
+    const next = new Map<string, number>();
+    let cumulative = 0;
+    const order = ['__checkbox', '__srno', ...visibleColumns.map((c, i) => c.id || c.header || String(i))];
+    for (const key of order) {
+      const el = headerCellRefs.current.get(key);
+      next.set(key, cumulative);
+      if (el) cumulative += el.offsetWidth;
+    }
+    setStickyLefts(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFreezeActive, frozenUpToVisibleIdx, visibleColumns.length]);
+
+  useLayoutEffect(() => {
+    recomputeStickyOffsets();
+    if (!isFreezeActive) return;
+    window.addEventListener('resize', recomputeStickyOffsets);
+    return () => window.removeEventListener('resize', recomputeStickyOffsets);
+  }, [recomputeStickyOffsets, isFreezeActive, data]);
+
+  // Sticky style helper — applied to both header <th> and body <td> for every
+  // cell within the frozen range. `isLastFrozen` gets a shadow divider so the
+  // freeze boundary reads clearly against the scrollable columns behind it.
+  const getStickyStyle = (key: string, bg: string): React.CSSProperties | undefined => {
+    if (!isFreezeActive || !stickyLefts.has(key)) return undefined;
+    return {
+      position: 'sticky',
+      left: stickyLefts.get(key),
+      zIndex: 15,
+      backgroundColor: bg,
+    };
+  };
+
+  const isLastFrozenKey = (key: string) => {
+    if (!isFreezeActive) return false;
+    const order = ['__checkbox', '__srno', ...visibleColumns.map((c, i) => c.id || c.header || String(i))];
+    return order[order.length - 1] === key || order.indexOf(key) === frozenUpToVisibleIdx + 2;
+  };
 
   // Reset selection when dataset changes
   useEffect(() => {
@@ -526,10 +618,15 @@ export default function DataTable<T>({
                     </button>
                   </div>
 
+                  <p className="mb-2 text-[11px] leading-snug text-slate-400">
+                    Check a column to show it. Pin <MapPinIcon className="inline h-3 w-3 -translate-y-px" /> a column to freeze everything up to it while scrolling.
+                  </p>
+
                   <div className="max-h-60 space-y-1.5 overflow-y-auto pr-1">
                     {orderedColumns.map((col, idx) => {
                       const colId = col.id || col.header || String(idx);
                       const isHidden = hiddenColumnIds.has(colId);
+                      const isFrozenHere = frozenUpToId === colId;
 
                       return (
                         <div
@@ -546,9 +643,29 @@ export default function DataTable<T>({
                             <span className={cn(isHidden && 'line-through text-slate-400')}>
                               {col.header}
                             </span>
+                            {col.optional && (
+                              <span className="rounded-full bg-blue-50 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-[#168eea]">
+                                Add
+                              </span>
+                            )}
                           </label>
 
                           <div className="flex items-center gap-1">
+                            <button
+                              disabled={isHidden}
+                              onClick={() => toggleFreezeUpTo(colId)}
+                              className={cn(
+                                'rounded p-0.5 disabled:opacity-30',
+                                isFrozenHere ? 'text-[#168eea]' : 'text-slate-400 hover:bg-slate-200 hover:text-slate-700'
+                              )}
+                              title={isFrozenHere ? 'Unfreeze' : 'Freeze columns up to here'}
+                            >
+                              {isFrozenHere ? (
+                                <MapPinIconSolid className="h-3 w-3" />
+                              ) : (
+                                <MapPinIcon className="h-3 w-3" />
+                              )}
+                            </button>
                             <button
                               disabled={idx === 0}
                               onClick={() => moveColumn(idx, idx - 1)}
@@ -599,9 +716,13 @@ export default function DataTable<T>({
         <table className="w-full border-collapse text-sm">
           {/* Header */}
           <thead>
-            <tr className="border-b-2 border-slate-800/10 bg-slate-700 text-left text-xs font-bold uppercase tracking-wider text-white">
+            <tr className="border-b border-slate-200 bg-slate-50/80 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">
               {selectable && (
-                <th className="w-10 border-r border-slate-600 px-3 py-3">
+                <th
+                  ref={(el) => { if (el) headerCellRefs.current.set('__checkbox', el); }}
+                  className={cn('w-10 px-4 py-3', isLastFrozenKey('__checkbox') && 'shadow-[2px_0_4px_-2px_rgba(0,0,0,0.15)]')}
+                  style={getStickyStyle('__checkbox', 'rgb(248 250 252 / 0.8)')}
+                >
                   <input
                     type="checkbox"
                     checked={allSelected}
@@ -614,21 +735,29 @@ export default function DataTable<T>({
                   />
                 </th>
               )}
-              <th className="w-14 border-r border-slate-600 px-3 py-3 text-center">
+              <th
+                ref={(el) => { if (el) headerCellRefs.current.set('__srno', el); }}
+                className={cn('w-14 px-4 py-3 text-center', isLastFrozenKey('__srno') && 'shadow-[2px_0_4px_-2px_rgba(0,0,0,0.15)]')}
+                style={getStickyStyle('__srno', 'rgb(248 250 252 / 0.8)')}
+              >
                 Sr.&nbsp;No.
               </th>
 
               {/* Dynamic Header Columns with Auto Sort */}
               {visibleColumns.map((col, i) => {
                 const isSorted = sortColIndex === i;
+                const key = col.id || col.header || String(i);
                 return (
                   <th
                     key={i}
+                    ref={(el) => { if (el) headerCellRefs.current.set(key, el); }}
                     onClick={() => handleHeaderClick(i)}
                     className={cn(
-                      'group cursor-pointer select-none border-r border-slate-600 px-4 py-3 transition hover:bg-slate-600/80 last:border-r-0',
-                      col.headerClassName
+                      'group cursor-pointer select-none px-4 py-3 transition hover:bg-slate-100',
+                      col.headerClassName,
+                      isLastFrozenKey(key) && 'shadow-[2px_0_4px_-2px_rgba(0,0,0,0.15)]'
                     )}
+                    style={getStickyStyle(key, 'rgb(248 250 252 / 0.8)')}
                     title="Click to sort Ascending / Descending"
                   >
                     <div className="flex items-center justify-between gap-1.5">
@@ -650,14 +779,14 @@ export default function DataTable<T>({
               })}
 
               {actions && (
-                <th className="border-r border-slate-600 px-4 py-3 text-right">Actions</th>
+                <th className="px-4 py-3 text-right">Actions</th>
               )}
               {expandedRowContent && <th className="w-10 px-3 py-3" />}
             </tr>
           </thead>
 
           {/* Body */}
-          <tbody className="divide-y divide-slate-200">
+          <tbody className="divide-y divide-slate-100">
             {displayData.length === 0 ? (
               <tr>
                 <td colSpan={colSpanTotal} className="py-10 text-center text-slate-400">
@@ -685,17 +814,18 @@ export default function DataTable<T>({
                       className={cn(
                         'transition-colors duration-150',
                         isSelected
-                          ? 'bg-[#168eea]/5'
+                          ? 'bg-[var(--sidebar-active-bg)]'
                           : isEven
-                          ? 'bg-white hover:bg-slate-50'
-                          : 'bg-slate-50/60 hover:bg-slate-100/60',
+                          ? 'bg-white hover:bg-slate-50/50'
+                          : 'bg-white hover:bg-slate-50/50',
                         (onRowClick || expandedRowContent) && 'cursor-pointer'
                       )}
                     >
                       {/* Checkbox */}
                       {selectable && (
                         <td
-                          className="border-r border-slate-100 px-3 py-3"
+                          className={cn('px-4 py-3', isLastFrozenKey('__checkbox') && 'shadow-[2px_0_4px_-2px_rgba(0,0,0,0.15)]')}
+                          style={getStickyStyle('__checkbox', isSelected ? 'var(--sidebar-active-bg)' : '#fff')}
                           onClick={(e) => e.stopPropagation()}
                         >
                           <input
@@ -709,19 +839,26 @@ export default function DataTable<T>({
                       )}
 
                       {/* Sr. No. */}
-                      <td className="border-r border-slate-100 px-3 py-3 text-center font-semibold text-slate-500">
+                      <td
+                        className={cn('px-4 py-3 text-center text-sm text-slate-400', isLastFrozenKey('__srno') && 'shadow-[2px_0_4px_-2px_rgba(0,0,0,0.15)]')}
+                        style={getStickyStyle('__srno', isSelected ? 'var(--sidebar-active-bg)' : '#fff')}
+                      >
                         {index + 1}
                       </td>
 
                       {/* Visible Data Cells */}
-                      {visibleColumns.map((col, i) => (
+                      {visibleColumns.map((col, i) => {
+                        const key = col.id || col.header || String(i);
+                        return (
                         <td
                           key={i}
                           onContextMenu={(e) => handleContextMenu(e, row, i)}
                           className={cn(
-                            'border-r border-slate-100 px-4 py-3 last:border-r-0',
-                            col.className
+                            'px-4 py-3',
+                            col.className,
+                            isLastFrozenKey(key) && 'shadow-[2px_0_4px_-2px_rgba(0,0,0,0.15)]'
                           )}
+                          style={getStickyStyle(key, isSelected ? 'var(--sidebar-active-bg)' : '#fff')}
                         >
                           {col.editValue && col.onEdit ? (
                             <EditableCell
@@ -738,12 +875,13 @@ export default function DataTable<T>({
                             col.accessor(row, index)
                           )}
                         </td>
-                      ))}
+                        );
+                      })}
 
                       {/* Actions */}
                       {actions && (
                         <td
-                          className="border-r border-slate-100 px-4 py-3 text-right"
+                          className="px-4 py-3 text-right"
                           onClick={(e) => e.stopPropagation()}
                         >
                           {actions(row)}

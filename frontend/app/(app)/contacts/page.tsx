@@ -223,6 +223,7 @@ export default function ContactsPage() {
 
       <Card>
         <DataTable
+          tableId="contacts_table"
           columns={columns}
           data={contacts}
           rowKey={(c) => c.id}

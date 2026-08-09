@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { quotesApi, itemsApi } from '@/lib/api';
 import Button from '@/components/ui/button';
@@ -20,6 +20,7 @@ export default function QuoteDetailPage() {
   const toast = useToast();
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const quoteId = params.id as string;
 
   const [quote, setQuote] = useState<any>(null);
@@ -52,6 +53,15 @@ export default function QuoteDetailPage() {
   useEffect(() => {
     fetchQuote();
   }, [fetchQuote]);
+
+  // Task 3.1: "Print Format" action links here with ?print=1 — auto-open the
+  // browser print dialog once the quote data has actually loaded.
+  useEffect(() => {
+    if (!loading && quote && searchParams.get('print') === '1') {
+      const t = setTimeout(() => window.print(), 300);
+      return () => clearTimeout(t);
+    }
+  }, [loading, quote, searchParams]);
 
   useEffect(() => {
     itemsApi
@@ -166,7 +176,7 @@ export default function QuoteDetailPage() {
 
   return (
     <div className="space-y-6 pb-12">
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3 no-print">
         <button onClick={() => router.push('/quotes')} className="text-slate-400 hover:text-slate-600">
           <ArrowLeftIcon className="h-5 w-5" />
         </button>
@@ -183,6 +193,9 @@ export default function QuoteDetailPage() {
           </Link>
         )}
         <div className="ml-auto flex flex-wrap gap-2">
+          <Button type="button" variant="secondary" size="sm" onClick={() => window.print()}>
+            Print
+          </Button>
           <Button type="button" variant="secondary" size="sm" onClick={() => runAction('send')} disabled={!!busyAction}>
             {busyAction === 'send' ? 'Sending...' : 'Send'}
           </Button>
@@ -201,6 +214,11 @@ export default function QuoteDetailPage() {
             {saving ? 'Saving...' : 'Save'}
           </Button>
         </div>
+      </div>
+      {/* Plain header shown only when printing, since the interactive toolbar above is hidden */}
+      <div className="hidden print:flex items-center gap-3">
+        <h1 className="text-2xl font-bold text-slate-900">{quote.quoteNumber}</h1>
+        <StatusBadge status={quote.status} />
       </div>
       {isLocked && (
         <p className="rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-700">

@@ -3,7 +3,6 @@ import {
   HomeIcon,
   UserGroupIcon,
   ClipboardDocumentListIcon,
-  CurrencyDollarIcon,
   ChartBarIcon,
   Cog6ToothIcon,
   UsersIcon,
@@ -44,27 +43,19 @@ export const navigation: NavSection[] = [
     items: [
       { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
       { name: 'Reports', href: '/reports', icon: ChartBarIcon, permission: 'reports:view' },
+      { name: 'Analytics', href: '/marketing/analytics', icon: PresentationChartLineIcon, permission: 'marketing:view' },
     ],
   },
   {
     title: 'Sales',
     items: [
       { name: 'Leads', href: '/leads', icon: ClipboardDocumentListIcon, permission: 'leads:read' },
-      { name: 'Contacts', href: '/contacts', icon: UserGroupIcon, permission: 'contacts:read' },
-      { name: 'Deals', href: '/deals', icon: CurrencyDollarIcon, permission: 'deals:read' },
-      { name: 'Pipeline', href: '/pipeline', icon: ViewColumnsIcon, permission: 'deals:read' },
       { name: 'Quotes', href: '/quotes', icon: DocumentTextIcon, permission: 'quotes:view' },
-      { name: 'Invoices', href: '/invoices', icon: ReceiptPercentIcon, permission: 'invoices:view' },
       { name: 'Tasks', href: '/tasks', icon: CheckCircleIcon, permission: 'tasks:view' },
       { name: 'Meetings', href: '/meetings', icon: CalendarDaysIcon, permission: 'meetings:view' },
-    ],
-  },
-  {
-    title: 'Inventory',
-    items: [
-      { name: 'Items', href: '/items', icon: CubeIcon, permission: 'items:read' },
-      { name: 'Categories', href: '/items/categories', icon: TagIcon, permission: 'item_categories:read' },
-      { name: 'Tax Master', href: '/items/taxes', icon: ReceiptRefundIcon, permission: 'taxes:read' },
+      { name: 'Invoices', href: '/invoices', icon: ReceiptPercentIcon, permission: 'invoices:view' },
+      { name: 'Pipeline', href: '/pipeline', icon: ViewColumnsIcon, permission: 'deals:read' },
+      { name: 'Contacts', href: '/contacts', icon: UserGroupIcon, permission: 'contacts:read' },
     ],
   },
   {
@@ -73,7 +64,14 @@ export const navigation: NavSection[] = [
       { name: 'Campaigns', href: '/marketing/campaigns', icon: MegaphoneIcon, permission: 'marketing:view' },
       { name: 'Email', href: '/marketing/email', icon: EnvelopeIcon, permission: 'marketing:view' },
       { name: 'Templates', href: '/marketing/templates', icon: DocumentDuplicateIcon, permission: 'marketing:view' },
-      { name: 'Analytics', href: '/marketing/analytics', icon: PresentationChartLineIcon, permission: 'marketing:view' },
+    ],
+  },
+  {
+    title: 'Inventory',
+    items: [
+      { name: 'Items', href: '/items', icon: CubeIcon, permission: 'items:read' },
+      { name: 'Categories', href: '/items/categories', icon: TagIcon, permission: 'item_categories:read' },
+      { name: 'Tax Master', href: '/items/taxes', icon: ReceiptRefundIcon, permission: 'taxes:read' },
     ],
   },
   {

@@ -17,17 +17,17 @@ export default function StatCard({ label, value, change, changeType = 'neutral',
   };
 
   return (
-    <div className={cn('rounded-lg border border-slate-200 bg-white p-5 shadow-sm', className)}>
+    <div className={cn('rounded-xl border border-slate-200/60 bg-white p-6 shadow-[0_2px_8px_rgb(0,0,0,0.04)]', className)}>
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-sm font-medium text-slate-500">{label}</p>
-          <p className="mt-1 text-2xl font-semibold text-slate-900">{value}</p>
+          <p className="text-sm font-medium text-slate-500 tracking-tight">{label}</p>
+          <p className="mt-2 text-[28px] font-bold text-slate-900 tracking-tight leading-none">{value}</p>
           {change && (
-            <p className={cn('mt-1 text-xs font-medium', changeColors[changeType])}>{change}</p>
+            <p className={cn('mt-2 text-[13px] font-medium', changeColors[changeType])}>{change}</p>
           )}
         </div>
         {icon && (
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-[#168eea]">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--sidebar-active-bg)] text-[var(--primary)]">
             {icon}
           </div>
         )}

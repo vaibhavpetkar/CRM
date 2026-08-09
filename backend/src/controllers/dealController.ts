@@ -16,7 +16,7 @@ const serializeDeal = (deal: any) => {
     assignedTo: plain.assignedTo
       ? `${plain.assignedTo.firstName} ${plain.assignedTo.lastName}`
       : null,
-    // Exposes the linked lead's number/company so the UI can render "View Lead LEAD-2026-00001".
+    // Exposes the linked lead's number/company so the UI can render "View Lead LD-000001".
     leadNumber: plain.lead?.leadNumber || null,
     leadCompany: plain.lead?.company || null,
   };
@@ -138,7 +138,7 @@ export const createDeal = async (req: Request, res: Response) => {
       title,
       client,
       value: value || 0,
-      currency: currency || 'USD',
+      currency: currency || 'INR',
       stage: stage || 'prospecting',
       probability: probability || 0,
       expectedCloseDate: expectedCloseDate || expectedClose || null,

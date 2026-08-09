@@ -129,6 +129,7 @@ export default function TaxMasterPage() {
 
       <Card>
         <DataTable
+          tableId="tax_master_table"
           columns={columns}
           data={taxes}
           rowKey={(t) => t.id}

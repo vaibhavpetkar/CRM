@@ -82,7 +82,7 @@ Company.init(
     currency: {
       type: DataTypes.STRING(10),
       allowNull: false,
-      defaultValue: 'USD',
+      defaultValue: 'INR', // Task 3.1: CRM default currency is INR
     },
     isActive: {
       type: DataTypes.BOOLEAN,

@@ -220,7 +220,7 @@ export default function Topbar() {
     : 'JD';
 
   return (
-    <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-slate-200 bg-white px-6">
+    <header className="no-print sticky top-0 z-20 flex h-14 items-center justify-between border-b border-slate-200/60 bg-white px-6">
       <div className="relative max-w-md flex-1">
         <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
         <input
@@ -232,12 +232,12 @@ export default function Topbar() {
           }}
           onFocus={() => setSearchOpen(true)}
           placeholder="Search leads, deals, contacts..."
-          className="w-full rounded-md border border-slate-200 bg-slate-50 py-2 pl-9 pr-8 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#168eea] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#168eea]"
+          className="w-full rounded-md border-0 bg-slate-100/50 py-2 pl-9 pr-8 text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)] transition-all"
         />
         {query && (
           <button
             onClick={clearSearch}
-            className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-400 hover:bg-slate-200 hover:text-slate-600"
+            className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-400 hover:bg-slate-200 hover:text-slate-600 transition-colors"
             aria-label="Clear search"
           >
             <XMarkIcon className="h-4 w-4" />
@@ -259,17 +259,17 @@ export default function Topbar() {
                   {searchResults.map((r) => (
                     <li key={`${r.type}-${r.id}`}>
                       <button
-                        onClick={() => handleSelectResult(r)}
-                        className="flex w-full flex-col items-start gap-0.5 px-4 py-2 text-left text-sm hover:bg-slate-50"
-                      >
-                        <span className="flex items-center gap-2">
-                          <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-500">
-                            {r.type}
-                          </span>
-                          <span className="font-medium text-slate-900">{r.title}</span>
-                        </span>
-                        {r.subtitle && <span className="text-xs text-slate-500">{r.subtitle}</span>}
-                      </button>
+                         onClick={() => handleSelectResult(r)}
+                         className="flex w-full flex-col items-start gap-0.5 px-4 py-2 text-left text-sm hover:bg-slate-50 transition-colors"
+                       >
+                         <span className="flex items-center gap-2">
+                           <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-500">
+                             {r.type}
+                           </span>
+                           <span className="font-medium text-slate-900">{r.title}</span>
+                         </span>
+                         {r.subtitle && <span className="text-xs text-slate-500">{r.subtitle}</span>}
+                       </button>
                     </li>
                   ))}
                 </ul>
@@ -283,7 +283,7 @@ export default function Topbar() {
         <div className="relative">
           <button
             onClick={() => setQuickCreateOpen((prev) => !prev)}
-            className="inline-flex items-center gap-1.5 rounded-md bg-[#168eea] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#1278cc]"
+            className="inline-flex items-center gap-1.5 rounded-md bg-[var(--primary)] px-3 py-1.5 text-sm font-medium text-white hover:bg-[var(--primary-hover)] transition-colors shadow-sm"
           >
             <PlusIcon className="h-4 w-4" />
             <span className="hidden sm:inline">Quick Create</span>
@@ -297,7 +297,7 @@ export default function Topbar() {
                   <button
                     key={href}
                     onClick={() => handleQuickCreate(href)}
-                    className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                    className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors"
                   >
                     <Icon className="h-4 w-4 text-slate-400" />
                     {label}
@@ -308,24 +308,26 @@ export default function Topbar() {
           )}
         </div>
 
+        <div className="mx-1 h-6 w-px bg-slate-200/60 hidden sm:block"></div>
+
         <Link
           href="/calendar"
-          className="rounded-md p-2 text-slate-500 hover:bg-slate-100"
+          className="rounded-full p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors"
           aria-label="Calendar"
           title="Calendar"
         >
-          <CalendarIcon className="h-5 w-5" />
+          <CalendarIcon className="h-[18px] w-[18px]" />
         </Link>
 
         <div className="relative">
           <button
             onClick={handleOpenNotifications}
-            className={`relative rounded-md p-2 text-slate-500 hover:bg-slate-100 ${
-              bellAnimating ? 'animate-bounce text-[#168eea]' : ''
+            className={`relative rounded-full p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors ${
+              bellAnimating ? 'animate-bounce text-[var(--primary)]' : ''
             }`}
             aria-label="Notifications"
           >
-            <BellIcon className="h-5 w-5" />
+            <BellIcon className="h-[18px] w-[18px]" />
             {unreadCount > 0 && (
               <span className="absolute right-1 top-1 flex h-4 min-w-[1rem] items-center justify-center">
                 {bellAnimating && (
@@ -342,13 +344,13 @@ export default function Topbar() {
             <>
               <div className="fixed inset-0 z-10" onClick={() => setNotifOpen(false)} />
               <div className="absolute right-0 z-20 mt-1 w-80 rounded-md border border-slate-200 bg-white shadow-lg">
-                <div className="flex items-center justify-between border-b border-slate-100 px-4 py-2">
+                <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
                   <p className="text-sm font-semibold text-slate-900">Notifications</p>
                   {unreadCount > 0 && (
                     <button
                       onClick={handleMarkAllRead}
                       disabled={notifLoading}
-                      className="text-xs font-medium text-[#168eea] hover:underline disabled:opacity-50"
+                      className="text-xs font-medium text-[var(--primary)] hover:underline disabled:opacity-50"
                     >
                       Mark all read
                     </button>
@@ -356,22 +358,22 @@ export default function Topbar() {
                 </div>
                 <div className="max-h-96 overflow-y-auto">
                   {notifications.length === 0 && (
-                    <p className="px-4 py-6 text-center text-sm text-slate-400">You&apos;re all caught up</p>
+                    <p className="px-4 py-8 text-center text-sm text-slate-400">You&apos;re all caught up</p>
                   )}
                   {notifications.map((n) => (
                     <button
                       key={n.id}
                       onClick={() => handleNotificationClick(n)}
-                      className={`flex w-full flex-col items-start gap-0.5 border-b border-slate-50 px-4 py-2.5 text-left hover:bg-slate-50 ${
-                        !n.isRead ? 'bg-blue-50/50' : ''
+                      className={`flex w-full flex-col items-start gap-1 border-b border-slate-50 px-4 py-3 text-left hover:bg-slate-50 transition-colors ${
+                        !n.isRead ? 'bg-[var(--sidebar-active-bg)]/30' : ''
                       }`}
                     >
                       <span className="flex w-full items-center gap-1.5">
-                        {!n.isRead && <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-[#168eea]" />}
+                        {!n.isRead && <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-[var(--primary)]" />}
                         <span className="text-sm font-medium text-slate-900">{n.title}</span>
                       </span>
-                      <span className="text-xs text-slate-500 line-clamp-2">{n.message}</span>
-                      <span className="text-[11px] text-slate-400">{timeAgo(n.createdAt)}</span>
+                      <span className="text-xs text-slate-500 line-clamp-2 leading-relaxed">{n.message}</span>
+                      <span className="text-[11px] text-slate-400 font-medium">{timeAgo(n.createdAt)}</span>
                     </button>
                   ))}
                 </div>
@@ -380,35 +382,34 @@ export default function Topbar() {
           )}
         </div>
 
-        <div className="relative">
+        <div className="relative ml-1">
           <button
             onClick={() => setMenuOpen(!menuOpen)}
-            className="flex items-center gap-2 rounded-md p-1.5 hover:bg-slate-100"
+            className="flex items-center gap-2.5 rounded-full p-1 hover:bg-slate-50 transition-colors"
           >
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#168eea] text-xs font-semibold text-white">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-[var(--primary)]">
               {initials}
             </div>
-            <div className="hidden text-left md:block">
-              <p className="text-sm font-medium text-slate-900">{displayName}</p>
-              <p className="text-xs text-slate-500">{user?.email || 'Sales Manager'}</p>
+            <div className="hidden text-left md:block pr-1">
+              <p className="text-sm font-semibold text-slate-900">{displayName}</p>
             </div>
-            <ChevronDownIcon className="hidden h-4 w-4 text-slate-400 md:block" />
+            <ChevronDownIcon className="hidden h-[14px] w-[14px] text-slate-400 md:block mr-1" />
           </button>
 
           {menuOpen && (
             <>
               <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
               <div className="absolute right-0 z-20 mt-1 w-48 rounded-md border border-slate-200 bg-white py-1 shadow-lg">
-                <Link href="/settings" className="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                <Link href="/settings" className="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
                   My Profile
                 </Link>
-                <Link href="/settings" className="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                <Link href="/settings" className="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
                   Settings
                 </Link>
-                <hr className="my-1 border-slate-100" />
+                <div className="my-1 h-px bg-slate-100" />
                 <button
                   onClick={handleSignOut}
-                  className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-slate-50"
+                  className="block w-full text-left px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
                 >
                   Sign Out
                 </button>

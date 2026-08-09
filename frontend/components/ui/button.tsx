@@ -6,10 +6,10 @@ type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
 };
 
 const variants = {
-  primary: 'bg-[#168eea] text-white hover:bg-[#1278cc] shadow-sm',
-  secondary: 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 shadow-sm',
-  ghost: 'text-slate-600 hover:bg-slate-100',
-  danger: 'bg-red-600 text-white hover:bg-red-700 shadow-sm',
+  primary: 'bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)]',
+  secondary: 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900',
+  ghost: 'text-slate-600 hover:bg-slate-100 hover:text-slate-900',
+  danger: 'bg-red-500 text-white hover:bg-red-600',
 };
 
 const sizes = {

@@ -75,7 +75,7 @@ Deal.init(
     currency: {
       type: DataTypes.STRING(3),
       allowNull: false,
-      defaultValue: 'USD',
+      defaultValue: 'INR',
     },
     client: {
       type: DataTypes.STRING(255),

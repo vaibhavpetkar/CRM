@@ -9,7 +9,7 @@ const getOrCreateCompany = async () => {
   if (!company) {
     company = await Company.create({
       name: 'My Company',
-      currency: 'USD',
+      currency: 'INR',
       isActive: true,
     });
   }
