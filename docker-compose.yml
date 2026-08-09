@@ -59,7 +59,7 @@ services:
     volumes:
       - backend_uploads:/usr/src/app/uploads
       # Mount host project root to /host so backend can read/write .env
-      - ${VPS_DEPLOY_PATH:-/var/www/crm}:/host:ro
+      - ${VPS_DEPLOY_PATH:-/var/www/crm}:/host
     ports:
       - "127.0.0.1:5000:5000"
     networks:
