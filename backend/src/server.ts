@@ -36,6 +36,7 @@ import itemCategoryRoutes from './routes/itemCategoryRoutes';
 import taxMasterRoutes from './routes/taxMasterRoutes';
 import companyRoutes from './routes/companyRoutes';
 import attachmentRoutes from './routes/attachmentRoutes';
+import settingsRoutes from './routes/settingsRoutes';
 
 // Import models in dependency order before sync
 import './models/Company';
@@ -139,6 +140,7 @@ app.use('/api/item-categories', itemCategoryRoutes);
 app.use('/api/taxes', taxMasterRoutes);
 app.use('/api/company', companyRoutes);
 app.use('/api/attachments', attachmentRoutes);
+app.use('/api/settings', settingsRoutes);
 
 // Serve uploaded files (attachments) statically
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));

@@ -468,6 +468,16 @@ export const companyApi = {
   updateCompany: async (data: any) => request<{ message: string; company: any }>('/company', { method: 'PUT', body: JSON.stringify(data) }),
 };
 
+// ─── System Settings API (Super Admin only) ──────────────────────────────────────
+
+export const settingsApi = {
+  getEnvVars: async () => request<{ envVars: { key: string; value: string; isSet: boolean }[] }>('/settings/env'),
+  updateEnvVars: async (envVars: Record<string, string>) => request<{ message: string }>('/settings/env', {
+    method: 'PUT',
+    body: JSON.stringify({ envVars }),
+  }),
+};
+
 // ─── Item Categories API ───────────────────────────────────────────────────────
 
 export const itemCategoriesApi = {

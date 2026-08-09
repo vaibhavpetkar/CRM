@@ -125,6 +125,11 @@ const modules: { module: string; label: string; actions: { action: string; label
     label: 'Company Settings',
     actions: [{ action: 'manage', label: 'Manage company settings (name, currency, etc.)' }],
   },
+  {
+    module: 'settings',
+    label: 'System Settings',
+    actions: [{ action: 'manage', label: 'Manage environment variables & system settings' }],
+  },
 ];
 
 export const PERMISSION_CATALOG: PermissionDef[] = modules.flatMap((m) =>
