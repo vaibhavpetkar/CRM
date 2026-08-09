@@ -79,6 +79,8 @@ export default function ActivityLogsPage() {
 
       <Card>
         <DataTable
+          showToolbar
+          tableId="activity_logs_table"
           columns={columns}
           data={logs}
           rowKey={(l) => l.id}

@@ -117,6 +117,7 @@ export default function InvoicesPage() {
 
       <Card>
         <DataTable
+          tableId="invoices_table"
           columns={columns}
           data={invoices}
           rowKey={(i) => i.id}

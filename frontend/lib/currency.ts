@@ -1,5 +1,5 @@
 const CURRENCY_KEY = 'crm_currency';
-export const DEFAULT_CURRENCY = 'USD';
+export const DEFAULT_CURRENCY = 'INR'; // Task 3.1: CRM default currency is INR
 
 /**
  * The org-wide currency (set on Settings > Company) is cached in localStorage

@@ -354,7 +354,7 @@ class QuoteService {
             title: `${quote.client} — ${quote.quoteNumber}`,
             client: quote.client,
             value: quote.amount,
-            currency: 'USD',
+            currency: 'INR',
             stage: 'negotiation',
             probability: 80,
             leadId: quote.leadId || null,
@@ -533,7 +533,7 @@ class QuoteService {
       grandTotal: Number(plain.amount),
       terms: quote.terms,
       paymentTerms: quote.paymentTerms,
-      currency: company?.currency || 'USD',
+      currency: company?.currency || 'INR',
       status: quote.status,
     };
   }

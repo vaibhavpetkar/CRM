@@ -9,12 +9,13 @@ import Sequence from '../models/Sequence';
  * for the duration of the transaction, so two simultaneous creates can never
  * receive the same number.
  *
- * Pass `includeYear: true` for transactional documents (Lead, Quote, Invoice) that
- * should be numbered per-calendar-year, e.g. "LEAD-2026-00001". In that mode the
+ * Pass `includeYear: true` for transactional documents (Quote, Invoice) that
+ * should be numbered per-calendar-year, e.g. "QT-2026-00001". In that mode the
  * sequence itself is scoped by year internally (key gets a `_${year}` suffix), so
  * the running number automatically resets back to 00001 on Jan 1 each year instead
- * of climbing forever. Master data (Item, Category, Tax) should omit this flag and
- * keeps its existing flat "PREFIX-00001" numbering.
+ * of climbing forever. Master data (Item, Category, Tax) and Leads (Series ID,
+ * e.g. "LD-000001") should omit this flag and keep the flat "PREFIX-000001"
+ * numbering that never resets.
  *
  * @param key         Internal sequence key, one row per key (per year, if includeYear) in the `sequences` table.
  * @param prefix      Human-readable prefix printed in the code, e.g. "ITEM", "LEAD".

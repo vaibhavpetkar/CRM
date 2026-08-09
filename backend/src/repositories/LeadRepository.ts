@@ -1,4 +1,4 @@
-import { FindOptions, Transaction } from 'sequelize';
+import { FindOptions, Transaction, Op } from 'sequelize';
 import Lead from '../models/Lead';
 import User from '../models/User';
 import LeadProduct from '../models/LeadProduct';
@@ -28,7 +28,7 @@ class LeadRepository extends BaseRepository<Lead> {
   constructor() {
     super(
       Lead,
-      ['firstName', 'lastName', 'email', 'company', 'leadNumber'], // searchable
+      ['leadNumber', 'company'], // searchable — Task 2.17: Series ID or Company Name only
       ['status', 'leadSource', 'territory', 'industry', 'assignedToId'], // filterable
       'createdAt'
     );
@@ -44,6 +44,24 @@ class LeadRepository extends BaseRepository<Lead> {
 
   async findByEmail(email: string, options: FindOptions = {}): Promise<Lead | null> {
     return this.findOne({ where: { email }, ...options });
+  }
+
+  // Task 2.6: duplicate detection by mobile OR email. Returns the first match
+  // (most recently created) so the UI can offer "View Existing Lead".
+  async findDuplicate(
+    { email, mobile }: { email?: string | null; mobile?: string | null },
+    excludeId?: number | string,
+    options: FindOptions = {}
+  ): Promise<Lead | null> {
+    const orConditions: any[] = [];
+    if (email) orConditions.push({ email });
+    if (mobile) orConditions.push({ mobile });
+    if (orConditions.length === 0) return null;
+
+    const where: any = { [Op.or]: orConditions };
+    if (excludeId) where.id = { [Op.ne]: excludeId };
+
+    return this.findOne({ where, order: [['createdAt', 'DESC']], ...options });
   }
 }
 

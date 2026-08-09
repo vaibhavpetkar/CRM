@@ -78,6 +78,8 @@ export default function RecycleBinPage() {
 
       <Card>
         <DataTable
+          showToolbar
+          tableId="recycle_bin_table"
           columns={columns}
           data={records}
           rowKey={(r) => `${r.type}-${r.id}`}

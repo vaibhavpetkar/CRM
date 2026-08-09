@@ -134,6 +134,8 @@ export default function CampaignsPage() {
 
       <Card>
         <DataTable
+          showToolbar
+          tableId="campaigns_table"
           columns={columns}
           data={campaigns}
           rowKey={(c) => c.id}

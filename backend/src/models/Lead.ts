@@ -4,7 +4,7 @@ import sequelize from '../config/database';
 // Define the attributes for the Lead model
 interface LeadAttributes {
   id: number;
-  leadNumber: string; // Auto-generated, e.g. LEAD-00001
+  leadNumber: string; // Auto-generated Series ID, e.g. LD-000001 (see codeGenerator.ts)
   date: Date; // Editable "Lead Date", distinct from the createdAt system timestamp
   territory?: string | null;
   alternateMobile?: string | null;
@@ -20,10 +20,10 @@ interface LeadAttributes {
   website?: string | null;
   jobTitle?: string | null; // a.k.a "Designation"
   leadSource: string; // e.g., 'website', 'social-media', 'referral', 'event', 'linkedin'
-  status: string;     // e.g., 'new', 'contacted', 'qualified', 'proposal', 'negotiation', 'won', 'lost'
+  status: string;     // 'new' | 'contacted' | 'working' | 'qualified' | 'unqualified' | 'converted' | 'lost'
   industry?: string | null;
   noOfEmployees?: number | null;
-  annualRevenue?: number | null; // a.k.a "Annual Turnover"
+  annualRevenue?: string | null; // a.k.a "Annual Turnover" — fixed range label, e.g. "₹1–5 Crores" (Task 2.2)
   rating?: string | null; // Hot, Warm, Cold, etc.
   emailOptOut?: boolean;
   skypeId?: string | null;
@@ -68,10 +68,12 @@ interface LeadAttributes {
   nextFollowUp?: Date | null;
 
   // RFQ Details
-  interestedIn?: string | null;
+  interestedIn?: string | null; // deprecated — see interestedInServices/interestedInProducts (Task 2.9)
+  interestedInServices?: string | null;
+  interestedInProducts?: string | null;
   timelineToPurchase?: string | null; // e.g. 'immediate', '1-3-months', '3-6-months', '6-12-months'
   qualifiedById?: number | null; // user who qualified the lead
-  meetingStatus?: string | null; // e.g. 'not-scheduled', 'scheduled', 'held', 'no-show'
+  meetingStatus?: string | null; // 'unassigned' | 'pending' | 'scheduled' | 'completed' | 'rescheduled' | 'cancelled' | 'no-show' (Task 2.10)
 
   createdById?: number | null;
   modifiedById?: number | null;
@@ -105,7 +107,7 @@ class Lead extends Model<LeadAttributes, LeadCreationAttributes> implements Lead
   public status!: string;
   public industry?: string | null;
   public noOfEmployees?: number | null;
-  public annualRevenue?: number | null;
+  public annualRevenue?: string | null;
   public rating?: string | null;
   public emailOptOut?: boolean;
   public skypeId?: string | null;
@@ -148,6 +150,8 @@ class Lead extends Model<LeadAttributes, LeadCreationAttributes> implements Lead
   public lastContacted?: Date | null;
   public nextFollowUp?: Date | null;
   public interestedIn?: string | null;
+  public interestedInServices?: string | null;
+  public interestedInProducts?: string | null;
   public timelineToPurchase?: string | null;
   public qualifiedById?: number | null;
   public meetingStatus?: string | null;
@@ -248,7 +252,7 @@ Lead.init(
       allowNull: true,
     },
     annualRevenue: {
-      type: DataTypes.DECIMAL(15, 2),
+      type: DataTypes.STRING(50),
       allowNull: true,
     },
     rating: {
@@ -387,6 +391,14 @@ Lead.init(
       allowNull: true,
     },
     interestedIn: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+    },
+    interestedInServices: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+    },
+    interestedInProducts: {
       type: DataTypes.STRING(255),
       allowNull: true,
     },

@@ -6,17 +6,28 @@ import StatusBadge from '@/components/ui/status-badge';
 import Button from '@/components/ui/button';
 import Card from '@/components/ui/card';
 import LoadingSpinner from '@/components/ui/loading-spinner';
-import { tasksApi, usersApi } from '@/lib/api';
+import { tasksApi, usersApi, leadsApi } from '@/lib/api';
 import { getStoredUser } from '@/lib/api';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { PlusIcon, XMarkIcon, TrashIcon, CheckCircleIcon, ClockIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, XMarkIcon, ClockIcon, ExclamationTriangleIcon, CheckCircleIcon, EllipsisVerticalIcon } from '@heroicons/react/24/outline';
 import { useToast } from '@/components/ui/toast';
+
+// Task 4.8: Task Type dropdown, reordered — Call, Email, Online Meeting, In
+// Person Meeting, Field Visit.
+const TASK_TYPES = [
+  { value: 'call', label: 'Call' },
+  { value: 'email', label: 'Email' },
+  { value: 'online-meeting', label: 'Online Meeting' },
+  { value: 'in-person-meeting', label: 'In Person Meeting' },
+  { value: 'field-visit', label: 'Field Visit' },
+];
 
 const emptyForm = {
   title: '',
-  type: 'task',
+  type: 'call',
   priority: 'medium',
   dueDate: '',
+  dueTime: '',
   status: 'pending',
   relatedTo: '',
   description: '',
@@ -35,6 +46,8 @@ export default function TasksPage() {
   const [formData, setFormData] = useState(emptyForm);
   const [submitting, setSubmitting] = useState(false);
   const [users, setUsers] = useState<any[]>([]);
+  const [companyOptions, setCompanyOptions] = useState<string[]>([]);
+  const [openMenuId, setOpenMenuId] = useState<number | string | null>(null);
   const currentUser = getStoredUser();
   const isMgrOrAdmin = ['Administrator', 'Sales Manager'].includes(currentUser?.role?.name);
 
@@ -52,8 +65,19 @@ export default function TasksPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await tasksApi.getTasks({ status: filter });
-      setTasks(res.tasks || []);
+      // Task 4.1: Overdue is now its own tab, computed from all non-completed
+      // tasks rather than being folded into "Pending". The backend has no
+      // distinct "overdue" status (it's date-derived), so for that tab we
+      // fetch everything not completed and filter client-side.
+      const res = await tasksApi.getTasks({ status: filter === 'overdue' ? 'all' : filter });
+      let list = res.tasks || [];
+      if (filter === 'overdue') {
+        list = list.filter((t: any) => t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'completed');
+      } else if (filter === 'pending') {
+        // Pending tab now excludes overdue ones, since those live under Overdue.
+        list = list.filter((t: any) => !(t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'completed'));
+      }
+      setTasks(list);
     } catch (err: any) {
       setError(err.message || 'Failed to load tasks. Is the backend running?');
       setTasks([]);
@@ -72,13 +96,37 @@ export default function TasksPage() {
     }
   }, [isMgrOrAdmin]);
 
+  // Task 4.5: Company Name search/typeahead sourced from existing Leads (company + contact person).
+  useEffect(() => {
+    leadsApi
+      .getLeads({ limit: 200 } as any)
+      .then((res) => {
+        const opts = new Set<string>();
+        (res.leads || []).forEach((l: any) => {
+          if (l.company) opts.add(l.company);
+          const contact = l.name || `${l.firstName || ''} ${l.lastName || ''}`.trim();
+          if (l.company && contact) opts.add(`${l.company} — ${contact}`);
+        });
+        setCompanyOptions(Array.from(opts));
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const closeMenu = () => setOpenMenuId(null);
+    document.addEventListener('click', closeMenu);
+    return () => document.removeEventListener('click', closeMenu);
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
     try {
       await tasksApi.createTask({
         ...formData,
-        assignedToId: formData.assignedToId ? Number(formData.assignedToId) : undefined,
+        // Task 4.6: "Assign to Me" explicitly assigns to the current user
+        // rather than leaving assignedToId empty/unassigned.
+        assignedToId: formData.assignedToId ? Number(formData.assignedToId) : currentUser?.id || undefined,
       });
       setIsModalOpen(false);
       setFormData(emptyForm);
@@ -90,24 +138,33 @@ export default function TasksPage() {
     }
   };
 
-  const toggleComplete = async (task: any) => {
+  // Task 4.2 / 4.3: task status is now managed entirely through the ⋮ action
+  // menu instead of a checkbox. "Note" appends a timestamped line to the
+  // task's description rather than opening a whole separate notes system.
+  const applyAction = async (task: any, action: 'done' | 'in-progress' | 'rescheduled' | 'disconnect-call' | 'delete' | 'note') => {
+    setOpenMenuId(null);
     try {
-      await tasksApi.updateTask(task.id, {
-        status: task.status === 'completed' ? 'pending' : 'completed',
-      });
+      if (action === 'delete') {
+        if (!confirm(`Delete task "${task.title}"?`)) return;
+        await tasksApi.deleteTask(task.id);
+      } else if (action === 'note') {
+        const note = prompt('Add a note to this task:');
+        if (!note) return;
+        const stamp = new Date().toLocaleString();
+        const nextDescription = `${task.description ? task.description + '\n' : ''}[${stamp}] ${note}`;
+        await tasksApi.updateTask(task.id, { description: nextDescription });
+      } else {
+        const statusMap: Record<string, string> = {
+          done: 'completed',
+          'in-progress': 'in-progress',
+          rescheduled: 'rescheduled',
+          'disconnect-call': 'disconnected-call',
+        };
+        await tasksApi.updateTask(task.id, { status: statusMap[action] });
+      }
       fetchTasks();
     } catch (err: any) {
       toast.error(err.message || 'Failed to update task');
-    }
-  };
-
-  const handleDelete = async (task: any) => {
-    if (!confirm(`Delete task "${task.title}"?`)) return;
-    try {
-      await tasksApi.deleteTask(task.id);
-      fetchTasks();
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to delete task');
     }
   };
 
@@ -156,9 +213,9 @@ export default function TasksPage() {
         </Card>
       </div>
 
-      {/* Filter Tabs */}
+      {/* Filter Tabs — Task 4.1: Overdue is now separate from Pending */}
       <div className="mb-4 flex gap-2">
-        {['all', 'pending', 'in-progress', 'completed'].map((status) => (
+        {['all', 'pending', 'overdue', 'in-progress', 'completed'].map((status) => (
           <button
             key={status}
             onClick={() => setFilter(status)}
@@ -185,32 +242,48 @@ export default function TasksPage() {
             const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'completed';
             return (
               <Card key={task.id} className={`flex items-center justify-between !p-4 ${isOverdue ? '!border-red-200 bg-red-50/30' : '!border-slate-200'}`}>
-                <div className="flex items-center gap-4">
-                  <input
-                    type="checkbox"
-                    checked={task.status === 'completed'}
-                    onChange={() => toggleComplete(task)}
-                    className="h-4 w-4 cursor-pointer rounded border-2 border-slate-400 text-[#168eea]"
-                  />
-                  <div>
-                    <p className={`text-sm font-medium ${task.status === 'completed' ? 'text-slate-400 line-through' : 'text-slate-900'}`}>
-                      {task.title}
-                    </p>
-                    <p className="text-xs text-slate-500">
-                      {task.type && <span className="capitalize">{task.type}</span>}
-                      {task.relatedTo && ` · ${task.relatedTo}`}
-                      {task.dueDate && ` · Due ${String(task.dueDate).split('T')[0]}`}
-                      {task.assignedTo && ` · 👤 ${task.assignedTo}`}
-                      {isOverdue && <span className="ml-1 font-medium text-red-500">· OVERDUE</span>}
-                    </p>
-                  </div>
+                <div>
+                  <p className={`text-sm font-medium ${task.status === 'completed' ? 'text-slate-400 line-through' : 'text-slate-900'}`}>
+                    {task.title}
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    {task.type && <span className="capitalize">{TASK_TYPES.find((t) => t.value === task.type)?.label || task.type}</span>}
+                    {task.relatedTo && ` · ${task.relatedTo}`}
+                    {task.dueDate && ` · Due ${String(task.dueDate).split('T')[0]}`}
+                    {task.dueTime && ` ${task.dueTime}`}
+                    {task.assignedTo && ` · 👤 ${task.assignedTo}`}
+                    {isOverdue && <span className="ml-1 font-medium text-red-500">· OVERDUE</span>}
+                  </p>
                 </div>
                 <div className="flex items-center gap-2">
                   <StatusBadge status={task.priority} />
                   <StatusBadge status={task.status} />
-                  <button onClick={() => handleDelete(task)} className="text-slate-300 hover:text-red-600" aria-label="Delete task">
-                    <TrashIcon className="h-4 w-4" />
-                  </button>
+                  <div className="relative">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setOpenMenuId(openMenuId === task.id ? null : task.id);
+                      }}
+                      className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                      aria-label="Task actions"
+                    >
+                      <EllipsisVerticalIcon className="h-5 w-5" />
+                    </button>
+                    {openMenuId === task.id && (
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        className="absolute right-0 top-7 z-10 w-44 rounded-md border border-slate-200 bg-white py-1 text-sm shadow-lg"
+                      >
+                        <button onClick={() => applyAction(task, 'done')} className="block w-full px-3 py-1.5 text-left hover:bg-slate-50">Done</button>
+                        <button onClick={() => applyAction(task, 'in-progress')} className="block w-full px-3 py-1.5 text-left hover:bg-slate-50">In Progress</button>
+                        <button onClick={() => applyAction(task, 'rescheduled')} className="block w-full px-3 py-1.5 text-left hover:bg-slate-50">Rescheduled</button>
+                        <button onClick={() => applyAction(task, 'disconnect-call')} className="block w-full px-3 py-1.5 text-left hover:bg-slate-50">Disconnect Call</button>
+                        <button onClick={() => applyAction(task, 'note')} className="block w-full px-3 py-1.5 text-left hover:bg-slate-50">Note</button>
+                        <div className="my-1 border-t border-slate-100" />
+                        <button onClick={() => applyAction(task, 'delete')} className="block w-full px-3 py-1.5 text-left text-red-600 hover:bg-red-50">Delete</button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </Card>
             );
@@ -230,7 +303,7 @@ export default function TasksPage() {
 
             <form onSubmit={handleSubmit} className="mt-4 space-y-3">
               <div>
-                <label className="block text-xs font-medium text-slate-700">Title *</label>
+                <label className="block text-xs font-medium text-slate-700">Task Name *</label>
                 <input
                   type="text"
                   required
@@ -241,14 +314,20 @@ export default function TasksPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-700">Related To</label>
+                <label className="block text-xs font-medium text-slate-700">Company Name</label>
                 <input
                   type="text"
-                  placeholder="e.g. TechCorp Inc"
+                  list="task-company-options"
+                  placeholder="Search company or contact person..."
                   value={formData.relatedTo}
                   onChange={(e) => setFormData({ ...formData, relatedTo: e.target.value })}
                   className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
                 />
+                <datalist id="task-company-options">
+                  {companyOptions.map((opt) => (
+                    <option key={opt} value={opt} />
+                  ))}
+                </datalist>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -259,10 +338,9 @@ export default function TasksPage() {
                     onChange={(e) => setFormData({ ...formData, type: e.target.value })}
                     className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
                   >
-                    <option value="task">Task</option>
-                    <option value="call">Call</option>
-                    <option value="email">Email</option>
-                    <option value="meeting">Meeting</option>
+                    {TASK_TYPES.map((t) => (
+                      <option key={t.value} value={t.value}>{t.label}</option>
+                    ))}
                   </select>
                 </div>
                 <div>
@@ -279,14 +357,25 @@ export default function TasksPage() {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-medium text-slate-700">Due Date</label>
-                <input
-                  type="date"
-                  value={formData.dueDate}
-                  onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-                  className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-700">Due Date</label>
+                  <input
+                    type="date"
+                    value={formData.dueDate}
+                    onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-700">Due Time</label>
+                  <input
+                    type="time"
+                    value={formData.dueTime}
+                    onChange={(e) => setFormData({ ...formData, dueTime: e.target.value })}
+                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                  />
+                </div>
               </div>
 
               {/* Assign to user — only for Managers/Admins */}
@@ -298,7 +387,7 @@ export default function TasksPage() {
                     onChange={(e) => setFormData({ ...formData, assignedToId: e.target.value })}
                     className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
                   >
-                    <option value="">Unassigned (myself)</option>
+                    <option value="">Assign to Me</option>
                     {users.map((u) => (
                       <option key={u.id} value={u.id}>
                         {u.firstName} {u.lastName} — {u.role?.name || u.email}

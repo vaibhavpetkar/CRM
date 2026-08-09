@@ -226,12 +226,13 @@ export const rolesApi = {
 // ─── Leads API ────────────────────────────────────────────────────────────────
 
 export const leadsApi = {
-  getLeads: async (params: { page?: number; limit?: number; search?: string; status?: string } = {}) => {
+  getLeads: async (params: { page?: number; limit?: number; search?: string; status?: string; territory?: string } = {}) => {
     const query = new URLSearchParams();
     if (params.page) query.append('page', String(params.page));
     if (params.limit) query.append('limit', String(params.limit));
     if (params.search) query.append('search', params.search);
     if (params.status && params.status !== 'all') query.append('status', params.status);
+    if (params.territory && params.territory !== 'all') query.append('territory', params.territory);
 
     const qString = query.toString();
     return request<{ leads: any[]; total: number; page: number; pages: number }>(
@@ -248,6 +249,17 @@ export const leadsApi = {
       method: 'POST',
       body: JSON.stringify(leadData),
     });
+  },
+
+  // Task 2.6: duplicate check by email/mobile, called before create to power
+  // the "A lead with this email address or mobile number already exists"
+  // warning popup.
+  checkDuplicate: async (email?: string, mobile?: string, excludeId?: string | number) => {
+    const query = new URLSearchParams();
+    if (email) query.append('email', email);
+    if (mobile) query.append('mobile', mobile);
+    if (excludeId) query.append('excludeId', String(excludeId));
+    return request<{ duplicate: any | null }>(`/leads/check-duplicate?${query.toString()}`);
   },
 
   updateLead: async (id: string | number, leadData: any) => {

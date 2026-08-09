@@ -47,8 +47,11 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
   return (
     <aside
       className={cn(
-        'fixed left-0 top-0 z-30 flex h-screen flex-col bg-white border-r border-slate-200 transition-all duration-200',
-        collapsed ? 'w-[68px]' : 'w-60'
+        // When collapsed to icon-only mode, swap the plain white background for a
+        // light blue tint (--sidebar-collapsed-bg) so the compact state reads as a
+        // distinct visual mode rather than an accident of missing labels.
+        'no-print fixed left-0 top-0 z-30 flex h-screen flex-col border-r border-slate-200 transition-all duration-200',
+        collapsed ? 'w-[68px] bg-[var(--sidebar-collapsed-bg)]' : 'w-60 bg-white'
       )}
     >
       <div className="flex h-14 items-center justify-between border-b border-slate-200 px-3">

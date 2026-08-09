@@ -88,6 +88,15 @@ class LeadService {
     return { ...serializeLead(lead), timeline, attachments };
   }
 
+  // Task 2.6: called by the frontend before showing the "Add Lead" duplicate
+  // warning popup. Returns the matching lead (serialized) if one exists, or
+  // null. `excludeId` lets the edit form check without flagging itself.
+  async checkDuplicate(email?: string | null, mobile?: string | null, excludeId?: number | string) {
+    if (!email && !mobile) return { duplicate: null };
+    const existing = await leadRepository.findDuplicate({ email, mobile }, excludeId);
+    return { duplicate: existing ? serializeLead(existing) : null };
+  }
+
   async create(data: CreateLeadInput, userId?: number | null) {
     if (!data.firstName || !data.lastName) {
       throw new ValidationError('firstName and lastName are required');
@@ -102,13 +111,25 @@ class LeadService {
     if (data.email === '') data.email = null;
     if (data.secondaryEmail === '') data.secondaryEmail = null;
 
-    if (data.email) {
-      const existing = await leadRepository.findByEmail(data.email as string);
-      if (existing) throw new ConflictError('Lead with this email already exists');
+    // Task 2.6: duplicate detection by mobile OR email. Rather than a hard
+    // block, the frontend calls `checkDuplicate` first and shows a warning
+    // popup ("View Existing Lead" / "Continue Anyway" / "Cancel"). If the
+    // user chooses to continue anyway, the request is resent with
+    // `allowDuplicate: true` and creation proceeds normally.
+    if (!data.allowDuplicate) {
+      const existing = await leadRepository.findDuplicate({
+        email: data.email as string | undefined,
+        mobile: data.mobile as string | undefined,
+      });
+      if (existing) {
+        throw new ConflictError('A lead with this email address or mobile number already exists');
+      }
     }
 
     return sequelize.transaction(async (t) => {
-      const leadNumber = await generateCode('LEAD', 'LEAD', 5, true);
+      // Task 2.15: Series ID format is "LD-000001" — short "LD" prefix, flat
+      // (non-year-scoped) 6-digit running number, auto-generated on create.
+      const leadNumber = await generateCode('LEAD', 'LD', 6, false);
 
       const lead = await leadRepository.create(
         {
@@ -153,6 +174,8 @@ class LeadService {
           lastContacted: data.lastContacted ?? null,
           nextFollowUp: data.nextFollowUp ?? null,
           interestedIn: data.interestedIn ?? null,
+          interestedInServices: data.interestedInServices ?? null,
+          interestedInProducts: data.interestedInProducts ?? null,
           timelineToPurchase: data.timelineToPurchase ?? null,
           qualifiedById: data.qualifiedById ?? null,
           meetingStatus: data.meetingStatus ?? null,
@@ -246,7 +269,7 @@ class LeadService {
         'company', 'website', 'jobTitle', 'prefix', 'industry', 'annualRevenue', 'leadSource',
         'sourceDetails', 'territory', 'status', 'score', 'value', 'notes',
         'street', 'city', 'state', 'zipCode', 'country', 'assignedToId', 'leadOwnerId',
-        'nextFollowUp', 'lastContacted', 'interestedIn', 'timelineToPurchase', 'qualifiedById', 'meetingStatus',
+        'nextFollowUp', 'lastContacted', 'interestedIn', 'interestedInServices', 'interestedInProducts', 'timelineToPurchase', 'qualifiedById', 'meetingStatus',
       ];
       const fieldChanges = computeChanges(before, after, REVERTABLE_FIELDS);
 
@@ -420,7 +443,7 @@ class LeadService {
             title: dealTitle || `${lead.company || `${lead.firstName} ${lead.lastName}`} Deal`,
             client: lead.company || `${lead.firstName} ${lead.lastName}`,
             value: dealValue ?? lead.value ?? lead.grandTotal ?? 0,
-            currency: 'USD',
+            currency: 'INR',
             stage: 'prospecting',
             probability: 10,
             leadId: lead.id,
@@ -441,7 +464,7 @@ class LeadService {
           convertedToContactId: contact.id,
           convertedToAccountId: company?.id || null,
           convertedToDealId: deal?.id || null,
-          status: 'won',
+          status: 'converted',
           modifiedById: userId ?? lead.modifiedById,
         },
         { transaction: t }

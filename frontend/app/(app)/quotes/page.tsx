@@ -11,7 +11,7 @@ import { QUOTE_FIELDS } from '@/lib/import-export/field-configs';
 import { formatCurrency } from '@/lib/utils';
 import { quotesApi } from '@/lib/api';
 import Link from 'next/link';
-import { PlusIcon, XMarkIcon, TrashIcon, PaperAirplaneIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, XMarkIcon, TrashIcon, PaperAirplaneIcon, PrinterIcon } from '@heroicons/react/24/outline';
 import { useToast } from '@/components/ui/toast';
 
 const emptyForm = { deal: '', client: '', amount: 10000, status: 'draft', validUntil: '' };
@@ -103,12 +103,21 @@ export default function QuotesPage() {
 
   const columns: DataTableColumn<any>[] = [
     { header: 'Quote #', accessor: (q) => <Link href={`/quotes/${q.id}`} className="font-medium text-[#168eea] hover:underline">{q.quoteNumber}</Link> },
-    { header: 'Deal', accessor: (q) => <span className="text-slate-900">{q.deal || '—'}</span> },
     { header: 'Client', accessor: (q) => <span className="text-slate-600">{q.client}</span> },
     { header: 'Amount', accessor: (q) => <span className="font-medium text-slate-900">{formatCurrency(q.amount)}</span> },
     { header: 'Status', accessor: (q) => <StatusBadge status={q.status} /> },
-    { header: 'Valid Until', accessor: (q) => <span className="text-slate-500">{q.validUntil ? String(q.validUntil).split('T')[0] : 'N/A'}</span> },
-    { header: 'Created', accessor: (q) => <span className="text-slate-500">{q.createdAt ? String(q.createdAt).split('T')[0] : 'N/A'}</span> },
+    {
+      header: 'Valid Until',
+      headerClassName: 'w-24',
+      className: 'w-24',
+      accessor: (q) => <span className="text-slate-500 text-sm">{q.validUntil ? String(q.validUntil).split('T')[0] : 'N/A'}</span>,
+    },
+    {
+      header: 'Created',
+      headerClassName: 'w-24',
+      className: 'w-24',
+      accessor: (q) => <span className="text-slate-500 text-sm">{q.createdAt ? String(q.createdAt).split('T')[0] : 'N/A'}</span>,
+    },
   ];
 
   return (
@@ -141,6 +150,8 @@ export default function QuotesPage() {
 
       <Card>
         <DataTable
+          showToolbar
+          tableId="quotes_table"
           columns={columns}
           data={quotes}
           rowKey={(q) => q.id}
@@ -151,6 +162,10 @@ export default function QuotesPage() {
               <button onClick={() => setSendQuoteId(quote.id)} className="text-slate-400 hover:text-[#168eea]" aria-label="Send">
                 <PaperAirplaneIcon className="h-4 w-4" />
               </button>
+              {/* Task 3.1: Print Format — opens the quote detail page's print view directly */}
+              <Link href={`/quotes/${quote.id}?print=1`} className="text-slate-400 hover:text-[#168eea]" aria-label="Print">
+                <PrinterIcon className="h-4 w-4" />
+              </Link>
               <button onClick={() => handleDelete(quote)} className="text-slate-400 hover:text-red-600" aria-label="Delete">
                 <TrashIcon className="h-4 w-4" />
               </button>

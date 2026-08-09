@@ -127,6 +127,7 @@ export default function ItemCategoriesPage() {
 
       <Card>
         <DataTable
+          tableId="item_categories_table"
           columns={columns}
           data={categories}
           rowKey={(c) => c.id}

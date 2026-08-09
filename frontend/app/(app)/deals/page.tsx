@@ -287,6 +287,7 @@ export default function DealsPage() {
 
       <Card>
         <DataTable
+          tableId="deals_table"
           columns={columns}
           data={deals}
           rowKey={(d) => d.id}

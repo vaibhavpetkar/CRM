@@ -220,6 +220,7 @@ export default function ItemsPage() {
 
       <Card>
         <DataTable
+          tableId="items_table"
           columns={columns}
           data={items}
           rowKey={(i) => i.id}

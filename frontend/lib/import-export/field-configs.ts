@@ -14,7 +14,7 @@ export const LEAD_FIELDS: ImportExportField[] = [
   { key: 'company', label: 'Company', type: 'text' },
   { key: 'jobTitle', label: 'Job Title', type: 'text' },
   { key: 'leadSource', label: 'Lead Source', type: 'select', options: ['website', 'linkedin', 'referral', 'event', 'social-media', 'cold-call', 'email', 'other'] },
-  { key: 'status', label: 'Status', type: 'select', options: ['new', 'contacted', 'qualified', 'proposal', 'negotiation', 'won', 'lost'] },
+  { key: 'status', label: 'Status', type: 'select', options: ['new', 'contacted', 'working', 'qualified', 'unqualified', 'converted', 'lost'] },
   { key: 'industry', label: 'Industry', type: 'text' },
   { key: 'noOfEmployees', label: 'No. of Employees', type: 'number', defaultExport: false },
   { key: 'annualRevenue', label: 'Annual Revenue', type: 'number', defaultExport: false },

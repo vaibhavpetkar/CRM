@@ -49,15 +49,16 @@ export const getTasks = async (req: Request & { user?: any }, res: Response) => 
 
 export const createTask = async (req: Request & { user?: any }, res: Response) => {
   try {
-    const { title, type, priority, dueDate, status, relatedTo, description, assignedToId } = req.body;
+    const { title, type, priority, dueDate, dueTime, status, relatedTo, description, assignedToId } = req.body;
     if (!title) return res.status(400).json({ message: 'Title is required' });
 
     const task = await Task.create({
       title,
-      type: type || 'task',
+      type: type || 'call',
       priority: priority || 'medium',
       status: status || 'pending',
       dueDate: dueDate || null,
+      dueTime: dueTime || null,
       relatedTo: relatedTo || null,
       description: description || null,
       assignedToId: assignedToId || req.user?.id || null,
@@ -94,7 +95,7 @@ export const updateTask = async (req: Request & { user?: any }, res: Response) =
     const task = await Task.findByPk(req.params.id);
     if (!task) return res.status(404).json({ message: 'Task not found' });
 
-    const { title, type, priority, dueDate, status, relatedTo, description, assignedToId } = req.body;
+    const { title, type, priority, dueDate, dueTime, status, relatedTo, description, assignedToId } = req.body;
     const previousAssigneeId = task.assignedToId;
 
     await task.update({
@@ -103,6 +104,7 @@ export const updateTask = async (req: Request & { user?: any }, res: Response) =
       priority: priority ?? task.priority,
       status: status ?? task.status,
       dueDate: dueDate ?? task.dueDate,
+      dueTime: dueTime ?? task.dueTime,
       relatedTo: relatedTo ?? task.relatedTo,
       description: description ?? task.description,
       assignedToId: assignedToId ?? task.assignedToId,

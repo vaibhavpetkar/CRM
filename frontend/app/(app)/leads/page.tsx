@@ -11,6 +11,7 @@ import ImportExportButtons from '@/components/ui/import-export-buttons';
 import { LEAD_FIELDS } from '@/lib/import-export/field-configs';
 import { formatCurrency } from '@/lib/utils';
 import { leadsApi, usersApi, getStoredUser } from '@/lib/api';
+import { TERRITORY_OPTIONS } from '@/lib/lead-options';
 import { hasPermission } from '@/lib/permissions';
 import { useKeyboardShortcuts } from '@/lib/hooks/useKeyboardShortcuts';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -69,6 +70,7 @@ const leadSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
   lastName: z.string().min(1, 'Last name is required'),
   email: z.string().email('Valid email is required'),
+  mobile: z.string().min(1, 'Mobile number is required'),
   company: z.string().optional(),
   leadSource: z.string().optional(),
   assignedToName: z.string().optional(),
@@ -79,6 +81,7 @@ export default function LeadsPage() {
   const toast = useToast();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
+  const [territoryFilter, setTerritoryFilter] = useState('all');
   const [leads, setLeads] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -94,6 +97,11 @@ export default function LeadsPage() {
   const [draggedLeadId, setDraggedLeadId] = useState<string | number | null>(null);
   const [dragOverStatus, setDragOverStatus] = useState<string | null>(null);
   const [selectedLeadIds, setSelectedLeadIds] = useState<(string | number)[]>([]);
+  // Task 2.6: duplicate-lead warning popup state. `pendingPayload` holds the
+  // lead the user is trying to create while they decide what to do about the
+  // match found in `duplicateMatch`.
+  const [duplicateMatch, setDuplicateMatch] = useState<any | null>(null);
+  const [pendingPayload, setPendingPayload] = useState<Record<string, any> | null>(null);
 
   const {
     register,
@@ -106,6 +114,7 @@ export default function LeadsPage() {
       firstName: '',
       lastName: '',
       email: '',
+      mobile: '',
       company: '',
       leadSource: 'Website',
       assignedToName: '',
@@ -129,6 +138,7 @@ export default function LeadsPage() {
         firstName: '',
         lastName: '',
         email: '',
+        mobile: '',
         company: '',
         leadSource: 'Website',
         assignedToName: '',
@@ -182,7 +192,11 @@ export default function LeadsPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await leadsApi.getLeads({ search, status: filter });
+      const res = await leadsApi.getLeads({
+        search,
+        status: filter,
+        territory: territoryFilter,
+      });
       setLeads(res.leads || []);
     } catch (err: any) {
       setError(err.message || 'Failed to load leads. Is the backend running?');
@@ -190,7 +204,7 @@ export default function LeadsPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, filter]);
+  }, [search, filter, territoryFilter]);
 
   useEffect(() => {
     fetchLeads();
@@ -202,6 +216,7 @@ export default function LeadsPage() {
       firstName: '',
       lastName: '',
       email: '',
+      mobile: '',
       company: '',
       leadSource: 'Website',
       assignedToName: '',
@@ -211,6 +226,33 @@ export default function LeadsPage() {
 
   const openEdit = (lead: any) => {
     router.push(`/leads/${lead.id}`);
+  };
+
+  // Task 2.6 — duplicate warning popup actions
+  const handleViewExistingLead = () => {
+    if (duplicateMatch) router.push(`/leads/${duplicateMatch.id}`);
+    setDuplicateMatch(null);
+    setPendingPayload(null);
+  };
+
+  const handleContinueAnyway = async () => {
+    if (!pendingPayload) return;
+    try {
+      await leadsApi.createLead({ ...pendingPayload, allowDuplicate: true });
+      setDuplicateMatch(null);
+      setPendingPayload(null);
+      setIsModalOpen(false);
+      reset();
+      setEditingId(null);
+      fetchLeads();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to save lead');
+    }
+  };
+
+  const handleCancelDuplicate = () => {
+    setDuplicateMatch(null);
+    setPendingPayload(null);
   };
 
   const onSubmitForm = async (data: LeadFormValues) => {
@@ -230,6 +272,7 @@ export default function LeadsPage() {
       firstName: data.firstName,
       lastName: data.lastName,
       email: data.email,
+      mobile: data.mobile,
       company: data.company,
       leadSource: (data.leadSource || 'Website').toLowerCase().replace(/\s+/g, '-'),
       assignedToId: resolvedAssignedToId,
@@ -239,6 +282,16 @@ export default function LeadsPage() {
       if (editingId) {
         await leadsApi.updateLead(editingId, payload);
       } else {
+        // Task 2.6: check for a duplicate by email/mobile before creating.
+        // If found, hold the payload and show the warning popup instead of
+        // creating immediately — the popup's "Continue Anyway" resubmits
+        // with allowDuplicate: true.
+        const { duplicate } = await leadsApi.checkDuplicate(data.email, data.mobile);
+        if (duplicate) {
+          setDuplicateMatch(duplicate);
+          setPendingPayload(payload);
+          return;
+        }
         await leadsApi.createLead(payload);
       }
       setIsModalOpen(false);
@@ -254,7 +307,7 @@ export default function LeadsPage() {
     const payload: Record<string, any> = { ...row };
     if (payload.leadSource) payload.leadSource = String(payload.leadSource).toLowerCase().trim().replace(/\s+/g, '-');
     if (payload.status) payload.status = String(payload.status).toLowerCase().trim();
-    ['score', 'value', 'noOfEmployees', 'annualRevenue', 'latitude', 'longitude'].forEach((key) => {
+    ['score', 'value', 'noOfEmployees', 'latitude', 'longitude'].forEach((key) => {
       if (payload[key] !== undefined && payload[key] !== '') payload[key] = Number(payload[key]);
       else delete payload[key];
     });
@@ -288,86 +341,98 @@ export default function LeadsPage() {
     },
   });
 
+  // Task 2.16: Leads table trimmed to 5 columns total (Checkbox is the built-in
+  // DataTable `selectable` column, handled separately) — Series ID, Company
+  // Name, Contact Person, Status. Everything else (Phone, Email, Title,
+  // Source, Industry, Score, Value, Assigned To, Last Contact, Next Follow Up)
+  // moved off the main table; still editable from the Lead detail page.
   const columns: DataTableColumn<any>[] = [
     {
-      header: 'Contact',
-      accessor: (lead) => {
-        const leadName = lead.name || `${lead.firstName || ''} ${lead.lastName || ''}`.trim() || 'Unnamed';
-        return (
-          <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#168eea]/10 text-xs font-semibold text-[#168eea]">
-              {leadName.charAt(0)}
-            </div>
-            <div>
-              <div className="flex items-center gap-1.5">
-                <Link
-                  href={`/leads/${lead.id}`}
-                  className="font-semibold text-slate-900 hover:text-[#168eea] hover:underline"
-                >
-                  {leadName}
-                </Link>
-                <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-mono text-slate-500">
-                  #{lead.id}
-                </span>
-              </div>
-              <p className="text-xs text-slate-500">{lead.email || 'No email'}</p>
-              {lead.phone && <p className="text-xs text-slate-400">📞 {lead.phone}</p>}
-              {lead.mobile && <p className="text-xs text-slate-400">📱 {lead.mobile}</p>}
-            </div>
-          </div>
-        );
-      },
+      header: 'Series ID',
+      accessor: (lead) => (
+        <Link
+          href={`/leads/${lead.id}`}
+          className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-mono text-slate-600 hover:text-[#168eea] hover:underline"
+        >
+          {lead.leadNumber || `#${lead.id}`}
+        </Link>
+      ),
     },
     {
-      header: 'Company',
-      accessor: (lead) => <span className="text-slate-600">{lead.company || '—'}</span>,
+      header: 'Company Name',
+      accessor: (lead) => <span className="font-medium text-slate-900">{lead.company || '—'}</span>,
       editValue: (lead) => lead.company || '',
       onEdit: (lead, val) => patchLead(lead, 'company', val),
     },
     {
-      header: 'Title',
-      accessor: (lead) => <span className="text-slate-500 text-sm">{lead.jobTitle || '—'}</span>,
-      editValue: (lead) => lead.jobTitle || '',
-      onEdit: (lead, val) => patchLead(lead, 'jobTitle', val),
+      header: 'Contact Person',
+      accessor: (lead) => {
+        const leadName = lead.name || `${lead.firstName || ''} ${lead.lastName || ''}`.trim() || 'Unnamed';
+        return (
+          <Link href={`/leads/${lead.id}`} className="text-slate-600 hover:text-[#168eea] hover:underline">
+            {leadName}
+          </Link>
+        );
+      },
     },
-    { header: 'Source', accessor: (lead) => <span className="capitalize text-slate-600">{lead.source || lead.leadSource || 'Website'}</span> },
     { header: 'Status', accessor: (lead) => <StatusBadge status={lead.status} /> },
-    { header: 'Industry', accessor: (lead) => <span className="text-slate-500 text-sm">{lead.industry || '—'}</span> },
+    // Task 2.16 removed these from the default view, but they're still real
+    // lead fields — available on request via "Arrange & Hide Columns" -> Add.
+    {
+      header: 'Phone',
+      id: 'phone',
+      optional: true,
+      accessor: (lead) => <span className="text-slate-600">{lead.phone || '—'}</span>,
+    },
+    {
+      header: 'Mobile',
+      id: 'mobile',
+      optional: true,
+      accessor: (lead) => <span className="text-slate-600">{lead.mobile || '—'}</span>,
+    },
+    {
+      header: 'Email',
+      id: 'email',
+      optional: true,
+      accessor: (lead) => <span className="text-slate-600">{lead.email || '—'}</span>,
+    },
+    {
+      header: 'Title',
+      id: 'jobTitle',
+      optional: true,
+      accessor: (lead) => <span className="text-slate-600">{lead.designation || lead.jobTitle || '—'}</span>,
+    },
+    {
+      header: 'Source',
+      id: 'leadSource',
+      optional: true,
+      accessor: (lead) => <span className="text-slate-600">{lead.source || lead.leadSource || '—'}</span>,
+    },
+    {
+      header: 'Industry',
+      id: 'industry',
+      optional: true,
+      accessor: (lead) => <span className="text-slate-600">{lead.industry || '—'}</span>,
+    },
     {
       header: 'Score',
-      accessor: (lead) => (
-        <div className="flex items-center gap-2">
-          <div className="h-1.5 w-12 rounded-full bg-slate-100">
-            <div className="h-1.5 rounded-full bg-[#168eea]" style={{ width: `${Math.min(100, lead.score || 0)}%` }} />
-          </div>
-          <span className="text-slate-600">{lead.score || 0}</span>
-        </div>
-      ),
+      id: 'score',
+      optional: true,
+      sortKey: (lead) => lead.score ?? 0,
+      accessor: (lead) => <span className="text-slate-600">{lead.score ?? '—'}</span>,
     },
-    { header: 'Value', accessor: (lead) => <span className="font-medium text-slate-900">{formatCurrency(lead.value || 0)}</span> },
+    {
+      header: 'Value',
+      id: 'value',
+      optional: true,
+      sortKey: (lead) => lead.value ?? 0,
+      accessor: (lead) => <span className="text-slate-600">{lead.value ? formatCurrency(lead.value) : '—'}</span>,
+    },
     {
       header: 'Assigned To',
-      accessor: (lead) => <span className="text-slate-600">{lead.assignedTo || 'Unassigned'}</span>,
-      editValue: (lead) => lead.assignedTo || '',
-      onEdit: (lead, val) => assignLead(lead, val),
-      editDatalist: { id: 'assignable-users-list', options: assignableUsers.map((u) => u.name) },
-    },
-    {
-      header: 'Last Contact',
-      accessor: (lead) => {
-        const raw = lead.lastContact || lead.lastContacted;
-        return <span className="text-slate-500">{raw ? String(raw).split('T')[0] : 'N/A'}</span>;
-      },
-    },
-    {
-      header: 'Next Follow Up',
-      accessor: (lead) => {
-        const raw = lead.nextFollowUp;
-        return <span className="text-slate-500">{raw ? String(raw).split('T')[0] : 'N/A'}</span>;
-      },
-      editValue: (lead) => (lead.nextFollowUp ? String(lead.nextFollowUp).split('T')[0] : ''),
-      editType: 'date',
-      onEdit: (lead, val) => patchLead(lead, 'nextFollowUp', val || null as any),
+      id: 'assignedTo',
+      optional: true,
+      accessor: (lead) => <span className="text-slate-600">{lead.assignedTo || '—'}</span>,
     },
   ];
 
@@ -394,7 +459,19 @@ export default function LeadsPage() {
       />
 
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
-        <SearchInput value={search} onChange={setSearch} placeholder="Search leads..." className="sm:max-w-xs" />
+        <SearchInput value={search} onChange={setSearch} placeholder="Search by Series ID or Company Name..." className="sm:max-w-xs" />
+        <div className="flex items-center gap-2">
+          <select
+            value={territoryFilter}
+            onChange={(e) => setTerritoryFilter(e.target.value)}
+            className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea]"
+          >
+            <option value="all">All Territories</option>
+            {TERRITORY_OPTIONS.map((opt) => (
+              <option key={opt} value={opt}>{opt}</option>
+            ))}
+          </select>
+        </div>
         <div className="flex items-center gap-2">
           <FunnelIcon className="h-4 w-4 text-slate-400" />
           <select
@@ -405,10 +482,10 @@ export default function LeadsPage() {
             <option value="all">All Statuses</option>
             <option value="new">New</option>
             <option value="contacted">Contacted</option>
+            <option value="working">Working / In Progress</option>
             <option value="qualified">Qualified</option>
-            <option value="proposal">Proposal</option>
-            <option value="negotiation">Negotiation</option>
-            <option value="won">Won</option>
+            <option value="unqualified">Unqualified / Disqualified</option>
+            <option value="converted">Converted</option>
             <option value="lost">Lost</option>
           </select>
         </div>
@@ -458,6 +535,7 @@ export default function LeadsPage() {
       ) : (
       <Card>
         <DataTable
+          tableId="leads_table"
           columns={columns}
           data={leads}
           rowKey={(l) => l.id}
@@ -528,6 +606,15 @@ export default function LeadsPage() {
                     {errors.email && <p className="mt-1 text-[10px] text-red-500">{errors.email.message}</p>}
                   </div>
                   <div>
+                    <label className="block text-xs font-medium text-slate-700">Mobile Number *</label>
+                    <input
+                      type="tel"
+                      {...register('mobile')}
+                      className={`mt-1 w-full rounded-md border-0 bg-slate-100/50 p-2 text-sm focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)] ${errors.mobile ? 'ring-1 ring-red-500 bg-red-50' : ''}`}
+                    />
+                    {errors.mobile && <p className="mt-1 text-[10px] text-red-500">{errors.mobile.message}</p>}
+                  </div>
+                  <div>
                     <label className="block text-xs font-medium text-slate-700">Company</label>
                     <input
                       type="text"
@@ -582,11 +669,40 @@ export default function LeadsPage() {
           </div>
         </div>
       )}
+
+      {duplicateMatch && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <h3 className="text-base font-semibold text-slate-900">Possible Duplicate Lead</h3>
+            <p className="mt-2 text-sm text-slate-600">
+              A lead with this email address or mobile number already exists.
+            </p>
+            <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm">
+              <p className="font-medium text-slate-800">
+                {duplicateMatch.name || `${duplicateMatch.firstName || ''} ${duplicateMatch.lastName || ''}`.trim()}
+              </p>
+              <p className="text-slate-500">{duplicateMatch.company || 'No company'}</p>
+              <p className="text-slate-500">{duplicateMatch.email || duplicateMatch.mobile}</p>
+            </div>
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <Button type="button" variant="secondary" size="sm" onClick={handleCancelDuplicate}>
+                Cancel
+              </Button>
+              <Button type="button" variant="secondary" size="sm" onClick={handleContinueAnyway}>
+                Continue Anyway
+              </Button>
+              <Button type="button" size="sm" onClick={handleViewExistingLead}>
+                View Existing Lead
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
 
-const LEAD_STATUSES = ['new', 'contacted', 'qualified', 'proposal', 'negotiation', 'won', 'lost'];
+const LEAD_STATUSES = ['new', 'contacted', 'working', 'qualified', 'unqualified', 'converted', 'lost'];
 
 function LeadsKanban({
   leads,
