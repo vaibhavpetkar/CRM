@@ -9,6 +9,7 @@ import Card from '@/components/ui/card';
 import StatusBadge from '@/components/ui/status-badge';
 import LoadingSpinner from '@/components/ui/loading-spinner';
 import CompanyAutocomplete from '@/components/ui/company-autocomplete';
+import ItemAutocomplete from '@/components/ui/item-autocomplete';
 import { formatCurrency } from '@/lib/utils';
 import { ArrowLeftIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { useToast } from '@/components/ui/toast';
@@ -329,25 +330,21 @@ export default function QuoteDetailPage() {
                       {isLocked ? (
                         row.productName
                       ) : (
-                        <select
+                        <ItemAutocomplete
                           value={row.itemId}
-                          onChange={(e) => {
-                            const id = e.target.value ? Number(e.target.value) : '';
+                          onChange={(val) => {
+                            const id = val ? Number(val) : '';
                             const match = itemCatalog.find((c) => c.id === id);
                             const next = [...lineItems];
                             next[idx] = { ...next[idx], itemId: id, productName: match?.itemName || next[idx].productName, unit: match?.unit || next[idx].unit, rate: match ? match.sellingPrice : next[idx].rate };
                             setLineItems(next);
                             if (match) addTaxFromItem(match);
                           }}
-                          className="w-full rounded-md border border-slate-200 p-1.5 text-sm focus:border-[#168eea] focus:outline-none"
-                        >
-                          <option value="">Select an item...</option>
-                          {itemCatalog.map((c) => (
-                            <option key={c.id} value={c.id}>
-                              {c.itemName}
-                            </option>
-                          ))}
-                        </select>
+                          onSelect={(item) => {
+                            // ItemAutocomplete onSelect is called after onChange with the full item
+                          }}
+                          placeholder="Type item name..."
+                        />
                       )}
                     </td>
                     <td className="p-2">
