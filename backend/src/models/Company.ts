@@ -5,7 +5,7 @@ import sequelize from '../config/database';
 interface CompanyAttributes {
   id: number;
   name: string;
-  email?: string;
+  email?: string | null;
   phone?: string;
   address?: string;
   website?: string;
@@ -22,7 +22,7 @@ interface CompanyCreationAttributes extends Optional<CompanyAttributes, 'id' | '
 class Company extends Model<CompanyAttributes, CompanyCreationAttributes> implements CompanyAttributes {
   public id!: number;
   public name!: string;
-  public email?: string;
+  public email?: string | null;
   public phone?: string;
   public address?: string;
   public website?: string;
@@ -51,6 +51,12 @@ Company.init(
     email: {
       type: DataTypes.STRING(255),
       allowNull: true,
+      // Sequelize's isEmail validator only skips validation for null, not ''.
+      // Normalize '' -> null here so clearing the field in the UI doesn't
+      // trip isEmail on save (see PUT /api/company 500 with value: '').
+      set(value: string | null | undefined) {
+        this.setDataValue('email', value === '' || value === undefined ? null : value);
+      },
       validate: {
         isEmail: true,
       },
