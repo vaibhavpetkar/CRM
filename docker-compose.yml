@@ -54,8 +54,12 @@ services:
       - CLIENT_URL=${CLIENT_URL:-https://crm.eleviq.buzz}
       - SUPER_ADMIN_EMAIL=${SUPER_ADMIN_EMAIL:-admin@crmpro.com}
       - SUPER_ADMIN_PASSWORD=${SUPER_ADMIN_PASSWORD:-et4t8HjfnhRYocM3Z22p!Aa1}
+      # Path to .env file on host (mounted at /host/.env inside container)
+      - ENV_FILE_PATH=/host/.env
     volumes:
       - backend_uploads:/usr/src/app/uploads
+      # Mount host project root to /host so backend can read/write .env
+      - ${VPS_DEPLOY_PATH:-/var/www/crm}:/host:ro
     ports:
       - "127.0.0.1:5000:5000"
     networks:

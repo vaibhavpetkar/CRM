@@ -58,14 +58,16 @@ export const updateEnvVars = async (req: Request, res: Response) => {
     // In a production Docker deployment, environment variables are typically set
     // at container startup via docker-compose or Kubernetes secrets.
     // This endpoint writes to a .env file that the VPS deployment script reads.
-    
-    // For now, we'll write to a .env file in the project root on the VPS
-    // The deployment script should source this file before running docker compose
+    // 
+    // IMPORTANT: The backend runs in Docker at /usr/src/app, but the VPS deploy script
+    // expects .env at the host project root. We use an env var to configure the path.
     
     const fs = await import('fs');
     const path = await import('path');
     
-    const envPath = path.resolve(process.cwd(), '.env');
+    // Use ENV_FILE_PATH if set (for Docker), otherwise fallback to cwd
+    const envFilePath = process.env.ENV_FILE_PATH || path.resolve(process.cwd(), '.env');
+    const envPath = path.resolve(envFilePath);
     
     // Read existing .env file
     let existingEnv = '';
