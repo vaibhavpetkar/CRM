@@ -6,13 +6,16 @@ import Button from '@/components/ui/button';
 import Card from '@/components/ui/card';
 import { authApi, getStoredUser } from '@/lib/api';
 import Link from 'next/link';
+import { Cog6ToothIcon } from '@heroicons/react/24/outline';
 
 const tabs = [
   { id: 'profile', label: 'Profile' },
   { id: 'security', label: 'Security' },
   { id: 'notifications', label: 'Notifications' },
   { id: 'preferences', label: 'Preferences' },
-];
+] as const;
+
+type Tab = { id: string; label: string; icon?: React.ReactNode };
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('profile');
@@ -22,6 +25,14 @@ export default function SettingsPage() {
     setUser(getStoredUser());
     authApi.getMe().then(setUser).catch(() => {});
   }, []);
+
+  const isSuperAdmin = user?.isSuperAdmin;
+
+  const superAdminTabs: Tab[] = isSuperAdmin
+    ? [{ id: 'developer', label: 'Developer', icon: <Cog6ToothIcon className="h-4 w-4" /> }]
+    : [];
+
+  const allTabs: Tab[] = [...tabs, ...superAdminTabs];
 
   // ─── Change password form state ────────────────────────────────────────────
   const [currentPassword, setCurrentPassword] = useState('');
@@ -62,16 +73,23 @@ export default function SettingsPage() {
       <PageHeader title="Settings" description="Manage your account and preferences" />
 
       <div className="mb-6 flex gap-1 border-b border-slate-200">
-        {tabs.map((tab) => (
+        {allTabs.map((tab) => (
           <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`px-4 py-2.5 text-sm font-medium transition-colors ${
-              activeTab === tab.id
+            onClick={() => {
+              if (tab.id === 'developer') {
+                window.location.href = '/settings/developer';
+              } else {
+                setActiveTab(tab.id);
+              }
+            }}
+            className={`px-4 py-2.5 text-sm font-medium transition-colors flex items-center gap-1.5 ${
+              activeTab === tab.id || (tab.id === 'developer' && window.location.pathname === '/settings/developer')
                 ? 'border-b-2 border-[#168eea] text-[#168eea]'
                 : 'text-slate-500 hover:text-slate-700'
             }`}
           >
+            {tab.icon && <span>{tab.icon}</span>}
             {tab.label}
           </button>
         ))}
