@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { Op } from 'sequelize';
+import { Op, ForeignKeyConstraintError, ValidationError } from 'sequelize';
 import Task from '../models/Task';
 import User from '../models/User';
 import Lead from '../models/Lead';
@@ -26,6 +26,14 @@ const serialize = (task: any) => {
     assignedTo: plain.assignedTo ? `${plain.assignedTo.firstName} ${plain.assignedTo.lastName}` : null,
   };
 };
+
+// leadId/dealId/contactId come from the client-side datalist and are normally
+// valid, but the picked record can be stale (deleted or edited by someone
+// else between page load and submit) or forged. Rather than let a bad FK
+// bubble up as a bare 500, surface it as a normal 400 the form can show.
+const isBadReferenceError = (error: unknown) =>
+  error instanceof ForeignKeyConstraintError ||
+  (error instanceof ValidationError && error.name === 'SequelizeValidationError');
 
 export const getTasks = async (req: Request & { user?: any }, res: Response) => {
   try {
@@ -103,6 +111,9 @@ export const createTask = async (req: Request & { user?: any }, res: Response) =
     return res.status(201).json({ message: 'Task created successfully', task: serialize(task) });
   } catch (error) {
     console.error('Create task error:', error);
+    if (isBadReferenceError(error)) {
+      return res.status(400).json({ message: 'The selected Lead, Deal, or Contact no longer exists. Please pick it again.' });
+    }
     return res.status(500).json({ message: 'Server error while creating task' });
   }
 };
@@ -154,6 +165,9 @@ export const updateTask = async (req: Request & { user?: any }, res: Response) =
     return res.json({ message: 'Task updated successfully', task: serialize(task) });
   } catch (error) {
     console.error('Update task error:', error);
+    if (isBadReferenceError(error)) {
+      return res.status(400).json({ message: 'The selected Lead, Deal, or Contact no longer exists. Please pick it again.' });
+    }
     return res.status(500).json({ message: 'Server error while updating task' });
   }
 };

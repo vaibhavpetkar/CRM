@@ -202,37 +202,40 @@ export default function MeetingsPage() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-700">Link to Lead</label>
-                <select
-                  value={formData.leadId}
+                <label className="block text-xs font-medium text-slate-700">
+                  Client {formData.leadId && <span className="font-normal text-[#168eea]">(linked to Lead — details auto-filled)</span>}
+                </label>
+                <input
+                  type="text"
+                  list="meeting-client-options"
+                  autoComplete="off"
+                  placeholder="Start typing a client name…"
+                  value={formData.client}
                   onChange={(e) => {
-                    const id = e.target.value;
-                    const picked = leadOptions.find((l) => String(l.id) === id);
+                    const typed = e.target.value;
+                    // Native <datalist> only gives us back the typed string, so we
+                    // match it against the loaded leads to find the real record —
+                    // that's what lets us auto-fill leadId (and anything else tied
+                    // to that Lead) instead of just storing free text.
+                    const matched = leadOptions.find((l) => l.label === typed);
                     setFormData({
                       ...formData,
-                      leadId: id,
-                      client: picked ? picked.label : formData.client,
+                      client: typed,
+                      leadId: matched ? String(matched.id) : '',
                     });
                   }}
                   className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
-                >
-                  <option value="">— Not linked to a Lead —</option>
-                  {leadOptions.map((l) => (
-                    <option key={l.id} value={l.id}>{l.label}</option>
-                  ))}
-                </select>
-                <p className="mt-1 text-[11px] text-slate-400">
-                  Linking a Lead lets this meeting show up on that Lead&apos;s timeline.
-                </p>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-700">Client {formData.leadId && <span className="font-normal text-slate-400">(auto-filled from linked Lead)</span>}</label>
-                <input
-                  type="text"
-                  value={formData.client}
-                  onChange={(e) => setFormData({ ...formData, client: e.target.value, leadId: '' })}
-                  className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
                 />
+                <datalist id="meeting-client-options">
+                  {leadOptions.map((l) => (
+                    <option key={l.id} value={l.label} />
+                  ))}
+                </datalist>
+                <p className="mt-1 text-[11px] text-slate-400">
+                  {formData.leadId
+                    ? 'This meeting will show up on that Lead\u2019s timeline.'
+                    : 'Pick a suggestion to link this meeting to an existing Lead, or type freely for a one-off client.'}
+                </p>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>

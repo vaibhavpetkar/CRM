@@ -34,7 +34,14 @@ jobs:
             # Rebuild and restart the Docker containers
             sudo docker compose down
             sudo docker compose up -d --build
-            
+
+            # Run any pending DB migrations against the now-running backend
+            # container. Without this, new columns/tables added by a
+            # migration (e.g. Meeting/Task -> Lead/Deal/Contact FKs) exist in
+            # the model but not the DB, and every query that touches them
+            # 500s in production even though the build succeeded.
+            sudo docker compose exec -T backend npm run migrate
+
             # Prune unused images to save disk space
             sudo docker image prune -f
 
