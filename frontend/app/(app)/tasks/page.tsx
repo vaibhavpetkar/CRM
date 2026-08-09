@@ -6,6 +6,7 @@ import StatusBadge from '@/components/ui/status-badge';
 import Button from '@/components/ui/button';
 import Card from '@/components/ui/card';
 import LoadingSpinner from '@/components/ui/loading-spinner';
+import CompanyAutocomplete from '@/components/ui/company-autocomplete';
 import { tasksApi, usersApi, leadsApi } from '@/lib/api';
 import { getStoredUser } from '@/lib/api';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -52,6 +53,17 @@ export default function TasksPage() {
   const [openMenuId, setOpenMenuId] = useState<number | string | null>(null);
   const currentUser = getStoredUser();
   const isMgrOrAdmin = ['Administrator', 'Sales Manager'].includes(currentUser?.role?.name);
+
+  // Handle company selection from autocomplete
+  const handleCompanySelect = (company: any) => {
+    // Find the matching lead to get the leadId
+    const matched = leadOptions.find((l) => l.label.includes(company.name));
+    setFormData((prev: any) => ({
+      ...prev,
+      relatedTo: company.name,
+      leadId: matched ? String(matched.id) : '',
+    }));
+  };
 
   // Support deep-linking from the topbar's Quick Create menu (/tasks?quickCreate=1)
   useEffect(() => {
@@ -341,41 +353,15 @@ export default function TasksPage() {
                 <label className="block text-xs font-medium text-slate-700">
                   Client {formData.leadId && <span className="font-normal text-[#168eea]">(linked to Lead — details auto-filled)</span>}
                 </label>
-                <input
-                  type="text"
-                  list="task-client-options"
-                  autoComplete="off"
-                  placeholder="Start typing a client, company, or contact…"
+                <CompanyAutocomplete
                   value={formData.relatedTo}
-                  onChange={(e) => {
-                    const typed = e.target.value;
-                    // The <datalist> below only returns the typed string on
-                    // selection, so match it back against the loaded leads to
-                    // recover the real record — that's what lets us auto-fill
-                    // leadId (and anything else tied to that Lead) instead of
-                    // just storing free text.
-                    const matched = leadOptions.find((l) => l.label === typed);
-                    setFormData({
-                      ...formData,
-                      relatedTo: typed,
-                      leadId: matched ? String(matched.id) : '',
-                    });
-                  }}
-                  className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                  onChange={(val) => setFormData({ ...formData, relatedTo: val })}
+                  onSelect={handleCompanySelect}
+                  placeholder="Start typing a client, company, or contact…"
                 />
-                <datalist id="task-client-options">
-                  {leadOptions.map((l) => (
-                    <option key={l.id} value={l.label} />
-                  ))}
-                  {companyOptions
-                    .filter((opt) => !leadOptions.some((l) => l.label === opt))
-                    .map((opt) => (
-                      <option key={opt} value={opt} />
-                    ))}
-                </datalist>
                 <p className="mt-1 text-[11px] text-slate-400">
                   {formData.leadId
-                    ? 'This task will show up on that Lead\u2019s timeline.'
+                    ? 'This task will show up on that Lead\'s timeline.'
                     : 'Pick a suggestion to link this task to an existing Lead, or type freely for a one-off client.'}
                 </p>
               </div>

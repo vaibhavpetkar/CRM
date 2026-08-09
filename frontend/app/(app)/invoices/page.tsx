@@ -7,6 +7,7 @@ import StatCard from '@/components/ui/stat-card';
 import Button from '@/components/ui/button';
 import Card from '@/components/ui/card';
 import DataTable, { DataTableColumn } from '@/components/ui/data-table';
+import CompanyAutocomplete from '@/components/ui/company-autocomplete';
 import { formatCurrency } from '@/lib/utils';
 import { invoicesApi } from '@/lib/api';
 import ImportExportButtons from '@/components/ui/import-export-buttons';
@@ -24,6 +25,14 @@ export default function InvoicesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState(emptyForm);
   const [submitting, setSubmitting] = useState(false);
+
+  // Handle company selection from autocomplete
+  const handleCompanySelect = (company: any) => {
+    setFormData((prev: any) => ({
+      ...prev,
+      client: company.name,
+    }));
+  };
 
   const fetchInvoices = useCallback(async () => {
     setLoading(true);
@@ -146,12 +155,11 @@ export default function InvoicesPage() {
             <form onSubmit={handleSubmit} className="mt-4 space-y-3">
               <div>
                 <label className="block text-xs font-medium text-slate-700">Client</label>
-                <input
-                  type="text"
-                  required
+                <CompanyAutocomplete
                   value={formData.client}
-                  onChange={(e) => setFormData({ ...formData, client: e.target.value })}
-                  className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                  onChange={(val) => setFormData({ ...formData, client: val })}
+                  onSelect={handleCompanySelect}
+                  placeholder="Type client name to search..."
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">

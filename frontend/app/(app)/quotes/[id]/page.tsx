@@ -8,6 +8,7 @@ import Button from '@/components/ui/button';
 import Card from '@/components/ui/card';
 import StatusBadge from '@/components/ui/status-badge';
 import LoadingSpinner from '@/components/ui/loading-spinner';
+import CompanyAutocomplete from '@/components/ui/company-autocomplete';
 import { formatCurrency } from '@/lib/utils';
 import { ArrowLeftIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { useToast } from '@/components/ui/toast';
@@ -33,6 +34,17 @@ export default function QuoteDetailPage() {
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
   const [taxLines, setTaxLines] = useState<TaxLine[]>([]);
   const [itemCatalog, setItemCatalog] = useState<{ id: number; itemName: string; unit: string; sellingPrice: number; taxId: number | null; taxType: string | null; taxRate: number | null }[]>([]);
+
+  // Handle company selection from autocomplete
+  const handleCompanySelect = (company: any) => {
+    setFormData((prev: any) => ({
+      ...prev,
+      client: company.name,
+      customerEmail: company.email || '',
+      customerPhone: company.phone || '',
+      customerAddress: company.address || '',
+    }));
+  };
 
   const fetchQuote = useCallback(async () => {
     setLoading(true);
@@ -230,12 +242,12 @@ export default function QuoteDetailPage() {
         <div className="grid grid-cols-2 gap-6">
           <div>
             <label className="block text-sm font-medium text-slate-700">Client</label>
-            <input
-              type="text"
-              disabled={isLocked}
+            <CompanyAutocomplete
               value={formData.client || ''}
-              onChange={(e) => setFormData({ ...formData, client: e.target.value })}
-              className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none disabled:bg-slate-50"
+              onChange={(val) => setFormData({ ...formData, client: val })}
+              onSelect={handleCompanySelect}
+              placeholder="Type client name to search..."
+              disabled={isLocked}
             />
           </div>
           <div>

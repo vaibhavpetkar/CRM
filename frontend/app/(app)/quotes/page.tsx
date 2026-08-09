@@ -7,6 +7,7 @@ import Button from '@/components/ui/button';
 import Card from '@/components/ui/card';
 import DataTable, { DataTableColumn } from '@/components/ui/data-table';
 import ImportExportButtons from '@/components/ui/import-export-buttons';
+import CompanyAutocomplete from '@/components/ui/company-autocomplete';
 import { QUOTE_FIELDS } from '@/lib/import-export/field-configs';
 import { formatCurrency } from '@/lib/utils';
 import { quotesApi } from '@/lib/api';
@@ -14,7 +15,7 @@ import Link from 'next/link';
 import { PlusIcon, XMarkIcon, TrashIcon, PaperAirplaneIcon, PrinterIcon } from '@heroicons/react/24/outline';
 import { useToast } from '@/components/ui/toast';
 
-const emptyForm = { deal: '', client: '', amount: 10000, status: 'draft', validUntil: '' };
+const emptyForm = { deal: '', client: '', customerEmail: '', customerPhone: '', customerAddress: '', amount: 10000, status: 'draft', validUntil: '' };
 
 export default function QuotesPage() {
   const toast = useToast();
@@ -27,6 +28,17 @@ export default function QuotesPage() {
   const [sendQuoteId, setSendQuoteId] = useState<string | number | null>(null);
   const [sendMethod, setSendMethod] = useState<'email' | 'whatsapp'>('email');
   const [sendTarget, setSendTarget] = useState('');
+
+  // Handle company selection from autocomplete
+  const handleCompanySelect = (company: any) => {
+    setFormData((prev: any) => ({
+      ...prev,
+      client: company.name,
+      customerEmail: company.email || '',
+      customerPhone: company.phone || '',
+      customerAddress: company.address || '',
+    }));
+  };
 
   const fetchQuotes = useCallback(async () => {
     setLoading(true);
@@ -187,12 +199,11 @@ export default function QuotesPage() {
             <form onSubmit={handleSubmit} className="mt-4 space-y-3">
               <div>
                 <label className="block text-xs font-medium text-slate-700">Client</label>
-                <input
-                  type="text"
-                  required
+                <CompanyAutocomplete
                   value={formData.client}
-                  onChange={(e) => setFormData({ ...formData, client: e.target.value })}
-                  className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                  onChange={(val) => setFormData({ ...formData, client: val })}
+                  onSelect={handleCompanySelect}
+                  placeholder="Type client name to search..."
                 />
               </div>
               <div>
