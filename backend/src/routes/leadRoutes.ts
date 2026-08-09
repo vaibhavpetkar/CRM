@@ -12,6 +12,9 @@ router.get('/stats', protect, authorize('leads:read'), leadController.getLeadSta
 // Task 2.6: must also come before /:id for the same reason.
 router.get('/check-duplicate', protect, authorize('leads:read'), leadController.checkDuplicateLead);
 
+// Company/Contact search for auto-populate (must come before /:id)
+router.get('/company-search', protect, authorize('leads:read'), leadController.searchCompaniesAndContacts);
+
 // Lead CRUD routes
 // Short-lived cache keyed by the exact querystring (page/limit/filters/sort) —
 // list results aren't scoped per-user here, so it's safe to share across

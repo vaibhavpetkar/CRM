@@ -8,6 +8,7 @@ import { ANNUAL_TURNOVER_OPTIONS, INDUSTRY_OPTIONS, DESIGNATION_OPTIONS, TERRITO
 import Button from '@/components/ui/button';
 import Card from '@/components/ui/card';
 import DataTable from '@/components/ui/data-table';
+import CompanyAutocomplete from '@/components/ui/company-autocomplete';
 import { ArrowLeftIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { useToast } from '@/components/ui/toast';
 import { useKeyboardShortcuts } from '@/lib/hooks/useKeyboardShortcuts';
@@ -44,6 +45,22 @@ export default function LeadDetailsPage() {
   const [itemCatalog, setItemCatalog] = useState<
     { id: number; itemName: string; unit: string; sellingPrice: number; taxId: number | null; taxType: string | null; taxRate: number | null }[]
   >([]);
+
+  // Handle company selection from autocomplete
+  const handleCompanySelect = (company: any) => {
+    // Auto-populate related fields
+    if (company.email) setFormData({ ...formData, email: company.email });
+    if (company.phone) setFormData({ ...formData, phone: company.phone });
+    if (company.address) setFormData({ ...formData, street: company.address });
+    if (company.website) setFormData({ ...formData, website: company.website });
+    if (company.industry) setFormData({ ...formData, industry: company.industry });
+    // If it's a contact, also populate contact person fields
+    if (company.contactName) {
+      const [firstName, ...lastNameParts] = company.contactName.split(' ');
+      setFormData({ ...formData, firstName, lastName: lastNameParts.join(' ') });
+      if (company.contactTitle) setFormData({ ...formData, jobTitle: company.contactTitle });
+    }
+  };
 
   useEffect(() => {
     itemsApi
@@ -353,11 +370,11 @@ export default function LeadDetailsPage() {
               <div className="grid grid-cols-3 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-slate-700">Company Name</label>
-                  <input
-                    type="text"
+                  <CompanyAutocomplete
                     value={formData.company || ''}
-                    onChange={(e) => setFormData({ ...formData, company: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                    onChange={(val) => setFormData({ ...formData, company: val })}
+                    onSelect={handleCompanySelect}
+                    placeholder="Type company name to search..."
                   />
                 </div>
                 <div>

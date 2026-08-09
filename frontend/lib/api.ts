@@ -290,6 +290,10 @@ export const leadsApi = {
     });
   },
 
+  searchCompanies: async (query: string) => {
+    return request<{ results: CompanySuggestion[] }>(`/leads/company-search?q=${encodeURIComponent(query)}`);
+  },
+
   getStats: async () => {
     return request<{
       totalLeads: number;
@@ -620,6 +624,19 @@ export interface GlobalSearchResult {
   title: string;
   subtitle: string;
   url: string;
+}
+
+export interface CompanySuggestion {
+  type: 'company' | 'contact';
+  id: number;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  website: string | null;
+  industry: string | null;
+  contactName: string | null;
+  contactTitle: string | null;
 }
 
 export const searchApi = {

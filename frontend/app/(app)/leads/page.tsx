@@ -8,6 +8,7 @@ import Button from '@/components/ui/button';
 import Card from '@/components/ui/card';
 import DataTable, { DataTableColumn } from '@/components/ui/data-table';
 import ImportExportButtons from '@/components/ui/import-export-buttons';
+import CompanyAutocomplete from '@/components/ui/company-autocomplete';
 import { LEAD_FIELDS } from '@/lib/import-export/field-configs';
 import { formatCurrency } from '@/lib/utils';
 import { leadsApi, usersApi, getStoredUser } from '@/lib/api';
@@ -74,6 +75,12 @@ const leadSchema = z.object({
   company: z.string().optional(),
   leadSource: z.string().optional(),
   assignedToName: z.string().optional(),
+  // Additional fields for auto-populate
+  phone: z.string().optional(),
+  street: z.string().optional(),
+  website: z.string().optional(),
+  industry: z.string().optional(),
+  jobTitle: z.string().optional(),
 });
 type LeadFormValues = z.infer<typeof leadSchema>;
 
@@ -107,6 +114,8 @@ export default function LeadsPage() {
     register,
     handleSubmit: hookFormSubmit,
     reset,
+    watch,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<LeadFormValues>({
     resolver: zodResolver(leadSchema),
@@ -120,6 +129,9 @@ export default function LeadsPage() {
       assignedToName: '',
     },
   });
+
+  // Watch company field for auto-populate
+  const watchedCompany = watch('company');
   // Users available to assign leads to (name typeahead datalist)
   const [assignableUsers, setAssignableUsers] = useState<{ id: number; name: string }[]>([]);
 
@@ -233,6 +245,23 @@ export default function LeadsPage() {
     if (duplicateMatch) router.push(`/leads/${duplicateMatch.id}`);
     setDuplicateMatch(null);
     setPendingPayload(null);
+  };
+
+  // Handle company selection from autocomplete
+  const handleCompanySelect = (company: any) => {
+    // Auto-populate related fields
+    if (company.email) setValue('email', company.email);
+    if (company.phone) setValue('phone', company.phone);
+    if (company.address) setValue('street', company.address);
+    if (company.website) setValue('website', company.website);
+    if (company.industry) setValue('industry', company.industry);
+    // If it's a contact, also populate contact person fields
+    if (company.contactName) {
+      const [firstName, ...lastNameParts] = company.contactName.split(' ');
+      setValue('firstName', firstName);
+      setValue('lastName', lastNameParts.join(' '));
+      if (company.contactTitle) setValue('jobTitle', company.contactTitle);
+    }
   };
 
   const handleContinueAnyway = async () => {
@@ -627,10 +656,11 @@ export default function LeadsPage() {
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-slate-700">Company</label>
-                    <input
-                      type="text"
-                      {...register('company')}
-                      className="mt-1 w-full rounded-md border-0 bg-slate-100/50 p-2 text-sm focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
+                    <CompanyAutocomplete
+                      value={watchedCompany || ''}
+                      onChange={(val) => setValue('company', val, { shouldValidate: true })}
+                      onSelect={handleCompanySelect}
+                      placeholder="Type company name to search..."
                     />
                   </div>
                   <div>

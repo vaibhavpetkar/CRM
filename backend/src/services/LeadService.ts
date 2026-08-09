@@ -352,6 +352,7 @@ class LeadService {
               relatedTo: `Lead: ${lead.leadNumber}`,
               description: `Auto-created follow-up task for lead ${lead.leadNumber}.`,
               assignedToId: ownerId,
+              leadId: lead.id,
             },
             { transaction: t }
           );
