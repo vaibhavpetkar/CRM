@@ -7,14 +7,21 @@ module.exports = {
   // column is left in place (unused going forward) rather than dropped, so any
   // historical data isn't destroyed.
   async up(queryInterface, Sequelize) {
-    await queryInterface.addColumn('leads', 'interestedInServices', {
-      type: Sequelize.STRING(255),
-      allowNull: true,
-    });
-    await queryInterface.addColumn('leads', 'interestedInProducts', {
-      type: Sequelize.STRING(255),
-      allowNull: true,
-    });
+    // Make migration idempotent by checking if columns exist
+    const tableDescription = await queryInterface.describeTable('leads');
+    
+    if (!tableDescription.interestedInServices) {
+      await queryInterface.addColumn('leads', 'interestedInServices', {
+        type: Sequelize.STRING(255),
+        allowNull: true,
+      });
+    }
+    if (!tableDescription.interestedInProducts) {
+      await queryInterface.addColumn('leads', 'interestedInProducts', {
+        type: Sequelize.STRING(255),
+        allowNull: true,
+      });
+    }
   },
 
   async down(queryInterface) {
