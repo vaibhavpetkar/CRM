@@ -30,10 +30,15 @@ export const generateInvoiceNumber = async () => {
  * Auto-generates an Invoice from an approved Quote. Used by the quote approval
  * workflow so sales reps don't have to manually re-key the quote into an invoice.
  * Idempotent: if an invoice already exists for this quote, it's returned as-is.
+ * Copies customer details (email, phone, address) from the quote.
  */
 export const createInvoiceFromQuote = async (quote: {
   id: number;
   client: string;
+  customerEmail?: string | null;
+  customerPhone?: string | null;
+  customerAddress?: string | null;
+  companyAddress?: string | null;
   amount: number;
   assignedToId?: number | null;
 }) => {
@@ -47,6 +52,10 @@ export const createInvoiceFromQuote = async (quote: {
   return Invoice.create({
     invoiceNumber: await generateInvoiceNumber(),
     client: quote.client,
+    customerEmail: quote.customerEmail || null,
+    customerPhone: quote.customerPhone || null,
+    customerAddress: quote.customerAddress || null,
+    companyAddress: quote.companyAddress || null,
     amount: quote.amount,
     status: 'pending',
     issuedDate,
@@ -84,14 +93,18 @@ export const getInvoices = async (req: Request, res: Response) => {
 
 export const createInvoice = async (req: Request, res: Response) => {
   try {
-    const { client, amount, status, issuedDate, dueDate, quoteId, assignedToId } = req.body;
+    const { client, customerEmail, customerPhone, customerAddress, companyAddress, amount, status, issuedDate, dueDate, quoteId, assignedToId } = req.body;
     if (!client) return res.status(400).json({ message: 'Client is required' });
 
     const invoice = await Invoice.create({
       invoiceNumber: await generateInvoiceNumber(),
       client,
+      customerEmail: customerEmail || null,
+      customerPhone: customerPhone || null,
+      customerAddress: customerAddress || null,
+      companyAddress: companyAddress || null,
       amount: amount || 0,
-      status: status || 'pending',
+      status: status || 'draft',
       issuedDate: issuedDate || null,
       dueDate: dueDate || null,
       quoteId: quoteId || null,
@@ -110,9 +123,13 @@ export const updateInvoice = async (req: Request, res: Response) => {
     const invoice = await Invoice.findByPk(req.params.id);
     if (!invoice) return res.status(404).json({ message: 'Invoice not found' });
 
-    const { client, amount, status, issuedDate, dueDate, quoteId, assignedToId } = req.body;
+    const { client, customerEmail, customerPhone, customerAddress, companyAddress, amount, status, issuedDate, dueDate, quoteId, assignedToId } = req.body;
     await invoice.update({
       client: client ?? invoice.client,
+      customerEmail: customerEmail ?? invoice.customerEmail,
+      customerPhone: customerPhone ?? invoice.customerPhone,
+      customerAddress: customerAddress ?? invoice.customerAddress,
+      companyAddress: companyAddress ?? invoice.companyAddress,
       amount: amount ?? invoice.amount,
       status: status ?? invoice.status,
       issuedDate: issuedDate ?? invoice.issuedDate,

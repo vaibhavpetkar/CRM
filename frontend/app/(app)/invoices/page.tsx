@@ -8,6 +8,7 @@ import Button from '@/components/ui/button';
 import Card from '@/components/ui/card';
 import DataTable, { DataTableColumn } from '@/components/ui/data-table';
 import CompanyAutocomplete from '@/components/ui/company-autocomplete';
+import SearchInput from '@/components/ui/search-input';
 import { formatCurrency } from '@/lib/utils';
 import { invoicesApi } from '@/lib/api';
 import ImportExportButtons from '@/components/ui/import-export-buttons';
@@ -15,7 +16,27 @@ import { INVOICE_FIELDS } from '@/lib/import-export/field-configs';
 import { PlusIcon, XMarkIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { useToast } from '@/components/ui/toast';
 
-const emptyForm = { client: '', amount: 10000, status: 'pending', issuedDate: '', dueDate: '' };
+const emptyForm = { 
+  client: '', 
+  customerEmail: '', 
+  customerPhone: '', 
+  customerAddress: '',
+  companyAddress: '',
+  amount: 10000, 
+  status: 'draft', 
+  issuedDate: '', 
+  dueDate: '',
+  quoteId: '',
+};
+
+const INVOICE_STATUSES = [
+  { value: 'all', label: 'All' },
+  { value: 'draft', label: 'Draft' },
+  { value: 'pending', label: 'Pending' },
+  { value: 'paid', label: 'Paid' },
+  { value: 'overdue', label: 'Overdue' },
+  { value: 'cancelled', label: 'Cancelled' },
+];
 
 export default function InvoicesPage() {
   const toast = useToast();
@@ -25,12 +46,17 @@ export default function InvoicesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState(emptyForm);
   const [submitting, setSubmitting] = useState(false);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
 
   // Handle company selection from autocomplete
   const handleCompanySelect = (company: any) => {
     setFormData((prev: any) => ({
       ...prev,
       client: company.name,
+      customerEmail: company.email || '',
+      customerPhone: company.phone || '',
+      customerAddress: company.address || '',
     }));
   };
 
@@ -38,7 +64,7 @@ export default function InvoicesPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await invoicesApi.getInvoices();
+      const res = await invoicesApi.getInvoices({ search, status: statusFilter });
       setInvoices(res.invoices || []);
     } catch (err: any) {
       setError(err.message || 'Failed to load invoices. Is the backend running?');
@@ -46,7 +72,7 @@ export default function InvoicesPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [search, statusFilter]);
 
   useEffect(() => {
     fetchInvoices();
@@ -60,10 +86,15 @@ export default function InvoicesPage() {
     e.preventDefault();
     setSubmitting(true);
     try {
-      await invoicesApi.createInvoice({ ...formData, amount: Number(formData.amount) });
+      await invoicesApi.createInvoice({ 
+        ...formData, 
+        amount: Number(formData.amount),
+        quoteId: formData.quoteId || undefined,
+      });
       setIsModalOpen(false);
       setFormData(emptyForm);
       fetchInvoices();
+      toast.success('Invoice created successfully');
     } catch (err: any) {
       toast.error(err.message || 'Failed to create invoice');
     } finally {
@@ -76,6 +107,7 @@ export default function InvoicesPage() {
     try {
       await invoicesApi.deleteInvoice(invoice.id);
       fetchInvoices();
+      toast.success('Invoice deleted');
     } catch (err: any) {
       toast.error(err.message || 'Failed to delete invoice');
     }
@@ -88,6 +120,7 @@ export default function InvoicesPage() {
     { header: 'Status', accessor: (i) => <StatusBadge status={i.status} /> },
     { header: 'Issued', accessor: (i) => <span className="text-slate-500">{i.issuedDate ? String(i.issuedDate).split('T')[0] : 'N/A'}</span> },
     { header: 'Due Date', accessor: (i) => <span className="text-slate-500">{i.dueDate ? String(i.dueDate).split('T')[0] : 'N/A'}</span> },
+    { header: 'Email', accessor: (i) => <span className="text-slate-500 text-sm">{i.customerEmail || '—'}</span> },
   ];
 
   return (
@@ -124,6 +157,28 @@ export default function InvoicesPage() {
 
       {error && <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
 
+      {/* Search and Filters */}
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <SearchInput 
+          value={search} 
+          onChange={setSearch} 
+          placeholder="Search by Invoice # or Company Name..." 
+          className="sm:max-w-xs" 
+        />
+        <div className="flex items-center gap-2">
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea]"
+          >
+            {INVOICE_STATUSES.map((s) => (
+              <option key={s.value} value={s.value}>{s.label}</option>
+            ))}
+          </select>
+        </div>
+        <span className="text-sm text-slate-500">{invoices.length} invoice{invoices.length === 1 ? '' : 's'}</span>
+      </div>
+
       <Card>
         <DataTable
           tableId="invoices_table"
@@ -144,7 +199,7 @@ export default function InvoicesPage() {
 
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+          <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="text-lg font-semibold text-slate-900">New Invoice</h3>
               <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600">
@@ -153,8 +208,9 @@ export default function InvoicesPage() {
             </div>
 
             <form onSubmit={handleSubmit} className="mt-4 space-y-3">
+              {/* Client Selection with Autocomplete */}
               <div>
-                <label className="block text-xs font-medium text-slate-700">Client</label>
+                <label className="block text-xs font-medium text-slate-700">Client *</label>
                 <CompanyAutocomplete
                   value={formData.client}
                   onChange={(val) => setFormData({ ...formData, client: val })}
@@ -162,9 +218,57 @@ export default function InvoicesPage() {
                   placeholder="Type client name to search..."
                 />
               </div>
+
+              {/* Customer Details (auto-filled from selection) */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-slate-700">Amount ($)</label>
+                  <label className="block text-xs font-medium text-slate-700">Customer Email</label>
+                  <input
+                    type="email"
+                    value={formData.customerEmail}
+                    onChange={(e) => setFormData({ ...formData, customerEmail: e.target.value })}
+                    placeholder="client@example.com"
+                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-700">Customer Phone</label>
+                  <input
+                    type="tel"
+                    value={formData.customerPhone}
+                    onChange={(e) => setFormData({ ...formData, customerPhone: e.target.value })}
+                    placeholder="+1 234 567 8900"
+                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Addresses */}
+              <div>
+                <label className="block text-xs font-medium text-slate-700">Customer Address</label>
+                <textarea
+                  value={formData.customerAddress}
+                  onChange={(e) => setFormData({ ...formData, customerAddress: e.target.value })}
+                  placeholder="Client billing address..."
+                  rows={2}
+                  className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-700">Company Address</label>
+                <textarea
+                  value={formData.companyAddress}
+                  onChange={(e) => setFormData({ ...formData, companyAddress: e.target.value })}
+                  placeholder="Your company address..."
+                  rows={2}
+                  className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                />
+              </div>
+
+              {/* Amount and Status */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-700">Amount *</label>
                   <input
                     type="number"
                     required
@@ -184,9 +288,12 @@ export default function InvoicesPage() {
                     <option value="pending">Pending</option>
                     <option value="paid">Paid</option>
                     <option value="overdue">Overdue</option>
+                    <option value="cancelled">Cancelled</option>
                   </select>
                 </div>
               </div>
+
+              {/* Dates */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-slate-700">Issued Date</label>
