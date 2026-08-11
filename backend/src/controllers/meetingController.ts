@@ -94,19 +94,33 @@ export const updateMeeting = async (req: Request, res: Response) => {
     if (!meeting) return res.status(404).json({ message: 'Meeting not found' });
 
     const { title, client, leadId, dealId, contactId, date, time, duration, type, status, notes, assignedToId } = req.body;
+
+    // duration is stored as STRING in DB (e.g. "60" or "1h"), so don't parse as number.
+    // Just validate it's a non-empty string if provided.
+    if (duration !== undefined && duration !== '' && String(duration).trim() === '') {
+      return res.status(400).json({ message: 'Duration cannot be empty' });
+    }
+
+    // Use !== undefined so nullable fields can be cleared, and normalize '' -> null.
+    // For FK fields (leadId, dealId, contactId, assignedToId), parse strings to numbers.
+    const norm = (v: any) => (v === '' ? null : v);
+    const normNum = (v: any) => {
+      const n = norm(v);
+      return n === null ? null : Number(n);
+    };
     await meeting.update({
-      title: title ?? meeting.title,
-      client: client ?? meeting.client,
-      leadId: leadId ?? meeting.leadId,
-      dealId: dealId ?? meeting.dealId,
-      contactId: contactId ?? meeting.contactId,
-      date: date ?? meeting.date,
-      time: time ?? meeting.time,
-      duration: duration ?? meeting.duration,
-      type: type ?? meeting.type,
-      status: status ?? meeting.status,
-      notes: notes ?? meeting.notes,
-      assignedToId: assignedToId ?? meeting.assignedToId,
+      title: title !== undefined ? title : meeting.title,
+      client: client !== undefined ? norm(client) : meeting.client,
+      leadId: leadId !== undefined ? normNum(leadId) : meeting.leadId,
+      dealId: dealId !== undefined ? normNum(dealId) : meeting.dealId,
+      contactId: contactId !== undefined ? normNum(contactId) : meeting.contactId,
+      date: date !== undefined ? date : meeting.date,
+      time: time !== undefined ? norm(time) : meeting.time,
+      duration: duration !== undefined ? norm(duration) : meeting.duration,
+      type: type !== undefined ? type : meeting.type,
+      status: status !== undefined ? status : meeting.status,
+      notes: notes !== undefined ? norm(notes) : meeting.notes,
+      assignedToId: assignedToId !== undefined ? normNum(assignedToId) : meeting.assignedToId,
     });
 
     await meeting.reload({ include: relationIncludes });

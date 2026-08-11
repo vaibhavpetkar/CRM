@@ -82,7 +82,12 @@ export const getTeamStats = async (_req: Request, res: Response) => {
       totalMembers,
       activeMembers,
       inactiveMembers: totalMembers - activeMembers,
-      byDepartment,
+      byDepartment: byDepartment.map((row: any) => ({
+        // COUNT comes back as a string from Postgres; normalize to a number
+        // and give the null bucket a friendly name.
+        department: row.department || 'Unassigned',
+        count: Number(row.get('count')) || 0,
+      })),
     });
   } catch (error) {
     console.error('Get team stats error:', error);
@@ -122,20 +127,35 @@ export const updateTeamMember = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ message: 'You cannot deactivate your own account.' });
     }
 
-    if (roleId !== undefined) {
-      const roleExists = roleId === null || (await Role.findByPk(roleId));
-      if (roleId !== null && !roleExists) {
+    // Protect super admins: only a super admin can change a super admin's role/status,
+    // and never deactivate the last active super admin.
+    if (member.isSuperAdmin) {
+      if (String(req.user?.id) !== String(member.id) && !req.user?.isSuperAdmin) {
+        return res.status(403).json({ message: 'Only a super admin can modify another super admin account.' });
+      }
+      if (isActive === false) {
+        const activeSuperAdmins = await User.count({ where: { isSuperAdmin: true, isActive: true } });
+        if (activeSuperAdmins <= 1) {
+          return res.status(400).json({ message: 'Cannot deactivate the last active super admin.' });
+        }
+      }
+    }
+
+    const normalizedRoleId = roleId === '' ? null : roleId;
+    if (normalizedRoleId !== undefined) {
+      const roleExists = normalizedRoleId === null || (await Role.findByPk(normalizedRoleId));
+      if (normalizedRoleId !== null && !roleExists) {
         return res.status(400).json({ message: 'Selected role does not exist.' });
       }
     }
 
     await member.update({
-      firstName: firstName ?? member.firstName,
-      lastName: lastName ?? member.lastName,
-      phone: phone ?? member.phone,
-      department: department ?? member.department,
-      position: position ?? member.position,
-      roleId: roleId !== undefined ? roleId : member.roleId,
+      firstName: firstName !== undefined ? firstName : member.firstName,
+      lastName: lastName !== undefined ? lastName : member.lastName,
+      phone: phone !== undefined ? phone : member.phone,
+      department: department !== undefined ? department : member.department,
+      position: position !== undefined ? position : member.position,
+      roleId: normalizedRoleId !== undefined ? normalizedRoleId : member.roleId,
       isActive: isActive !== undefined ? isActive : member.isActive,
     });
 

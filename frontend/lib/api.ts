@@ -45,15 +45,33 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_BASE}${endpoint}`, {
-    ...options,
-    headers,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE}${endpoint}`, {
+      ...options,
+      headers,
+    });
+  } catch (err) {
+    // Network failure (backend down, no connectivity) — don't mask it as a 500.
+    throw new Error('Network error: could not reach the server. Check your connection and try again.');
+  }
 
-  const data = await response.json().catch(() => ({}));
+  const contentType = response.headers.get('content-type') || '';
+  let data: any = null;
+  if (contentType.includes('application/json')) {
+    data = await response.json().catch(() => null);
+  } else if (response.ok) {
+    data = await response.text().catch(() => '');
+  }
 
   if (!response.ok) {
-    throw new Error(data.message || `Request failed with status ${response.status}`);
+    const message =
+      (data && data.message) ||
+      (typeof data === 'string' && data) ||
+      (contentType.includes('application/json')
+        ? `Request failed with status ${response.status}`
+        : `Request failed with status ${response.status} (non-JSON response — the server may be returning an error page)`);
+    throw new Error(message);
   }
 
   return data as T;

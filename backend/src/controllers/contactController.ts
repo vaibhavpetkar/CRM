@@ -20,6 +20,8 @@ const serializeContact = (contact: any) => {
   };
 };
 
+const ALLOWED_SORT = new Set(['createdAt', 'updatedAt', 'firstName', 'lastName', 'email', 'company', 'lastContacted']);
+
 export const getContacts = async (req: Request, res: Response) => {
   try {
     const {
@@ -30,6 +32,12 @@ export const getContacts = async (req: Request, res: Response) => {
       sortBy = 'createdAt',
       order = 'DESC',
     } = req.query;
+
+    // Clamp pagination to avoid negative offsets / NaN / unbounded limits.
+    const parsedPage = Math.max(1, parseInt(page as string, 10) || 1);
+    const parsedLimit = Math.min(200, Math.max(1, parseInt(limit as string, 10) || 10));
+    const safeSortBy = ALLOWED_SORT.has(sortBy as string) ? (sortBy as string) : 'createdAt';
+    const safeOrder = String(order).toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
 
     const whereClause: any = {};
 
@@ -49,7 +57,11 @@ export const getContacts = async (req: Request, res: Response) => {
 
     const { leadId } = req.query;
     if (leadId) {
-      whereClause.leadId = parseInt(leadId as string);
+      const parsedLeadId = parseInt(leadId as string, 10);
+      if (Number.isNaN(parsedLeadId)) {
+        return res.status(400).json({ message: 'Invalid leadId' });
+      }
+      whereClause.leadId = parsedLeadId;
     }
 
     const contacts = await Contact.findAndCountAll({
@@ -62,16 +74,16 @@ export const getContacts = async (req: Request, res: Response) => {
           required: false,
         },
       ],
-      limit: parseInt(limit as string),
-      offset: (parseInt(page as string) - 1) * parseInt(limit as string),
-      order: [[sortBy as string, order as string]],
+      limit: parsedLimit,
+      offset: (parsedPage - 1) * parsedLimit,
+      order: [[safeSortBy, safeOrder]],
     });
 
     return res.json({
       contacts: contacts.rows.map(serializeContact),
       total: contacts.count,
-      page: parseInt(page as string),
-      pages: Math.ceil(contacts.count / parseInt(limit as string)),
+      page: parsedPage,
+      pages: Math.ceil(contacts.count / parsedLimit),
     });
   } catch (error) {
     console.error('Get contacts error:', error);
@@ -123,9 +135,9 @@ export const createContact = async (req: Request, res: Response) => {
       return res.status(400).json({ message: 'firstName and lastName are required' });
     }
 
-    // Check if contact with email already exists
+    // Check if contact with email already exists (case-insensitive)
     if (email) {
-      const existingContact = await Contact.findOne({ where: { email } });
+      const existingContact = await Contact.findOne({ where: sequelize.where(sequelize.fn('lower', sequelize.col('email')), String(email).toLowerCase()) });
       if (existingContact) {
         return res.status(400).json({ message: 'Contact with this email already exists' });
       }
@@ -178,26 +190,31 @@ export const updateContact = async (req: Request, res: Response) => {
       isActive,
     } = req.body;
 
-    // Check if email is being changed and already exists
-    if (email && email !== contact.email) {
-      const existingContact = await Contact.findOne({ where: { email } });
+    // Check if email is being changed and already exists (case-insensitive —
+    // the column has no unique index, so this is the only dedup guard).
+    const newEmail = email !== undefined && email !== '' ? String(email).toLowerCase() : null;
+    if (newEmail && newEmail !== String(contact.email || '').toLowerCase()) {
+      const existingContact = await Contact.findOne({ where: sequelize.where(sequelize.fn('lower', sequelize.col('email')), newEmail) });
       if (existingContact) {
         return res.status(400).json({ message: 'Contact with this email already exists' });
       }
     }
 
+    // Use !== undefined so fields can actually be cleared to null/empty, and
+    // normalize '' -> null so empty dates don't 500 on a DATE column.
+    const norm = (v: any) => (v === '' ? null : v);
     await contact.update({
-      firstName: firstName ?? contact.firstName,
-      lastName: lastName ?? contact.lastName,
-      email: email ?? contact.email,
-      phone: phone ?? contact.phone,
-      company: company ?? contact.company,
-      jobTitle: jobTitle ?? title ?? contact.jobTitle,
-      leadSource: leadSource ?? contact.leadSource,
-      notes: notes ?? contact.notes,
-      assignedToId: assignedToId ?? contact.assignedToId,
-      lastContacted: lastContacted ?? contact.lastContacted,
-      isActive: isActive ?? contact.isActive,
+      firstName: firstName !== undefined ? firstName : contact.firstName,
+      lastName: lastName !== undefined ? lastName : contact.lastName,
+      email: email !== undefined ? norm(email) : contact.email,
+      phone: phone !== undefined ? norm(phone) : contact.phone,
+      company: company !== undefined ? norm(company) : contact.company,
+      jobTitle: jobTitle !== undefined ? norm(jobTitle) : (title !== undefined ? norm(title) : contact.jobTitle),
+      leadSource: leadSource !== undefined ? norm(leadSource) : contact.leadSource,
+      notes: notes !== undefined ? norm(notes) : contact.notes,
+      assignedToId: assignedToId !== undefined ? norm(assignedToId) : contact.assignedToId,
+      lastContacted: lastContacted !== undefined ? norm(lastContacted) : contact.lastContacted,
+      isActive: isActive !== undefined ? isActive : contact.isActive,
     });
 
     await contact.reload({

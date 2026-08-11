@@ -1,5 +1,5 @@
 import sequelize from '../config/database';
-import { Transaction } from 'sequelize';
+import { Transaction, Op } from 'sequelize';
 import Lead from '../models/Lead';
 import LeadProduct from '../models/LeadProduct';
 import LeadTax from '../models/LeadTax';
@@ -237,24 +237,72 @@ class LeadService {
     if (data.email === '') data.email = null;
     if (data.secondaryEmail === '') data.secondaryEmail = null;
 
-    if (data.email && data.email !== lead.email) {
-      const existing = await leadRepository.findByEmail(data.email as string);
+    // Case-insensitive duplicate check (email column has no unique index).
+    const normalizedEmail = data.email && data.email !== lead.email
+      ? String(data.email).toLowerCase()
+      : null;
+    if (normalizedEmail && normalizedEmail !== String(lead.email).toLowerCase()) {
+      const existing = await leadRepository.findByEmail(normalizedEmail);
       if (existing) throw new ConflictError('Lead with this email already exists');
     }
 
     const before = lead.toJSON() as unknown as Record<string, unknown>;
 
     return sequelize.transaction(async (t) => {
-      await leadRepository.update(lead, {
-        ...data,
-        prefix: data.prefix ?? data.salutation ?? lead.prefix,
-        jobTitle: data.jobTitle ?? data.designation ?? lead.jobTitle,
-        annualRevenue: data.annualRevenue ?? data.annualTurnover ?? lead.annualRevenue,
-        street: data.street ?? data.address ?? lead.street,
-        zipCode: data.zipCode ?? data.pincode ?? lead.zipCode,
-        leadSource: data.leadSource ?? data.source ?? lead.leadSource,
+      // Explicit whitelist — NEVER spread the raw request body into the row.
+      // This blocks clients from forging internal fields (leadNumber, isConverted,
+      // convertedAt, convertedToDealId) or clobbering computed totals
+      // (subtotal/taxTotal/grandTotal) via update.
+      const updatable = {
+        date: data.date ?? lead.date,
+        territory: data.territory !== undefined ? data.territory : lead.territory,
+        firstName: data.firstName !== undefined ? data.firstName : lead.firstName,
+        lastName: data.lastName !== undefined ? data.lastName : lead.lastName,
+        prefix: data.prefix !== undefined ? data.prefix : (data.salutation !== undefined ? data.salutation : lead.prefix),
+        email: data.email !== undefined ? data.email : lead.email,
+        phone: data.phone !== undefined ? data.phone : lead.phone,
+        fax: data.fax !== undefined ? data.fax : lead.fax,
+        mobile: data.mobile !== undefined ? data.mobile : lead.mobile,
+        alternateMobile: data.alternateMobile !== undefined ? data.alternateMobile : lead.alternateMobile,
+        company: data.company !== undefined ? data.company : lead.company,
+        website: data.website !== undefined ? data.website : lead.website,
+        jobTitle: data.jobTitle !== undefined ? data.jobTitle : (data.designation !== undefined ? data.designation : lead.jobTitle),
+        leadSource: data.leadSource !== undefined ? data.leadSource : (data.source !== undefined ? data.source : lead.leadSource),
+        status: data.status !== undefined ? data.status : lead.status,
+        industry: data.industry !== undefined ? data.industry : lead.industry,
+        noOfEmployees: data.noOfEmployees !== undefined ? data.noOfEmployees : lead.noOfEmployees,
+        annualRevenue: data.annualRevenue !== undefined ? data.annualRevenue : (data.annualTurnover !== undefined ? data.annualTurnover : lead.annualRevenue),
+        rating: data.rating !== undefined ? data.rating : lead.rating,
+        emailOptOut: data.emailOptOut !== undefined ? data.emailOptOut : lead.emailOptOut,
+        skypeId: data.skypeId !== undefined ? data.skypeId : lead.skypeId,
+        secondaryEmail: data.secondaryEmail !== undefined ? data.secondaryEmail : lead.secondaryEmail,
+        leadImage: data.leadImage !== undefined ? data.leadImage : lead.leadImage,
+        leadOwnerId: data.leadOwnerId !== undefined ? data.leadOwnerId : lead.leadOwnerId,
+        country: data.country !== undefined ? data.country : lead.country,
+        state: data.state !== undefined ? data.state : lead.state,
+        city: data.city !== undefined ? data.city : lead.city,
+        street: data.street !== undefined ? data.street : (data.address !== undefined ? data.address : lead.street),
+        zipCode: data.zipCode !== undefined ? data.zipCode : (data.pincode !== undefined ? data.pincode : lead.zipCode),
+        latitude: data.latitude !== undefined ? data.latitude : lead.latitude,
+        longitude: data.longitude !== undefined ? data.longitude : lead.longitude,
+        description: data.description !== undefined ? data.description : lead.description,
+        score: data.score !== undefined ? data.score : lead.score,
+        value: data.value !== undefined ? data.value : lead.value,
+        notes: data.notes !== undefined ? data.notes : lead.notes,
+        assignedToId: data.assignedToId !== undefined ? data.assignedToId : lead.assignedToId,
+        sourceDetails: data.sourceDetails !== undefined ? data.sourceDetails : lead.sourceDetails,
+        lastContacted: data.lastContacted !== undefined ? data.lastContacted : lead.lastContacted,
+        nextFollowUp: data.nextFollowUp !== undefined ? data.nextFollowUp : lead.nextFollowUp,
+        interestedIn: data.interestedIn !== undefined ? data.interestedIn : lead.interestedIn,
+        interestedInServices: data.interestedInServices !== undefined ? data.interestedInServices : lead.interestedInServices,
+        interestedInProducts: data.interestedInProducts !== undefined ? data.interestedInProducts : lead.interestedInProducts,
+        timelineToPurchase: data.timelineToPurchase !== undefined ? data.timelineToPurchase : lead.timelineToPurchase,
+        qualifiedById: data.qualifiedById !== undefined ? data.qualifiedById : lead.qualifiedById,
+        meetingStatus: data.meetingStatus !== undefined ? data.meetingStatus : lead.meetingStatus,
         modifiedById: userId ?? lead.modifiedById,
-      }, t);
+      };
+
+      await leadRepository.update(lead, updatable, t);
 
       if (data.products !== undefined) {
         await this.replaceProducts(lead.id, (data.products as ProductInput[]) || [], t);
@@ -335,13 +383,30 @@ class LeadService {
       // Auto-create a follow-up task whenever the Next Follow-up date is set or
       // changed. Assigned to the lead owner (falls back to the assignee if no
       // owner is set) so they're reminded to actually make the follow-up contact.
+      // If a pending follow-up task already exists for this lead, update it in
+      // place instead of stacking duplicate reminders on every re-save.
       const nextFollowUpChanged =
         String(before.nextFollowUp ?? '') !== String(after.nextFollowUp ?? '');
 
-      if (nextFollowUpChanged && after.nextFollowUp) {
+      if (nextFollowUpChanged) {
         const ownerId = (after.leadOwnerId ?? after.assignedToId) as number | null;
+        const existingTask = after.nextFollowUp
+          ? await Task.findOne({
+              where: {
+                leadId: lead.id,
+                status: 'pending',
+                title: { [Op.iLike]: `Follow up with ${lead.firstName} ${lead.lastName}%` },
+              },
+              transaction: t,
+            })
+          : null;
 
-        if (ownerId) {
+        if (existingTask) {
+          await existingTask.update(
+            { dueDate: after.nextFollowUp as Date, assignedToId: ownerId || existingTask.assignedToId },
+            { transaction: t }
+          );
+        } else if (after.nextFollowUp && ownerId) {
           const task = await Task.create(
             {
               title: `Follow up with ${lead.firstName} ${lead.lastName}${lead.company ? ` (${lead.company})` : ''}`,
@@ -571,9 +636,20 @@ class LeadService {
 
     return sequelize.transaction(async (t) => {
       const before = lead.toJSON() as unknown as Record<string, unknown>;
+
+      // Only revert fields whose CURRENT value still matches the `after` value
+      // stored in the diff. This prevents a stale revert from clobbering edits
+      // that were made to the same field AFTER this timeline entry was logged.
+      const current = lead.toJSON() as unknown as Record<string, unknown>;
       const revertValues: Record<string, unknown> = {};
       for (const [field, diff] of Object.entries(log.changes!)) {
-        revertValues[field] = diff.before;
+        if (String(current[field] ?? null) === String(diff.after ?? null)) {
+          revertValues[field] = diff.before;
+        }
+      }
+
+      if (Object.keys(revertValues).length === 0) {
+        throw new ConflictError('This change can no longer be reverted because the field has been edited again since.');
       }
 
       await leadRepository.update(lead, { ...revertValues, modifiedById: userId ?? lead.modifiedById }, t);

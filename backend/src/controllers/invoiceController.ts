@@ -1,8 +1,10 @@
 import { Request, Response } from 'express';
 import { Op } from 'sequelize';
 import Invoice from '../models/Invoice';
+import Payment from '../models/Payment';
 import User from '../models/User';
 import { generateCode } from '../utils/codeGenerator';
+import { markOverdueInvoices, recalculateInvoiceStatus, toFiniteNonNegative } from '../utils/invoiceStatus';
 
 const serialize = (invoice: any) => {
   const plain = invoice.toJSON ? invoice.toJSON() : invoice;
@@ -70,6 +72,12 @@ export const getInvoices = async (req: Request, res: Response) => {
     const { search, status } = req.query;
     const whereClause: any = {};
 
+    // Lazily flip idle pending invoices that have passed their due date to
+    // 'overdue' — previously status was only recomputed on payment events, so
+    // unpaid past-due invoices stayed 'pending' forever and the Overdue filter
+    // was empty for them.
+    await markOverdueInvoices();
+
     if (search) {
       whereClause[Op.or] = [
         { client: { [Op.iLike]: `%${search}%` } },
@@ -96,6 +104,11 @@ export const createInvoice = async (req: Request, res: Response) => {
     const { client, customerEmail, customerPhone, customerAddress, companyAddress, amount, status, issuedDate, dueDate, quoteId, assignedToId } = req.body;
     if (!client) return res.status(400).json({ message: 'Client is required' });
 
+    const parsedAmount = amount !== undefined && amount !== '' ? toFiniteNonNegative(amount) : 0;
+    if (parsedAmount === null) {
+      return res.status(400).json({ message: 'Amount must be a valid non-negative number' });
+    }
+
     const invoice = await Invoice.create({
       invoiceNumber: await generateInvoiceNumber(),
       client,
@@ -103,7 +116,7 @@ export const createInvoice = async (req: Request, res: Response) => {
       customerPhone: customerPhone || null,
       customerAddress: customerAddress || null,
       companyAddress: companyAddress || null,
-      amount: amount || 0,
+      amount: parsedAmount,
       status: status || 'draft',
       issuedDate: issuedDate || null,
       dueDate: dueDate || null,
@@ -124,19 +137,30 @@ export const updateInvoice = async (req: Request, res: Response) => {
     if (!invoice) return res.status(404).json({ message: 'Invoice not found' });
 
     const { client, customerEmail, customerPhone, customerAddress, companyAddress, amount, status, issuedDate, dueDate, quoteId, assignedToId } = req.body;
+
+    const parsedAmount = amount !== undefined && amount !== '' ? toFiniteNonNegative(amount) : null;
+    if (amount !== undefined && parsedAmount === null) {
+      return res.status(400).json({ message: 'Amount must be a valid non-negative number' });
+    }
+
     await invoice.update({
       client: client ?? invoice.client,
-      customerEmail: customerEmail ?? invoice.customerEmail,
-      customerPhone: customerPhone ?? invoice.customerPhone,
-      customerAddress: customerAddress ?? invoice.customerAddress,
-      companyAddress: companyAddress ?? invoice.companyAddress,
-      amount: amount ?? invoice.amount,
+      customerEmail: customerEmail !== undefined ? customerEmail : invoice.customerEmail,
+      customerPhone: customerPhone !== undefined ? customerPhone : invoice.customerPhone,
+      customerAddress: customerAddress !== undefined ? customerAddress : invoice.customerAddress,
+      companyAddress: companyAddress !== undefined ? companyAddress : invoice.companyAddress,
+      amount: parsedAmount !== null ? parsedAmount : invoice.amount,
       status: status ?? invoice.status,
-      issuedDate: issuedDate ?? invoice.issuedDate,
-      dueDate: dueDate ?? invoice.dueDate,
-      quoteId: quoteId ?? invoice.quoteId,
-      assignedToId: assignedToId ?? invoice.assignedToId,
+      issuedDate: issuedDate !== undefined ? issuedDate : invoice.issuedDate,
+      dueDate: dueDate !== undefined ? dueDate : invoice.dueDate,
+      quoteId: quoteId !== undefined ? quoteId : invoice.quoteId,
+      assignedToId: assignedToId !== undefined ? assignedToId : invoice.assignedToId,
     });
+
+    // Amount/dueDate edits can make the stored status stale (e.g. raising the
+    // amount above recorded payments, or extending an overdue invoice's due
+    // date). Recompute it — draft/cancelled are preserved by the helper.
+    await recalculateInvoiceStatus(invoice.id);
 
     await invoice.reload({ include: [{ model: User, attributes: ['id', 'firstName', 'lastName'], as: 'assignedTo', required: false }] });
     return res.json({ message: 'Invoice updated successfully', invoice: serialize(invoice) });
@@ -150,9 +174,16 @@ export const deleteInvoice = async (req: Request, res: Response) => {
   try {
     const invoice = await Invoice.findByPk(req.params.id);
     if (!invoice) return res.status(404).json({ message: 'Invoice not found' });
+
+    const linkedPayments = await Payment.count({ where: { invoiceId: invoice.id } });
+    if (linkedPayments > 0) {
+      return res.status(409).json({ message: 'Cannot delete this invoice because it has recorded payments.' });
+    }
+
     await invoice.destroy();
     return res.json({ message: 'Invoice deleted successfully' });
   } catch (error) {
+    console.error('Delete invoice error:', error);
     return res.status(500).json({ message: 'Server error' });
   }
 };

@@ -36,6 +36,7 @@ export default function ItemAutocomplete({
   const [isLoading, setIsLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  const [selectedItemName, setSelectedItemName] = useState<string>('');
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
@@ -98,6 +99,7 @@ export default function ItemAutocomplete({
     onChange(newValue);
     setIsOpen(newValue.length >= 2);
     setHighlightedIndex(-1);
+    if (newValue.length < 2) setSelectedItemName('');
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -129,6 +131,7 @@ export default function ItemAutocomplete({
   const handleSelect = (suggestion: ItemSuggestion) => {
     onChange(suggestion.id);
     onSelect?.(suggestion);
+    setSelectedItemName(suggestion.itemName);
     setIsOpen(false);
     setHighlightedIndex(-1);
     inputRef.current?.blur();
@@ -145,10 +148,20 @@ export default function ItemAutocomplete({
     onChange('');
     setSuggestions([]);
     setIsOpen(false);
+    setSelectedItemName('');
     inputRef.current?.focus();
   };
 
-  const displayValue = suggestions.find(s => s.id === value)?.itemName || String(value);
+  const displayValue = (() => {
+    const v = String(value);
+    if (v === '') return '';
+    const found = suggestions.find(s => s.id === value);
+    if (found) return found.itemName;
+    // Value is a numeric ID but not in suggestions yet (e.g. after reload) —
+    // show the cached selected name if we have it, otherwise just the ID.
+    if (!isNaN(Number(v)) && selectedItemName) return selectedItemName;
+    return v;
+  })();
 
   return (
     <div className={cn('relative', className)}>

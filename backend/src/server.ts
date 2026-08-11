@@ -93,7 +93,9 @@ app.use(
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
-        callback(new Error('Not allowed by CORS'));
+        // Reject disallowed origins client-side (browser blocks the request)
+        // instead of returning a 500 via the error handler.
+        callback(null, false);
       }
     },
     credentials: true,
@@ -142,8 +144,11 @@ app.use('/api/company', companyRoutes);
 app.use('/api/attachments', attachmentRoutes);
 app.use('/api/settings', settingsRoutes);
 
-// Serve uploaded files (attachments) statically
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+// Serve uploaded files (attachments, generated PDFs) statically — but only to
+// authenticated users. Nothing in the frontend loads these via raw <img>/<a>
+// tags; quote/invoice PDFs are served through their own protected API routes
+// (e.g. /api/quotes/:id/pdf), so requiring a Bearer token here is safe.
+app.use('/uploads', protect, express.static(path.join(__dirname, '../uploads')));
 
 // Health check
 app.get('/api/health', (_req: Request, res: Response) => {
@@ -152,7 +157,41 @@ app.get('/api/health', (_req: Request, res: Response) => {
 
 // Protected profile route
 app.get('/api/profile', protect, (req: Request & { user?: any }, res: Response) => {
-  res.json({ user: req.user });
+  const user = req.user;
+  if (!user) {
+    return res.status(401).json({ message: 'Not authenticated' });
+  }
+  // NEVER serialize the raw Sequelize instance — it contains the password hash
+  // and all reset/invite tokens. Return only whitelisted public fields.
+  const safeParse = (permissions?: string) => {
+    if (!permissions) return [] as string[];
+    try {
+      return JSON.parse(permissions) as string[];
+    } catch {
+      return [] as string[];
+    }
+  };
+  return res.json({
+    user: {
+      id: user.id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      phone: user.phone,
+      roleId: user.roleId,
+      companyId: user.companyId,
+      isSuperAdmin: user.isSuperAdmin,
+      isActive: user.isActive,
+      emailVerified: user.emailVerified,
+      role: user.role
+        ? {
+            id: user.role.id,
+            name: user.role.name,
+            permissions: safeParse(user.role.permissions),
+          }
+        : null,
+    },
+  });
 });
 
 // ─── 404 Handler ─────────────────────────────────────────────────────────────

@@ -4,6 +4,7 @@ import Invoice from '../models/Invoice';
 import User from '../models/User';
 import ActivityLog from '../models/ActivityLog';
 import { notifyUser } from '../utils/notificationService';
+import { recalculateInvoiceStatus } from '../utils/invoiceStatus';
 
 const serialize = (payment: any) => {
   const plain = payment.toJSON ? payment.toJSON() : payment;
@@ -11,33 +12,6 @@ const serialize = (payment: any) => {
     ...plain,
     recordedBy: plain.recordedBy ? `${plain.recordedBy.firstName} ${plain.recordedBy.lastName}` : null,
   };
-};
-
-/**
- * Recalculates an invoice's status from the sum of its recorded payments:
- *   0 paid            -> 'pending' (or 'overdue' if past due date)
- *   0 < paid < amount  -> 'partial'
- *   paid >= amount     -> 'paid'
- */
-const recalculateInvoiceStatus = async (invoiceId: number) => {
-  const invoice = await Invoice.findByPk(invoiceId);
-  if (!invoice) return null;
-
-  const payments = await Payment.findAll({ where: { invoiceId } });
-  const totalPaid = payments.reduce((sum, p) => sum + parseFloat(String(p.amount)), 0);
-  const invoiceAmount = parseFloat(String(invoice.amount));
-
-  let status = invoice.status;
-  if (totalPaid <= 0) {
-    status = invoice.dueDate && new Date(invoice.dueDate) < new Date() ? 'overdue' : 'pending';
-  } else if (totalPaid < invoiceAmount) {
-    status = 'partial';
-  } else {
-    status = 'paid';
-  }
-
-  await invoice.update({ status });
-  return { invoice, totalPaid };
 };
 
 export const getPaymentsForInvoice = async (req: Request, res: Response) => {
@@ -68,16 +42,23 @@ export const recordPayment = async (req: Request & { user?: any }, res: Response
     const { invoiceId } = req.params;
     const { amount, method, reference, paidOn, notes } = req.body;
 
-    if (!amount || amount <= 0) {
+    // Validate BEFORE coercion: `"abc" <= 0` is false and `!"abc"` is false, so
+    // the old check let garbage through to Postgres and 500'd there.
+    const parsedAmount = Number(amount);
+    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
       return res.status(400).json({ message: 'A positive payment amount is required' });
     }
 
     const invoice = await Invoice.findByPk(invoiceId);
     if (!invoice) return res.status(404).json({ message: 'Invoice not found' });
 
+    if (invoice.status === 'cancelled') {
+      return res.status(409).json({ message: 'Cannot record a payment against a cancelled invoice.' });
+    }
+
     const payment = await Payment.create({
       invoiceId: invoice.id,
-      amount,
+      amount: parsedAmount,
       method: method || 'bank_transfer',
       reference: reference || null,
       paidOn: paidOn || new Date(),
@@ -92,7 +73,7 @@ export const recordPayment = async (req: Request & { user?: any }, res: Response
       entityType: 'Invoice',
       entityId: invoice.id,
       performedById: req.user?.id || null,
-      details: `Payment of ${amount} recorded for invoice ${invoice.invoiceNumber}. Status is now "${result?.invoice.status}".`,
+      details: `Payment of ${parsedAmount} recorded for invoice ${invoice.invoiceNumber}. Status is now "${result?.invoice.status}".`,
     });
 
     if (result?.invoice.status === 'paid') {

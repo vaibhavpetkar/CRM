@@ -57,6 +57,7 @@ export default function Topbar() {
   const [searching, setSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<GlobalSearchResult[]>([]);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchSeq = useRef(0);
 
   useEffect(() => {
     if (searchTimer.current) clearTimeout(searchTimer.current);
@@ -68,15 +69,21 @@ export default function Topbar() {
     }
 
     setSearching(true);
+    const seq = ++searchSeq.current;
+    const q = query.trim();
     searchTimer.current = setTimeout(async () => {
       try {
-        const res = await searchApi.globalSearch(query.trim());
+        const res = await searchApi.globalSearch(q);
+        // Only apply the results if this is still the latest query — otherwise
+        // a slow response for an older term can clobber newer results.
+        if (seq !== searchSeq.current) return;
         setSearchResults(res.results);
       } catch (err) {
         console.error('Global search failed', err);
+        if (seq !== searchSeq.current) return;
         setSearchResults([]);
       } finally {
-        setSearching(false);
+        if (seq === searchSeq.current) setSearching(false);
       }
     }, 300);
 

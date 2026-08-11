@@ -124,21 +124,30 @@ export const updateTask = async (req: Request & { user?: any }, res: Response) =
     if (!task) return res.status(404).json({ message: 'Task not found' });
 
     const { title, type, priority, dueDate, dueTime, status, relatedTo, leadId, dealId, contactId, description, assignedToId } = req.body;
+    // Normalize to string for comparison — body values arrive as strings while
+    // the DB value is a number, so `"5" !== 5` previously fired a spurious
+    // assignment notification on every save where the assignee didn't change.
     const previousAssigneeId = task.assignedToId;
+    const newAssigneeId = assignedToId !== undefined && assignedToId !== '' ? String(assignedToId) : null;
+    const prevAssigneeId = previousAssigneeId !== null && previousAssigneeId !== undefined ? String(previousAssigneeId) : null;
+
+    // Normalize '' -> null so empty date fields can be cleared without 500ing.
+    const normDate = (v: any) => (v === '' ? null : v);
+    const normNullable = (v: any) => (v === '' ? null : v);
 
     await task.update({
-      title: title ?? task.title,
-      type: type ?? task.type,
-      priority: priority ?? task.priority,
-      status: status ?? task.status,
-      dueDate: dueDate ?? task.dueDate,
-      dueTime: dueTime ?? task.dueTime,
-      relatedTo: relatedTo ?? task.relatedTo,
-      leadId: leadId ?? task.leadId,
-      dealId: dealId ?? task.dealId,
-      contactId: contactId ?? task.contactId,
-      description: description ?? task.description,
-      assignedToId: assignedToId ?? task.assignedToId,
+      title: title !== undefined ? title : task.title,
+      type: type !== undefined ? type : task.type,
+      priority: priority !== undefined ? priority : task.priority,
+      status: status !== undefined ? status : task.status,
+      dueDate: dueDate !== undefined ? normDate(dueDate) : task.dueDate,
+      dueTime: dueTime !== undefined ? normDate(dueTime) : task.dueTime,
+      relatedTo: relatedTo !== undefined ? normNullable(relatedTo) : task.relatedTo,
+      leadId: leadId !== undefined ? normNullable(leadId) : task.leadId,
+      dealId: dealId !== undefined ? normNullable(dealId) : task.dealId,
+      contactId: contactId !== undefined ? normNullable(contactId) : task.contactId,
+      description: description !== undefined ? normNullable(description) : task.description,
+      assignedToId: assignedToId !== undefined ? (assignedToId === '' ? null : assignedToId) : task.assignedToId,
     });
 
     await task.reload({ include: relationIncludes });
@@ -151,9 +160,9 @@ export const updateTask = async (req: Request & { user?: any }, res: Response) =
       details: `Task "${task.title}" updated.`,
     });
 
-    if (assignedToId && assignedToId !== previousAssigneeId && assignedToId !== req.user?.id) {
+    if (newAssigneeId && newAssigneeId !== prevAssigneeId && newAssigneeId !== String(req.user?.id ?? '')) {
       await notifyUser({
-        userId: assignedToId,
+        userId: Number(newAssigneeId),
         type: 'task_assigned',
         title: 'Task assigned to you',
         message: `You've been assigned the task "${task.title}"${task.dueDate ? ` (due ${new Date(task.dueDate).toLocaleDateString()})` : ''}.`,
@@ -257,18 +266,25 @@ export const getTaskDashboard = async (req: Request & { user?: any }, res: Respo
     }
 
     const now = new Date();
+    // Tasks due earlier today were landing in the Overdue bucket because the
+    // overdue query used `dueDate < now`. Buckets are now day-aligned so they
+    // don't overlap mid-day: overdue = before today, due today = any time today,
+    // due this week = the actual calendar week (today .. end of week).
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
     const endOfToday = new Date();
     endOfToday.setHours(23, 59, 59, 999);
     const endOfWeek = new Date();
     endOfWeek.setDate(endOfWeek.getDate() + 7);
+    endOfWeek.setHours(23, 59, 59, 999);
 
     const includeUser = [{ model: User, attributes: ['id', 'firstName', 'lastName'], as: 'assignedTo', required: false }];
 
     const [pendingTasks, overdueTasks, dueTodayTasks, dueThisWeekTasks, completedCount] = await Promise.all([
       Task.findAll({ where: { ...whereClause, status: { [Op.ne]: 'completed' } }, include: includeUser, order: [['dueDate', 'ASC']] }),
-      Task.findAll({ where: { ...whereClause, status: { [Op.ne]: 'completed' }, dueDate: { [Op.lt]: now } }, include: includeUser, order: [['dueDate', 'ASC']] }),
-      Task.findAll({ where: { ...whereClause, status: { [Op.ne]: 'completed' }, dueDate: { [Op.between]: [now, endOfToday] } }, include: includeUser, order: [['dueDate', 'ASC']] }),
-      Task.findAll({ where: { ...whereClause, status: { [Op.ne]: 'completed' }, dueDate: { [Op.between]: [now, endOfWeek] } }, include: includeUser, order: [['dueDate', 'ASC']] }),
+      Task.findAll({ where: { ...whereClause, status: { [Op.ne]: 'completed' }, dueDate: { [Op.lt]: startOfToday } }, include: includeUser, order: [['dueDate', 'ASC']] }),
+      Task.findAll({ where: { ...whereClause, status: { [Op.ne]: 'completed' }, dueDate: { [Op.between]: [startOfToday, endOfToday] } }, include: includeUser, order: [['dueDate', 'ASC']] }),
+      Task.findAll({ where: { ...whereClause, status: { [Op.ne]: 'completed' }, dueDate: { [Op.between]: [startOfToday, endOfWeek] } }, include: includeUser, order: [['dueDate', 'ASC']] }),
       Task.count({ where: { ...whereClause, status: 'completed' } }),
     ]);
 

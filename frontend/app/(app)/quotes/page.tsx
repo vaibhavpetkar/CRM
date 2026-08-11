@@ -10,12 +10,13 @@ import ImportExportButtons from '@/components/ui/import-export-buttons';
 import CompanyAutocomplete from '@/components/ui/company-autocomplete';
 import { QUOTE_FIELDS } from '@/lib/import-export/field-configs';
 import { formatCurrency } from '@/lib/utils';
+import { getCachedCurrency } from '@/lib/currency';
 import { quotesApi } from '@/lib/api';
 import Link from 'next/link';
 import { PlusIcon, XMarkIcon, TrashIcon, PaperAirplaneIcon, PrinterIcon } from '@heroicons/react/24/outline';
 import { useToast } from '@/components/ui/toast';
 
-const emptyForm = { deal: '', client: '', customerEmail: '', customerPhone: '', customerAddress: '', amount: 10000, status: 'draft', validUntil: '' };
+const emptyForm = { deal: '', client: '', customerEmail: '', customerPhone: '', customerAddress: '', amount: '', status: 'draft', validUntil: '' };
 
 export default function QuotesPage() {
   const toast = useToast();
@@ -218,14 +219,14 @@ export default function QuotesPage() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-slate-700">Amount ($)</label>
-                  <input
-                    type="number"
-                    required
-                    value={formData.amount}
-                    onChange={(e) => setFormData({ ...formData, amount: Number(e.target.value) })}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
-                  />
+                  <label className="block text-xs font-medium text-slate-700">Amount ({getCachedCurrency()})</label>
+<input
+                      type="number"
+                      required
+                      value={formData.amount}
+                      onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                      className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                    />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-700">Status</label>

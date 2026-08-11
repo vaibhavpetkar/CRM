@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import User from '../models/User';
+import Role from '../models/Role';
 import jwt, { SignOptions } from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
@@ -7,6 +8,8 @@ import { Op } from 'sequelize';
 import { OAuth2Client } from 'google-auth-library';
 import { AuthRequest } from '../middleware/authMiddleware';
 import { sendInviteEmail, sendResetPasswordEmail } from '../utils/mailer';
+
+const roleInclude = { model: Role, as: 'role' };
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -59,44 +62,42 @@ const userPublicFields = (user: User) => {
 
 // ─── Register ─────────────────────────────────────────────────────────────────
 
-const isSuperAdminEmail = (email: string) => {
-  return email.toLowerCase() === (process.env.SUPER_ADMIN_EMAIL || '').toLowerCase();
-};
-
 export const register = async (req: Request, res: Response) => {
   try {
-    const { firstName, lastName, email, password, phone, companyId, roleId } = req.body;
+    const { firstName, lastName, email, password, phone } = req.body;
 
     if (!firstName || !lastName || !email || !password) {
       return res.status(400).json({ message: 'firstName, lastName, email, and password are required' });
     }
 
-    const existingUser = await User.findOne({ where: { email } });
+    if (password.length < 6) {
+      return res.status(400).json({ message: 'Password must be at least 6 characters' });
+    }
+
+    const existingUser = await User.findOne({ where: { email: email.toLowerCase() } });
     if (existingUser) {
       return res.status(400).json({ message: 'User already exists with this email' });
     }
 
     const hashedPassword = await hashPassword(password);
 
+    // Self-registration is intentionally limited: no roleId/companyId escalation,
+    // no super-admin minting, and the account is inactive until an admin invites
+    // (or provisions) it. Super-admin provisioning happens only in server.ts/seed.ts.
     const user = await User.create({
       firstName,
       lastName,
-      email,
+      email: email.toLowerCase(),
       password: hashedPassword,
       phone: phone || null,
-      companyId: companyId || null,
-      roleId: roleId || null,
-      isSuperAdmin: isSuperAdminEmail(email),
-      isActive: true,
-      emailVerified: true,
+      isSuperAdmin: false,
+      isActive: false,
+      emailVerified: false,
       phoneVerified: false,
     });
 
-    const token = generateToken(user.id);
-
     return res.status(201).json({
-      message: 'User registered successfully.',
-      token,
+      message: 'User registered successfully. An administrator must activate your account before you can log in.',
       user: userPublicFields(user),
     });
   } catch (error) {
@@ -115,7 +116,7 @@ export const login = async (req: Request, res: Response) => {
       return res.status(400).json({ message: 'Email and password are required' });
     }
 
-    const user = await User.findOne({ where: { email } });
+    const user = await User.findOne({ where: { email }, include: [roleInclude] });
     if (!user) {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
@@ -165,18 +166,17 @@ export const googleLogin = async (req: Request, res: Response) => {
     }
 
     const { email, given_name, family_name } = payload;
-    let user = await User.findOne({ where: { email } });
+    let user = await User.findOne({ where: { email }, include: [roleInclude] });
 
     if (!user) {
       const randomPassword = crypto.randomBytes(16).toString('hex');
       const hashedPassword = await hashPassword(randomPassword);
-      const superAdmin = isSuperAdminEmail(email);
       user = await User.create({
         firstName: given_name || 'Google',
         lastName: family_name || 'User',
         email,
         password: hashedPassword,
-        isSuperAdmin: superAdmin,
+        isSuperAdmin: false,
         emailVerified: true,
         phoneVerified: false,
         isActive: true,
@@ -214,7 +214,6 @@ export const sendInvitation = async (req: Request, res: Response) => {
 
     const inviteToken = crypto.randomBytes(32).toString('hex');
     const inviteExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
-    const superAdmin = isSuperAdminEmail(email);
 
     let user = await User.findOne({ where: { email } });
 
@@ -226,7 +225,6 @@ export const sendInvitation = async (req: Request, res: Response) => {
         inviteToken,
         inviteExpires,
         roleId: roleId || user.roleId,
-        isSuperAdmin: superAdmin || user.isSuperAdmin,
       });
     } else {
       const dummyPassword = await hashPassword(crypto.randomBytes(16).toString('hex'));
@@ -236,7 +234,7 @@ export const sendInvitation = async (req: Request, res: Response) => {
         email,
         password: dummyPassword,
         roleId: roleId || null,
-        isSuperAdmin: superAdmin,
+        isSuperAdmin: false,
         isActive: true,
         emailVerified: false,
         phoneVerified: false,
@@ -300,15 +298,24 @@ export const acceptInvitation = async (req: Request, res: Response) => {
       return res.status(400).json({ message: 'Invitation token and password are required' });
     }
 
+    if (password.length < 6) {
+      return res.status(400).json({ message: 'Password must be at least 6 characters' });
+    }
+
     const user = await User.findOne({
       where: {
         inviteToken: token,
         inviteExpires: { [Op.gt]: new Date() },
       },
+      include: [roleInclude],
     });
 
     if (!user) {
       return res.status(400).json({ message: 'Invalid or expired invitation token' });
+    }
+
+    if (!user.isActive) {
+      return res.status(403).json({ message: 'Account has been deactivated. Contact your administrator.' });
     }
 
     const hashedPassword = await hashPassword(password);
@@ -318,7 +325,6 @@ export const acceptInvitation = async (req: Request, res: Response) => {
       firstName: firstName || user.firstName,
       lastName: lastName || user.lastName,
       emailVerified: true,
-      isActive: true,
       inviteToken: null,
       inviteExpires: null,
       lastLogin: new Date(),
@@ -427,6 +433,10 @@ export const resetPassword = async (req: Request, res: Response) => {
 
     if (!password) {
       return res.status(400).json({ message: 'New password is required' });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ message: 'Password must be at least 6 characters' });
     }
 
     const user = await User.findOne({

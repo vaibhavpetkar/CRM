@@ -22,6 +22,8 @@ const serializeDeal = (deal: any) => {
   };
 };
 
+const ALLOWED_SORT = new Set(['createdAt', 'updatedAt', 'title', 'client', 'value', 'stage', 'expectedCloseDate']);
+
 export const getDeals = async (req: Request, res: Response) => {
   try {
     const {
@@ -32,6 +34,11 @@ export const getDeals = async (req: Request, res: Response) => {
       sortBy = 'createdAt',
       order = 'DESC',
     } = req.query;
+
+    const parsedPage = Math.max(1, parseInt(page as string, 10) || 1);
+    const parsedLimit = Math.min(200, Math.max(1, parseInt(limit as string, 10) || 10));
+    const safeSortBy = ALLOWED_SORT.has(sortBy as string) ? (sortBy as string) : 'createdAt';
+    const safeOrder = String(order).toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
 
     const whereClause: any = {};
 
@@ -63,16 +70,16 @@ export const getDeals = async (req: Request, res: Response) => {
           required: false,
         },
       ],
-      limit: parseInt(limit as string),
-      offset: (parseInt(page as string) - 1) * parseInt(limit as string),
-      order: [[sortBy as string, order as string]],
+      limit: parsedLimit,
+      offset: (parsedPage - 1) * parsedLimit,
+      order: [[safeSortBy, safeOrder]],
     });
 
     return res.json({
       deals: deals.rows.map(serializeDeal),
       total: deals.count,
-      page: parseInt(page as string),
-      pages: Math.ceil(deals.count / parseInt(limit as string)),
+      page: parsedPage,
+      pages: Math.ceil(deals.count / parsedLimit),
     });
   } catch (error) {
     console.error('Get deals error:', error);
@@ -134,13 +141,22 @@ export const createDeal = async (req: Request, res: Response) => {
       return res.status(400).json({ message: 'title and client are required' });
     }
 
+    const parsedValue = value !== undefined && value !== '' ? Number(value) : 0;
+    if (!Number.isFinite(parsedValue) || parsedValue < 0) {
+      return res.status(400).json({ message: 'Value must be a valid non-negative number' });
+    }
+    const parsedProbability = probability !== undefined && probability !== '' ? Number(probability) : 0;
+    if (!Number.isFinite(parsedProbability) || parsedProbability < 0 || parsedProbability > 100) {
+      return res.status(400).json({ message: 'Probability must be between 0 and 100' });
+    }
+
     const deal = await Deal.create({
       title,
       client,
-      value: value || 0,
+      value: parsedValue,
       currency: currency || 'INR',
       stage: stage || 'prospecting',
-      probability: probability || 0,
+      probability: parsedProbability,
       expectedCloseDate: expectedCloseDate || expectedClose || null,
       description: description || null,
       nextStep: nextStep || null,
@@ -150,6 +166,13 @@ export const createDeal = async (req: Request, res: Response) => {
       contactId: contactId || null,
       leadId: leadId || null,
       isActive: true,
+    });
+
+    await deal.reload({
+      include: [
+        { model: User, attributes: ['id', 'firstName', 'lastName', 'email'], as: 'assignedTo', required: false },
+        { model: Lead, attributes: ['id', 'leadNumber', 'company'], as: 'lead', required: false },
+      ],
     });
 
     return res.status(201).json({
@@ -189,26 +212,40 @@ export const updateDeal = async (req: Request, res: Response) => {
       isActive,
     } = req.body;
 
+    const parsedValue = value !== undefined && value !== '' ? Number(value) : null;
+    if (value !== undefined && (!Number.isFinite(parsedValue) || (parsedValue as number) < 0)) {
+      return res.status(400).json({ message: 'Value must be a valid non-negative number' });
+    }
+    const parsedProbability = probability !== undefined && probability !== '' ? Number(probability) : null;
+    if (probability !== undefined && (!Number.isFinite(parsedProbability) || (parsedProbability as number) < 0 || (parsedProbability as number) > 100)) {
+      return res.status(400).json({ message: 'Probability must be between 0 and 100' });
+    }
+
+    // Use !== undefined so nullable fields can be cleared, and normalize '' -> null.
+    const norm = (v: any) => (v === '' ? null : v);
     await deal.update({
-      title: title ?? deal.title,
-      client: client ?? deal.client,
-      value: value ?? deal.value,
-      currency: currency ?? deal.currency,
-      stage: stage ?? deal.stage,
-      probability: probability ?? deal.probability,
-      expectedCloseDate: expectedCloseDate ?? expectedClose ?? deal.expectedCloseDate,
-      description: description ?? deal.description,
-      nextStep: nextStep ?? deal.nextStep,
-      source: source ?? deal.source,
-      assignedToId: assignedToId ?? deal.assignedToId,
-      accountId: accountId ?? deal.accountId,
-      contactId: contactId ?? deal.contactId,
-      leadId: leadId ?? deal.leadId,
-      isActive: isActive ?? deal.isActive,
+      title: title !== undefined ? title : deal.title,
+      client: client !== undefined ? client : deal.client,
+      value: parsedValue !== null ? parsedValue : deal.value,
+      currency: currency !== undefined ? currency : deal.currency,
+      stage: stage !== undefined ? stage : deal.stage,
+      probability: parsedProbability !== null ? parsedProbability : deal.probability,
+      expectedCloseDate: expectedCloseDate !== undefined ? norm(expectedCloseDate) : (expectedClose !== undefined ? norm(expectedClose) : deal.expectedCloseDate),
+      description: description !== undefined ? norm(description) : deal.description,
+      nextStep: nextStep !== undefined ? norm(nextStep) : deal.nextStep,
+      source: source !== undefined ? norm(source) : deal.source,
+      assignedToId: assignedToId !== undefined ? norm(assignedToId) : deal.assignedToId,
+      accountId: accountId !== undefined ? norm(accountId) : deal.accountId,
+      contactId: contactId !== undefined ? norm(contactId) : deal.contactId,
+      leadId: leadId !== undefined ? norm(leadId) : deal.leadId,
+      isActive: isActive !== undefined ? isActive : deal.isActive,
     });
 
     await deal.reload({
-      include: [{ model: User, attributes: ['id', 'firstName', 'lastName', 'email'], as: 'assignedTo', required: false }],
+      include: [
+        { model: User, attributes: ['id', 'firstName', 'lastName', 'email'], as: 'assignedTo', required: false },
+        { model: Lead, attributes: ['id', 'leadNumber', 'company'], as: 'lead', required: false },
+      ],
     });
 
     return res.json({

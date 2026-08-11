@@ -57,8 +57,8 @@ const emptyForm = {
   // Description
   description: '',
   // Scoring & Value
-  score: 50,
-  value: 10000,
+  score: '',
+  value: '',
   // System fields
   notes: '',
   assignedToId: '',

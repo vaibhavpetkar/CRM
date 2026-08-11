@@ -22,7 +22,7 @@ const emptyForm = {
   customerPhone: '', 
   customerAddress: '',
   companyAddress: '',
-  amount: 10000, 
+  amount: '', 
   status: 'draft', 
   issuedDate: '', 
   dueDate: '',
@@ -33,6 +33,7 @@ const INVOICE_STATUSES = [
   { value: 'all', label: 'All' },
   { value: 'draft', label: 'Draft' },
   { value: 'pending', label: 'Pending' },
+  { value: 'partial', label: 'Partial' },
   { value: 'paid', label: 'Paid' },
   { value: 'overdue', label: 'Overdue' },
   { value: 'cancelled', label: 'Cancelled' },
@@ -79,7 +80,7 @@ export default function InvoicesPage() {
   }, [fetchInvoices]);
 
   const totalPaid = useMemo(() => invoices.filter((i) => i.status === 'paid').reduce((s, i) => s + Number(i.amount || 0), 0), [invoices]);
-  const totalPending = useMemo(() => invoices.filter((i) => i.status === 'pending').reduce((s, i) => s + Number(i.amount || 0), 0), [invoices]);
+  const totalPending = useMemo(() => invoices.filter((i) => i.status === 'pending' || i.status === 'partial').reduce((s, i) => s + Number(i.amount || 0), 0), [invoices]);
   const totalOverdue = useMemo(() => invoices.filter((i) => i.status === 'overdue').reduce((s, i) => s + Number(i.amount || 0), 0), [invoices]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -269,13 +270,13 @@ export default function InvoicesPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-slate-700">Amount *</label>
-                  <input
-                    type="number"
-                    required
-                    value={formData.amount}
-                    onChange={(e) => setFormData({ ...formData, amount: Number(e.target.value) })}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
-                  />
+<input
+                      type="number"
+                      required
+                      value={formData.amount}
+                      onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                      className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                    />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-700">Status</label>
@@ -286,6 +287,7 @@ export default function InvoicesPage() {
                   >
                     <option value="draft">Draft</option>
                     <option value="pending">Pending</option>
+                    <option value="partial">Partial</option>
                     <option value="paid">Paid</option>
                     <option value="overdue">Overdue</option>
                     <option value="cancelled">Cancelled</option>

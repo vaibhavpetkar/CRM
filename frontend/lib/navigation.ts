@@ -77,8 +77,8 @@ export const navigation: NavSection[] = [
   {
     title: 'Administration',
     items: [
-      { name: 'Team', href: '/team', icon: UsersIcon, permission: 'users:view' },
-      { name: 'Company', href: '/settings/company', icon: BuildingOffice2Icon, permission: 'users:manage' },
+      { name: 'Team', href: '/team', icon: UsersIcon, permission: 'users:read' },
+      { name: 'Company', href: '/settings/company', icon: BuildingOffice2Icon, permission: 'company:manage' },
       { name: 'Roles', href: '/settings/roles', icon: ShieldCheckIcon, permission: 'roles:view' },
       { name: 'Activity Logs', href: '/activity-logs', icon: ClockIcon }, // Administrator only (handled in page)
       { name: 'Recycle Bin', href: '/recycle-bin', icon: TrashIcon }, // Administrator only

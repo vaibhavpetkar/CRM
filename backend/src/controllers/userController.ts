@@ -125,11 +125,32 @@ export const updateUser = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ message: 'You cannot deactivate your own account.' });
     }
 
+    // Protect super admins from being demoted or deactivated by non-super-admins,
+    // and never deactivate the last active super admin (would lock everyone out).
+    if (user.isSuperAdmin) {
+      if (req.user?.id !== user.id && !req.user?.isSuperAdmin) {
+        return res.status(403).json({ message: 'Only a super admin can modify another super admin account.' });
+      }
+      if (typeof isActive === 'boolean' && !isActive) {
+        const activeSuperAdmins = await User.count({ where: { isSuperAdmin: true, isActive: true } });
+        if (activeSuperAdmins <= 1) {
+          return res.status(400).json({ message: 'Cannot deactivate the last active super admin.' });
+        }
+      }
+    }
+
+    if (roleId !== undefined && roleId !== null && roleId !== '') {
+      const roleExists = await Role.findByPk(roleId);
+      if (!roleExists) {
+        return res.status(400).json({ message: 'Selected role does not exist' });
+      }
+    }
+
     await user.update({
-      roleId: roleId !== undefined ? roleId : user.roleId,
+      roleId: roleId !== undefined ? (roleId === '' ? null : roleId) : user.roleId,
       isActive: typeof isActive === 'boolean' ? isActive : user.isActive,
-      firstName: firstName || user.firstName,
-      lastName: lastName || user.lastName,
+      firstName: firstName !== undefined ? firstName : user.firstName,
+      lastName: lastName !== undefined ? lastName : user.lastName,
       phone: phone !== undefined ? phone : user.phone,
     });
 
@@ -149,6 +170,17 @@ export const deactivateUser = async (req: AuthRequest, res: Response) => {
 
     if (user.id === req.user?.id) {
       return res.status(400).json({ message: 'You cannot deactivate your own account.' });
+    }
+
+    if (user.isSuperAdmin && !req.user?.isSuperAdmin) {
+      return res.status(403).json({ message: 'Only a super admin can deactivate a super admin.' });
+    }
+
+    if (user.isSuperAdmin) {
+      const activeSuperAdmins = await User.count({ where: { isSuperAdmin: true, isActive: true } });
+      if (activeSuperAdmins <= 1) {
+        return res.status(400).json({ message: 'Cannot deactivate the last active super admin.' });
+      }
     }
 
     await user.update({ isActive: false });

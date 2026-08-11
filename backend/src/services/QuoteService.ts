@@ -181,7 +181,30 @@ class QuoteService {
     data = sanitizeDateFields(data, ['quotationDate', 'validUntil']);
 
     return sequelize.transaction(async (t) => {
-      await quoteRepository.update(quote, { ...data }, t);
+      // Explicit whitelist — never spread the raw body. This blocks callers from
+      // writing computed totals (subtotal/taxTotal/amount), status, revision
+      // numbers, approval fields, or quote numbers directly via update.
+      const updatable: Record<string, any> = {
+        leadId: data.leadId !== undefined ? data.leadId : quote.leadId,
+        dealId: data.dealId !== undefined ? data.dealId : quote.dealId,
+        client: data.client !== undefined ? data.client : quote.client,
+        customerEmail: data.customerEmail !== undefined ? data.customerEmail : quote.customerEmail,
+        customerPhone: data.customerPhone !== undefined ? data.customerPhone : quote.customerPhone,
+        customerAddress: data.customerAddress !== undefined ? data.customerAddress : quote.customerAddress,
+        discountType: data.discountType !== undefined ? data.discountType : quote.discountType,
+        discountValue: data.discountValue !== undefined ? data.discountValue : quote.discountValue,
+        shippingCharges: data.shippingCharges !== undefined ? data.shippingCharges : quote.shippingCharges,
+        terms: data.terms !== undefined ? data.terms : quote.terms,
+        paymentTerms: data.paymentTerms !== undefined ? data.paymentTerms : quote.paymentTerms,
+        assignedToId: data.assignedToId !== undefined ? data.assignedToId : quote.assignedToId,
+        salesPersonId: data.assignedToId !== undefined ? data.assignedToId : quote.salesPersonId,
+        validUntil: data.validUntil !== undefined ? data.validUntil : quote.validUntil,
+        // quotationDate is NOT NULL — sanitize turns '' into null, so fall back
+        // to the existing value instead of writing null and 500ing.
+        quotationDate: data.quotationDate !== undefined && data.quotationDate !== null ? data.quotationDate : quote.quotationDate,
+      };
+
+      await quoteRepository.update(quote, updatable, t);
 
       if (data.products !== undefined) await this.replaceProducts(quote.id, data.products || [], t);
       if (data.taxes !== undefined) await this.replaceTaxes(quote.id, data.taxes || [], t);
@@ -239,10 +262,15 @@ class QuoteService {
       { filename: `${quote.quoteNumber}.pdf`, path: absolutePath }
     );
 
-    if (quote.status === 'draft') {
-      await quote.update({ status: 'sent', sentAt: new Date() });
-    } else {
-      await quote.update({ sentAt: new Date() });
+    // Only transition draft -> sent (and stamp sentAt) when the email actually
+    // went out. If SMTP is unavailable, keep the quote as a draft so it remains
+    // editable and isn't shown as delivered.
+    if (sent) {
+      if (quote.status === 'draft') {
+        await quote.update({ status: 'sent', sentAt: new Date() });
+      } else {
+        await quote.update({ sentAt: new Date() });
+      }
     }
 
     await logActivity({ action: 'email_sent', entityType: 'Quote', entityId: quote.id, performedById: userId, details: `Quotation emailed to ${recipient}${sent ? '' : ' (SMTP not configured — logged only)'}` });
@@ -277,7 +305,9 @@ class QuoteService {
           paymentTerms: original.paymentTerms,
           assignedToId: original.assignedToId,
           salesPersonId: original.salesPersonId,
-          validUntil: original.validUntil,
+          // A fresh revision shouldn't inherit a stale expiry — give it a fresh
+          // 30-day window so it isn't born already expired.
+          validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
           revisionOf: rootId,
           revisionNumber: original.revisionNumber + 1,
           createdById: userId ?? null,
@@ -295,7 +325,10 @@ class QuoteService {
       await this.replaceTaxes(revision.id, taxes.map((tx: any) => ({ taxId: tx.taxId, taxType: tx.taxType, percentage: tx.percentage })), t);
       await this.recalculateTotals(revision.id, t);
 
-      if (original.status !== 'accepted') {
+      // Mark the previous version superseded so it can't keep being approved /
+      // accepted and spawn stale invoices. The accepted guard below was a bug —
+      // an accepted quote that gets revised would live on forever as approvable.
+      if (original.status !== 'rejected') {
         await original.update({ status: 'superseded' }, { transaction: t });
       }
 
@@ -325,7 +358,9 @@ class QuoteService {
    */
   async accept(id: number | string, userId?: number | null) {
     return sequelize.transaction(async (t) => {
-      const quote = await Quote.findByPk(id, { transaction: t });
+      // Row lock prevents two concurrent accepts from both passing the
+      // status guard and creating duplicate deals.
+      const quote = await Quote.findByPk(id, { transaction: t, lock: t.LOCK.UPDATE });
       if (!quote) throw new NotFoundError('Quote', id);
       if (quote.status === 'accepted') throw new ConflictError('Quotation is already accepted');
 
@@ -398,7 +433,9 @@ class QuoteService {
    */
   async approve(id: number | string, userId?: number | null) {
     return sequelize.transaction(async (t) => {
-      const quote = await Quote.findByPk(id, { transaction: t });
+      // Row lock: prevents two concurrent approves from both passing the
+      // approvedAt guard and creating two invoices for the same quote.
+      const quote = await Quote.findByPk(id, { transaction: t, lock: t.LOCK.UPDATE });
       if (!quote) throw new NotFoundError('Quote', id);
       if (quote.status !== 'accepted') {
         throw new ConflictError('Only a customer-accepted quotation can be approved');
@@ -414,6 +451,11 @@ class QuoteService {
         {
           invoiceNumber,
           client: quote.client,
+          // Copy customer contact details from the quote so the generated
+          // invoice carries the bill-to email/phone/address.
+          customerEmail: quote.customerEmail || null,
+          customerPhone: quote.customerPhone || null,
+          customerAddress: quote.customerAddress || null,
           amount: quote.amount,
           status: 'pending',
           issuedDate: new Date(),
