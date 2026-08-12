@@ -3,16 +3,17 @@
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
   async up(queryInterface, Sequelize) {
-    // Make migration idempotent by checking if columns exist
+    // Make migration idempotent by checking if columns exist (case-insensitive)
     const tableDescription = await queryInterface.describeTable('quotes');
-    
-    if (!tableDescription.approvedAt) {
+    const columns = Object.keys(tableDescription).map(k => k.toLowerCase());
+
+    if (!columns.includes('approvedat')) {
       await queryInterface.addColumn('quotes', 'approvedAt', {
         type: Sequelize.DATE,
         allowNull: true,
       });
     }
-    if (!tableDescription.approvedById) {
+    if (!columns.includes('approvedbyid')) {
       await queryInterface.addColumn('quotes', 'approvedById', {
         type: Sequelize.INTEGER.UNSIGNED,
         allowNull: true,

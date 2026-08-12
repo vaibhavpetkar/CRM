@@ -261,16 +261,18 @@ export default function QuoteDetailPage() {
               className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none disabled:bg-slate-50"
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700">Customer Phone</label>
-            <input
-              type="tel"
-              disabled={isLocked}
-              value={formData.customerPhone || ''}
-              onChange={(e) => setFormData({ ...formData, customerPhone: e.target.value })}
-              className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none disabled:bg-slate-50"
-            />
-          </div>
+<div>
+              <label className="block text-sm font-medium text-slate-700">Customer Phone</label>
+              <input
+                type="tel"
+                disabled={isLocked}
+                maxLength={10}
+                value={formData.customerPhone || ''}
+                onChange={(e) => setFormData({ ...formData, customerPhone: e.target.value.replace(/\D/g, '') })}
+                placeholder="10-digit number"
+                className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none disabled:bg-slate-50"
+              />
+            </div>
           <div>
             <label className="block text-sm font-medium text-slate-700">Valid Until</label>
             <input

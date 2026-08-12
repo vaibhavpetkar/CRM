@@ -527,25 +527,29 @@ export default function LeadDetailsPage() {
                     className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700">Mobile Number <span className="text-red-500">*</span></label>
-                  <input
-                    type="tel"
-                    required
-                    value={formData.mobile || ''}
-                    onChange={(e) => setFormData({ ...formData, mobile: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700">Alternate Mobile</label>
-                  <input
-                    type="tel"
-                    value={formData.alternateMobile || ''}
-                    onChange={(e) => setFormData({ ...formData, alternateMobile: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
-                  />
-                </div>
+<div>
+                      <label className="block text-sm font-medium text-slate-700">Mobile Number <span className="text-red-500">*</span></label>
+                      <input
+                        type="tel"
+                        required
+                        maxLength={10}
+                        value={formData.mobile || ''}
+                        onChange={(e) => setFormData({ ...formData, mobile: e.target.value.replace(/\D/g, '') })}
+                        placeholder="10-digit number"
+                        className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700">Alternate Mobile</label>
+                      <input
+                        type="tel"
+                        maxLength={10}
+                        value={formData.alternateMobile || ''}
+                        onChange={(e) => setFormData({ ...formData, alternateMobile: e.target.value.replace(/\D/g, '') })}
+                        placeholder="10-digit number"
+                        className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                      />
+                    </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700">Assigned To (Lead Owner)</label>
                   <input

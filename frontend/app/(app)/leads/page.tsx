@@ -9,6 +9,8 @@ import Card from '@/components/ui/card';
 import DataTable, { DataTableColumn } from '@/components/ui/data-table';
 import ImportExportButtons from '@/components/ui/import-export-buttons';
 import CompanyAutocomplete from '@/components/ui/company-autocomplete';
+import UserAutocomplete from '@/components/ui/user-autocomplete';
+import TerritoryAutocomplete from '@/components/ui/territory-autocomplete';
 import { LEAD_FIELDS } from '@/lib/import-export/field-configs';
 import { formatCurrency } from '@/lib/utils';
 import { leadsApi, usersApi, getStoredUser } from '@/lib/api';
@@ -65,22 +67,30 @@ const emptyForm = {
   sourceDetails: '',
   lastContacted: '',
   nextFollowUp: '',
+  // New fields
+  territory: '',
+  qualifiedById: '',
+  alternateMobile: '',
 };
 
 const leadSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
   lastName: z.string().min(1, 'Last name is required'),
   email: z.string().email('Valid email is required'),
-  mobile: z.string().min(1, 'Mobile number is required'),
+  mobile: z.string().min(10, 'Mobile number must be 10 digits').max(10, 'Mobile number must be 10 digits').regex(/^\d{10}$/, 'Mobile number must be 10 digits'),
   company: z.string().optional(),
   leadSource: z.string().optional(),
-  assignedToName: z.string().optional(),
+  assignedToId: z.union([z.string(), z.number()]).optional(),
   // Additional fields for auto-populate
   phone: z.string().optional(),
   street: z.string().optional(),
   website: z.string().optional(),
   industry: z.string().optional(),
   jobTitle: z.string().optional(),
+  territory: z.string().optional(),
+  qualifiedById: z.union([z.string(), z.number()]).optional(),
+  alternateMobile: z.string().optional().refine(val => !val || /^\d{10}$/.test(val), 'Alternate mobile must be 10 digits'),
+  meetingStatus: z.string().optional(),
 });
 type LeadFormValues = z.infer<typeof leadSchema>;
 
@@ -126,7 +136,7 @@ export default function LeadsPage() {
       mobile: '',
       company: '',
       leadSource: 'Website',
-      assignedToName: '',
+      assignedToId: '',
     },
   });
 
@@ -153,7 +163,11 @@ export default function LeadsPage() {
         mobile: '',
         company: '',
         leadSource: 'Website',
-        assignedToName: '',
+        assignedToId: '',
+        territory: '',
+        qualifiedById: '',
+        alternateMobile: '',
+        meetingStatus: '',
       });
       setIsModalOpen(true);
       router.replace('/leads');
@@ -231,7 +245,7 @@ export default function LeadsPage() {
       mobile: '',
       company: '',
       leadSource: 'Website',
-      assignedToName: '',
+      assignedToId: '',
     });
     setIsModalOpen(true);
   };
@@ -285,16 +299,9 @@ export default function LeadsPage() {
   };
 
   const onSubmitForm = async (data: LeadFormValues) => {
-    let resolvedAssignedToId: number | null = null;
-    const typedAssignee = (data.assignedToName || '').trim();
-    if (typedAssignee) {
-      const match = assignableUsers.find((u) => u.name.toLowerCase() === typedAssignee.toLowerCase());
-      if (!match) {
-        toast.warning(`No user found named "${typedAssignee}". Please pick a name from the suggestions.`);
-        return;
-      }
-      resolvedAssignedToId = match.id;
-    }
+    // assignedToId and qualifiedById are now stored as IDs directly from UserAutocomplete
+    const resolvedAssignedToId = data.assignedToId ? Number(data.assignedToId) : null;
+    const resolvedQualifiedById = data.qualifiedById ? Number(data.qualifiedById) : null;
 
     const payload = {
       ...emptyForm,
@@ -305,6 +312,10 @@ export default function LeadsPage() {
       company: data.company,
       leadSource: (data.leadSource || 'Website').toLowerCase().replace(/\s+/g, '-'),
       assignedToId: resolvedAssignedToId,
+      qualifiedById: resolvedQualifiedById,
+      territory: data.territory,
+      alternateMobile: data.alternateMobile,
+      meetingStatus: data.meetingStatus,
     } as Record<string, any>;
 
     // emptyForm defaults numeric fields to '' so the inputs render blank —
@@ -312,11 +323,10 @@ export default function LeadsPage() {
     // for type integer"). Convert to a number when filled, or drop the key
     // (-> backend defaults it to null) when left blank. Mirrors the same
     // sanitization already applied on the CSV import path below.
-    ['noOfEmployees', 'latitude', 'longitude', 'leadOwnerId'].forEach((key) => {
+    ['noOfEmployees', 'latitude', 'longitude', 'leadOwnerId', 'assignedToId', 'qualifiedById'].forEach((key) => {
       if (payload[key] !== undefined && payload[key] !== '') payload[key] = Number(payload[key]);
       else delete payload[key];
     });
-    if (payload.assignedToId === '') delete payload.assignedToId;
 
     try {
       if (editingId) {
@@ -650,6 +660,7 @@ export default function LeadsPage() {
                     <input
                       type="tel"
                       {...register('mobile')}
+                      placeholder="10-digit number"
                       className={`mt-1 w-full rounded-md border-0 bg-slate-100/50 p-2 text-sm focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)] ${errors.mobile ? 'ring-1 ring-red-500 bg-red-50' : ''}`}
                     />
                     {errors.mobile && <p className="mt-1 text-[10px] text-red-500">{errors.mobile.message}</p>}
@@ -680,20 +691,61 @@ export default function LeadsPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-slate-700">Assign To</label>
-                    <input
-                      type="text"
-                      list="assignable-users-list-modal"
-                      {...register('assignedToName')}
-                      placeholder="Start typing a name..."
-                      className="mt-1 w-full rounded-md border-0 bg-slate-100/50 p-2 text-sm focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
+                    <label className="block text-xs font-medium text-slate-700">Territory</label>
+                    <TerritoryAutocomplete
+                      value={watch('territory') || ''}
+                      onChange={(val) => setValue('territory', val)}
+                      placeholder="Type territory to search..."
                     />
-                    <datalist id="assignable-users-list-modal">
-                      {assignableUsers.map((u) => (
-                        <option key={u.id} value={u.name} />
-                      ))}
-                    </datalist>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700">Qualified By</label>
+                    <UserAutocomplete
+                      value={watch('qualifiedById') || ''}
+                      onChange={(val) => setValue('qualifiedById', val)}
+                      placeholder="Type user name to search..."
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-b border-slate-200 pb-4">
+                <h4 className="text-sm font-medium text-slate-700 mb-3">Assignment & Scheduling</h4>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700">Assigned To (Lead Owner)</label>
+                    <UserAutocomplete
+                      value={watch('assignedToId') || ''}
+                      onChange={(val) => setValue('assignedToId', val)}
+                      placeholder="Type user name to search..."
+                    />
                     <p className="mt-1 text-[11px] text-slate-400">The assignee is notified automatically when assigned.</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700">Schedule Meeting</label>
+                    <select
+                      {...register('meetingStatus')}
+                      className="mt-1 w-full rounded-md border-0 bg-slate-100/50 p-2 text-sm focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
+                    >
+                      <option value="">None</option>
+                      <option value="pending">Pending</option>
+                      <option value="scheduled">Scheduled</option>
+                      <option value="completed">Completed</option>
+                      <option value="rescheduled">Rescheduled</option>
+                      <option value="cancelled">Cancelled</option>
+                      <option value="no-show">No Show</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700">Alternate Mobile</label>
+                    <input
+                      type="tel"
+                      {...register('alternateMobile')}
+                      placeholder="10-digit number"
+                      className={`mt-1 w-full rounded-md border-0 bg-slate-100/50 p-2 text-sm focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)] ${errors.alternateMobile ? 'ring-1 ring-red-500 bg-red-50' : ''}`}
+                    />
+                    {errors.alternateMobile && <p className="mt-1 text-[10px] text-red-500">{errors.alternateMobile.message}</p>}
                   </div>
                 </div>
               </div>

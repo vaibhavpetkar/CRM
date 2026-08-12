@@ -13,7 +13,7 @@ import { formatCurrency } from '@/lib/utils';
 import { invoicesApi } from '@/lib/api';
 import ImportExportButtons from '@/components/ui/import-export-buttons';
 import { INVOICE_FIELDS } from '@/lib/import-export/field-configs';
-import { PlusIcon, XMarkIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, XMarkIcon, TrashIcon, PencilSquareIcon } from '@heroicons/react/24/outline';
 import { useToast } from '@/components/ui/toast';
 
 const emptyForm = { 
@@ -45,6 +45,7 @@ export default function InvoicesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | number | null>(null);
   const [formData, setFormData] = useState(emptyForm);
   const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState('');
@@ -87,17 +88,27 @@ export default function InvoicesPage() {
     e.preventDefault();
     setSubmitting(true);
     try {
-      await invoicesApi.createInvoice({ 
-        ...formData, 
-        amount: Number(formData.amount),
-        quoteId: formData.quoteId || undefined,
-      });
+      if (editingId) {
+        await invoicesApi.updateInvoice(editingId, { 
+          ...formData, 
+          amount: Number(formData.amount),
+          quoteId: formData.quoteId || undefined,
+        });
+        toast.success('Invoice updated successfully');
+      } else {
+        await invoicesApi.createInvoice({ 
+          ...formData, 
+          amount: Number(formData.amount),
+          quoteId: formData.quoteId || undefined,
+        });
+        toast.success('Invoice created successfully');
+      }
       setIsModalOpen(false);
       setFormData(emptyForm);
+      setEditingId(null);
       fetchInvoices();
-      toast.success('Invoice created successfully');
     } catch (err: any) {
-      toast.error(err.message || 'Failed to create invoice');
+      toast.error(err.message || 'Failed to save invoice');
     } finally {
       setSubmitting(false);
     }
@@ -112,6 +123,23 @@ export default function InvoicesPage() {
     } catch (err: any) {
       toast.error(err.message || 'Failed to delete invoice');
     }
+  };
+
+  const openEdit = (invoice: any) => {
+    setEditingId(invoice.id);
+    setFormData({
+      client: invoice.client,
+      customerEmail: invoice.customerEmail || '',
+      customerPhone: invoice.customerPhone || '',
+      customerAddress: invoice.customerAddress || '',
+      companyAddress: invoice.companyAddress || '',
+      amount: invoice.amount,
+      status: invoice.status,
+      issuedDate: invoice.issuedDate ? String(invoice.issuedDate).split('T')[0] : '',
+      dueDate: invoice.dueDate ? String(invoice.dueDate).split('T')[0] : '',
+      quoteId: invoice.quoteId || '',
+    });
+    setIsModalOpen(true);
   };
 
   const columns: DataTableColumn<any>[] = [
@@ -145,7 +173,7 @@ export default function InvoicesPage() {
                 onImportComplete: fetchInvoices,
               }}
             />
-            <Button size="sm" onClick={() => setIsModalOpen(true)}><PlusIcon className="h-4 w-4" /> New Invoice</Button>
+            <Button size="sm" onClick={() => { setFormData(emptyForm); setEditingId(null); setIsModalOpen(true); }}><PlusIcon className="h-4 w-4" /> New Invoice</Button>
           </>
         }
       />
@@ -191,9 +219,14 @@ export default function InvoicesPage() {
           totalEntries={invoices.length}
           emptyMessage='No invoices yet. Click "New Invoice" to create one.'
           actions={(invoice) => (
-            <button onClick={() => handleDelete(invoice)} className="text-slate-400 hover:text-red-600" aria-label="Delete">
-              <TrashIcon className="h-4 w-4" />
-            </button>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => openEdit(invoice)} className="text-slate-400 hover:text-[#168eea]" aria-label="Edit">
+                <PencilSquareIcon className="h-4 w-4" />
+              </button>
+              <button onClick={() => handleDelete(invoice)} className="text-slate-400 hover:text-red-600" aria-label="Delete">
+                <TrashIcon className="h-4 w-4" />
+              </button>
+            </div>
           )}
         />
       </Card>
@@ -202,7 +235,7 @@ export default function InvoicesPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-lg font-semibold text-slate-900">New Invoice</h3>
+              <h3 className="text-lg font-semibold text-slate-900">{editingId ? 'Edit Invoice' : 'New Invoice'}</h3>
               <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600">
                 <XMarkIcon className="h-5 w-5" />
               </button>
@@ -236,9 +269,10 @@ export default function InvoicesPage() {
                   <label className="block text-xs font-medium text-slate-700">Customer Phone</label>
                   <input
                     type="tel"
+                    maxLength={10}
                     value={formData.customerPhone}
-                    onChange={(e) => setFormData({ ...formData, customerPhone: e.target.value })}
-                    placeholder="+1 234 567 8900"
+                    onChange={(e) => setFormData({ ...formData, customerPhone: e.target.value.replace(/\D/g, '') })}
+                    placeholder="10-digit number"
                     className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
                   />
                 </div>

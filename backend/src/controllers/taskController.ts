@@ -50,7 +50,8 @@ export const getTasks = async (req: Request & { user?: any }, res: Response) => 
     if (priority && priority !== 'all') whereClause.priority = priority;
 
     const userRole = req.user?.role?.name;
-    if (userRole !== 'Administrator' && userRole !== 'Sales Manager') {
+    const isSuperAdmin = req.user?.isSuperAdmin === true;
+    if (!isSuperAdmin && userRole !== 'Sales Manager') {
       whereClause.assignedToId = req.user?.id;
     }
 
@@ -261,7 +262,8 @@ export const getTaskDashboard = async (req: Request & { user?: any }, res: Respo
 
     const whereClause: any = {};
     const userRole = req.user?.role?.name;
-    if (userRole !== 'Administrator' && userRole !== 'Sales Manager') {
+    const isSuperAdmin = req.user?.isSuperAdmin === true;
+    if (!isSuperAdmin && userRole !== 'Sales Manager') {
       whereClause.assignedToId = req.user?.id;
     }
 

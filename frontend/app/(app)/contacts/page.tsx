@@ -293,9 +293,11 @@ export default function ContactsPage() {
                 <div>
                   <label className="block text-xs font-medium text-slate-700">Phone</label>
                   <input
-                    type="text"
+                    type="tel"
+                    maxLength={10}
                     value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/\D/g, '') })}
+                    placeholder="10-digit number"
                     className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
                   />
                 </div>
@@ -416,8 +418,11 @@ export default function ContactsPage() {
                   <div>
                     <label className="block text-xs font-medium text-slate-700">Phone</label>
                     <input
+                      type="tel"
+                      maxLength={10}
                       value={panelForm.phone}
-                      onChange={(e) => setPanelForm({ ...panelForm, phone: e.target.value })}
+                      onChange={(e) => setPanelForm({ ...panelForm, phone: e.target.value.replace(/\D/g, '') })}
+                      placeholder="10-digit number"
                       className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
                     />
                   </div>

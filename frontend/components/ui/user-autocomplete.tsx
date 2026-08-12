@@ -1,70 +1,70 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { MagnifyingGlassIcon, CubeIcon, XMarkIcon } from '@heroicons/react/24/outline';
-import { itemsApi } from '@/lib/api';
+import { MagnifyingGlassIcon, UserCircleIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { usersApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
-export interface ItemSuggestion {
+export interface UserSuggestion {
   id: number;
-  itemName: string;
-  unit: string;
-  sellingPrice: number;
-  taxId: number | null;
-  taxType: string | null;
-  taxRate: number | null;
+  name: string;
+  email: string;
+  firstName: string;
+  lastName: string;
 }
 
-interface ItemAutocompleteProps {
+interface UserAutocompleteProps {
   value: string | number | '';
   onChange: (value: string | number | '') => void;
-  onSelect?: (item: ItemSuggestion) => void;
+  onSelect?: (user: UserSuggestion) => void;
   placeholder?: string;
   className?: string;
   disabled?: boolean;
 }
 
-export default function ItemAutocomplete({
+export default function UserAutocomplete({
   value,
   onChange,
   onSelect,
-  placeholder = 'Type item name to search...',
+  placeholder = 'Type user name to search...',
   className,
   disabled = false,
-}: ItemAutocompleteProps) {
-  const [suggestions, setSuggestions] = useState<ItemSuggestion[]>([]);
+}: UserAutocompleteProps) {
+  const [suggestions, setSuggestions] = useState<UserSuggestion[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
-  const [selectedItemName, setSelectedItemName] = useState<string>('');
+  const [selectedUserName, setSelectedUserName] = useState<string>('');
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
   const fetchSuggestions = useCallback(async (query: string) => {
-    // Allow empty query to fetch all items (or first 20)
+    if (query.length < 2) {
+      setSuggestions([]);
+      return;
+    }
+
     setIsLoading(true);
     try {
-      const res = await itemsApi.getItems({ search: query || '', limit: 20, isActive: true });
-      setSuggestions(res.items || []);
+      const res = await usersApi.getUsers({ search: query });
+      setSuggestions(res.users || []);
     } catch (error) {
-      console.error('Failed to fetch item suggestions:', error);
+      console.error('Failed to fetch user suggestions:', error);
       setSuggestions([]);
     } finally {
       setIsLoading(false);
     }
   }, []);
 
-  // Debounced search
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     
     const searchValue = String(value);
-    // Allow search with empty string (show all) or when user types
-    if (searchValue.length >= 2 || searchValue === '' || searchValue === '%') {
+    if (searchValue.length >= 2) {
       debounceRef.current = setTimeout(() => {
         fetchSuggestions(searchValue);
-      }, searchValue === '' || searchValue === '%' ? 0 : 300);
+      }, 300);
     } else {
       debounceRef.current = setTimeout(() => {
         setSuggestions([]);
@@ -76,7 +76,6 @@ export default function ItemAutocomplete({
     };
   }, [value, fetchSuggestions]);
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (inputRef.current && !inputRef.current.contains(event.target as Node)) {
@@ -96,7 +95,7 @@ export default function ItemAutocomplete({
     onChange(newValue);
     setIsOpen(newValue.length >= 2);
     setHighlightedIndex(-1);
-    if (newValue.length < 2) setSelectedItemName('');
+    if (newValue.length < 2) setSelectedUserName('');
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -125,10 +124,10 @@ export default function ItemAutocomplete({
     }
   };
 
-  const handleSelect = (suggestion: ItemSuggestion) => {
+  const handleSelect = (suggestion: UserSuggestion) => {
     onChange(suggestion.id);
     onSelect?.(suggestion);
-    setSelectedItemName(suggestion.itemName);
+    setSelectedUserName(suggestion.name);
     setIsOpen(false);
     setHighlightedIndex(-1);
     inputRef.current?.blur();
@@ -136,12 +135,7 @@ export default function ItemAutocomplete({
 
   const handleFocus = () => {
     const searchValue = String(value);
-    // Show suggestions when focused with empty value or when we have suggestions for the current value
-    if ((searchValue === '' || searchValue === '%') && suggestions.length === 0) {
-      // Trigger a fetch for empty search
-      fetchSuggestions('');
-      setIsOpen(true);
-    } else if (searchValue.length >= 2 && suggestions.length > 0) {
+    if (searchValue.length >= 2 && suggestions.length > 0) {
       setIsOpen(true);
     }
   };
@@ -150,7 +144,7 @@ export default function ItemAutocomplete({
     onChange('');
     setSuggestions([]);
     setIsOpen(false);
-    setSelectedItemName('');
+    setSelectedUserName('');
     inputRef.current?.focus();
   };
 
@@ -158,10 +152,8 @@ export default function ItemAutocomplete({
     const v = String(value);
     if (v === '') return '';
     const found = suggestions.find(s => s.id === value);
-    if (found) return found.itemName;
-    // Value is a numeric ID but not in suggestions yet (e.g. after reload) —
-    // show the cached selected name if we have it, otherwise just the ID.
-    if (!isNaN(Number(v)) && selectedItemName) return selectedItemName;
+    if (found) return found.name;
+    if (!isNaN(Number(v)) && selectedUserName) return selectedUserName;
     return v;
   })();
 
@@ -186,7 +178,7 @@ export default function ItemAutocomplete({
           autoComplete="off"
           role="combobox"
           aria-autocomplete="list"
-          aria-controls="item-suggestions"
+          aria-controls="user-suggestions"
           aria-expanded={isOpen && suggestions.length > 0}
         />
         {displayValue && (
@@ -209,7 +201,7 @@ export default function ItemAutocomplete({
       {isOpen && suggestions.length > 0 && (
         <div
           ref={dropdownRef}
-          id="item-suggestions"
+          id="user-suggestions"
           className="absolute z-20 mt-1 w-full max-h-60 overflow-y-auto rounded-md border border-slate-200 bg-white shadow-lg ring-1 ring-black ring-opacity-5"
           role="listbox"
         >
@@ -229,11 +221,11 @@ export default function ItemAutocomplete({
               aria-selected={index === highlightedIndex}
             >
               <div className="flex items-center gap-2">
-                <CubeIcon className={cn('h-4 w-4 flex-shrink-0', index === highlightedIndex ? 'text-white' : 'text-slate-400')} />
+                <UserCircleIcon className={cn('h-4 w-4 flex-shrink-0', index === highlightedIndex ? 'text-white' : 'text-slate-400')} />
                 <div className="flex-1 min-w-0">
-                  <p className="truncate font-medium">{suggestion.itemName}</p>
+                  <p className="truncate font-medium">{suggestion.name}</p>
                   <p className="truncate text-xs" style={{ opacity: index === highlightedIndex ? 0.8 : 0.6 }}>
-                    {suggestion.unit} • {suggestion.sellingPrice}
+                    {suggestion.email}
                   </p>
                 </div>
               </div>
@@ -244,7 +236,7 @@ export default function ItemAutocomplete({
 
       {isOpen && suggestions.length === 0 && String(value).length >= 2 && !isLoading && (
         <div className="absolute z-20 mt-1 w-full rounded-md border border-slate-200 bg-white shadow-lg ring-1 ring-black ring-opacity-5 p-3 text-sm text-slate-500 text-center">
-          No items found
+          No users found
         </div>
       )}
     </div>
