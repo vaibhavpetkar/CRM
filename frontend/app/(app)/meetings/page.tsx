@@ -7,6 +7,7 @@ import Button from '@/components/ui/button';
 import Card from '@/components/ui/card';
 import LoadingSpinner from '@/components/ui/loading-spinner';
 import { meetingsApi, leadsApi } from '@/lib/api';
+import SearchableSelect from '@/components/ui/searchable-select';
 import { useRouter, useSearchParams } from 'next/navigation';
 import ImportExportButtons from '@/components/ui/import-export-buttons';
 import { MEETING_FIELDS } from '@/lib/import-export/field-configs';
@@ -205,16 +206,10 @@ export default function MeetingsPage() {
                 <label className="block text-xs font-medium text-slate-700">
                   Client {formData.leadId && <span className="font-normal text-[#168eea]">(linked to Lead — details auto-filled)</span>}
                 </label>
-                <input
-                  type="text"
-                  list="meeting-client-options"
-                  autoComplete="off"
-                  placeholder="Start typing a client name…"
+                <SearchableSelect
                   value={formData.client}
-                  onChange={(e) => {
-                    const typed = e.target.value;
-                    // Native <datalist> only gives us back the typed string, so we
-                    // match it against the loaded leads to find the real record —
+                  onChange={(typed) => {
+                    // Matches against the loaded leads to find the real record —
                     // that's what lets us auto-fill leadId (and anything else tied
                     // to that Lead) instead of just storing free text.
                     const matched = leadOptions.find((l) => l.label === typed);
@@ -224,13 +219,10 @@ export default function MeetingsPage() {
                       leadId: matched ? String(matched.id) : '',
                     });
                   }}
-                  className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                  options={leadOptions.map((l) => ({ value: l.label }))}
+                  placeholder="Start typing a client name…"
+                  className="mt-1"
                 />
-                <datalist id="meeting-client-options">
-                  {leadOptions.map((l) => (
-                    <option key={l.id} value={l.label} />
-                  ))}
-                </datalist>
                 <p className="mt-1 text-[11px] text-slate-400">
                   {formData.leadId
                     ? 'This meeting will show up on that Lead\u2019s timeline.'

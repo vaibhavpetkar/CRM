@@ -14,6 +14,7 @@ import { formatCurrency, getCurrencySymbol } from '@/lib/utils';
 import { dealsApi, leadsApi, quotesApi, aiApi, getStoredUser } from '@/lib/api';
 import { hasPermission } from '@/lib/permissions';
 import AISummaryPanel from '@/components/ui/ai-summary-panel';
+import SearchableSelect from '@/components/ui/searchable-select';
 import { useKeyboardShortcuts } from '@/lib/hooks/useKeyboardShortcuts';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -340,24 +341,17 @@ export default function DealsPage() {
 
               <div>
                 <label className="block text-xs font-medium text-slate-700">Client / Company Name</label>
-                <input
-                  type="text"
-                  required
-                  list="deal-client-leads"
-                  placeholder="e.g. TechCorp Inc"
+                <SearchableSelect
                   value={formData.client}
-                  onChange={(e) => {
-                    const typed = e.target.value;
+                  required
+                  onChange={(typed) => {
                     const match = leadOptions.find((l) => l.company.toLowerCase() === typed.toLowerCase());
                     setFormData({ ...formData, client: typed, leadId: match ? match.id : null });
                   }}
-                  className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                  options={leadOptions.map((l) => ({ value: l.company, sublabel: l.leadNumber }))}
+                  placeholder="e.g. TechCorp Inc"
+                  className="mt-1"
                 />
-                <datalist id="deal-client-leads">
-                  {leadOptions.map((l) => (
-                    <option key={l.id} value={l.company} />
-                  ))}
-                </datalist>
                 {formData.leadId ? (
                   <Link href={`/leads/${formData.leadId}`} className="mt-1 inline-block text-[11px] font-medium text-[#168eea] hover:underline">
                     Linked to lead {leadOptions.find((l) => l.id === formData.leadId)?.leadNumber || `#${formData.leadId}`} →

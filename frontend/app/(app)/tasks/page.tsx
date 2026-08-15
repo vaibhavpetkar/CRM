@@ -7,6 +7,7 @@ import Button from '@/components/ui/button';
 import Card from '@/components/ui/card';
 import LoadingSpinner from '@/components/ui/loading-spinner';
 import CompanyAutocomplete from '@/components/ui/company-autocomplete';
+import SearchableSelect from '@/components/ui/searchable-select';
 import { tasksApi, usersApi, leadsApi } from '@/lib/api';
 import { getStoredUser } from '@/lib/api';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -48,6 +49,7 @@ export default function TasksPage() {
   const [formData, setFormData] = useState(emptyForm);
   const [submitting, setSubmitting] = useState(false);
   const [users, setUsers] = useState<any[]>([]);
+  const [assignToName, setAssignToName] = useState('');
   const [companyOptions, setCompanyOptions] = useState<string[]>([]);
   const [leadOptions, setLeadOptions] = useState<{ id: number; label: string }[]>([]);
   const [openMenuId, setOpenMenuId] = useState<number | string | null>(null);
@@ -69,6 +71,7 @@ export default function TasksPage() {
   useEffect(() => {
     if (searchParams.get('quickCreate')) {
       setFormData(emptyForm);
+      setAssignToName('');
       setIsModalOpen(true);
       router.replace('/tasks');
     }
@@ -152,6 +155,7 @@ export default function TasksPage() {
       });
       setIsModalOpen(false);
       setFormData(emptyForm);
+      setAssignToName('');
       fetchTasks();
     } catch (err: any) {
       toast.error(err.message || 'Failed to create task');
@@ -418,18 +422,16 @@ export default function TasksPage() {
               {isMgrOrAdmin && (
                 <div>
                   <label className="block text-xs font-medium text-slate-700">Assign To</label>
-                  <select
-                    value={formData.assignedToId}
-                    onChange={(e) => setFormData({ ...formData, assignedToId: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
-                  >
-                    <option value="">Assign to Me</option>
-                    {users.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.firstName} {u.lastName} — {u.role?.name || u.email}
-                      </option>
-                    ))}
-                  </select>
+                  <SearchableSelect
+                    value={assignToName}
+                    onChange={(v) => {
+                      setAssignToName(v);
+                      const match = users.find((u) => `${u.firstName} ${u.lastName}`.trim() === v.trim());
+                      setFormData({ ...formData, assignedToId: match ? String(match.id) : '' });
+                    }}
+                    options={users.map((u) => ({ value: `${u.firstName} ${u.lastName}`.trim(), sublabel: u.role?.name || u.email }))}
+                    placeholder="Assign to me (default) or search a name..."
+                  />
                 </div>
               )}
 

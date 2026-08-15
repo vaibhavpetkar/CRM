@@ -11,6 +11,7 @@ import Card from '@/components/ui/card';
 import DataTable from '@/components/ui/data-table';
 import CompanyAutocomplete from '@/components/ui/company-autocomplete';
 import AISummaryPanel from '@/components/ui/ai-summary-panel';
+import SearchableSelect from '@/components/ui/searchable-select';
 import { ArrowLeftIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { useToast } from '@/components/ui/toast';
 import { useKeyboardShortcuts } from '@/lib/hooks/useKeyboardShortcuts';
@@ -443,19 +444,13 @@ export default function LeadDetailsPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700">Territory</label>
-                  <input
-                    type="text"
-                    list="territory-options"
-                    placeholder="Search district..."
+                  <SearchableSelect
                     value={formData.territory || ''}
-                    onChange={(e) => setFormData({ ...formData, territory: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                    onChange={(v) => setFormData({ ...formData, territory: v })}
+                    options={TERRITORY_OPTIONS.map((opt) => ({ value: opt }))}
+                    placeholder="Search district..."
+                    className="mt-1"
                   />
-                  <datalist id="territory-options">
-                    {TERRITORY_OPTIONS.map((opt) => (
-                      <option key={opt} value={opt} />
-                    ))}
-                  </datalist>
                 </div>
               </div>
             </div>
@@ -554,19 +549,13 @@ export default function LeadDetailsPage() {
                     </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700">Assigned To (Lead Owner)</label>
-                  <input
-                    type="text"
-                    list="assignable-users-list-detail"
+                  <SearchableSelect
                     value={assignedToName}
-                    onChange={(e) => setAssignedToName(e.target.value)}
+                    onChange={setAssignedToName}
+                    options={assignableUsers.map((u) => ({ value: u.name }))}
                     placeholder="Start typing a name..."
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                    className="mt-1"
                   />
-                  <datalist id="assignable-users-list-detail">
-                    {assignableUsers.map((u) => (
-                      <option key={u.id} value={u.name} />
-                    ))}
-                  </datalist>
                   <p className="mt-1 text-[11px] text-slate-400">The owner is notified automatically when assigned or follow-up tasks are created.</p>
                 </div>
                 <div className="col-span-3">
@@ -667,19 +656,13 @@ export default function LeadDetailsPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700">Qualified By</label>
-                <input
-                  type="text"
-                  list="qualified-by-list-detail"
+                <SearchableSelect
                   value={qualifiedByName}
-                  onChange={(e) => setQualifiedByName(e.target.value)}
+                  onChange={setQualifiedByName}
+                  options={assignableUsers.map((u) => ({ value: u.name }))}
                   placeholder="Start typing a name..."
-                  className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                  className="mt-1"
                 />
-                <datalist id="qualified-by-list-detail">
-                  {assignableUsers.map((u) => (
-                    <option key={u.id} value={u.name} />
-                  ))}
-                </datalist>
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700">Meeting Status</label>

@@ -67,10 +67,19 @@ export const searchCompaniesAndContacts = asyncHandler(async (req: AuthRequest, 
   }
 
   const searchTerm = q.trim();
+  // Match each typed word independently (case-insensitive substring, any
+  // order) rather than requiring the whole typed string to appear as one
+  // literal substring — "Corp Tech" now finds "Tech Corp Ltd", not just
+  // exact left-to-right substrings.
+  const words = searchTerm.split(/\s+/).filter(Boolean);
+  const wordConditions = (field: string) => ({
+    [Op.and]: words.map((w) => ({ [field]: { [Op.iLike]: `%${w}%` } })),
+  });
+
   const [companies, contacts] = await Promise.all([
     Company.findAll({
       where: {
-        name: { [Op.iLike]: `%${searchTerm}%` },
+        ...wordConditions('name'),
         isActive: true,
       },
       attributes: ['id', 'name', 'email', 'phone', 'address', 'website', 'industry'],
@@ -79,7 +88,7 @@ export const searchCompaniesAndContacts = asyncHandler(async (req: AuthRequest, 
     }),
     Contact.findAll({
       where: {
-        company: { [Op.iLike]: `%${searchTerm}%` },
+        ...wordConditions('company'),
         isActive: true,
       },
       attributes: ['id', 'firstName', 'lastName', 'email', 'phone', 'company', 'jobTitle'],
