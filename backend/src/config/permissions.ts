@@ -130,6 +130,11 @@ const modules: { module: string; label: string; actions: { action: string; label
     label: 'System Settings',
     actions: [{ action: 'manage', label: 'Manage environment variables & system settings' }],
   },
+  {
+    module: 'integrations',
+    label: 'Integrations',
+    actions: [{ action: 'manage', label: 'Connect/disconnect third-party integrations' }],
+  },
 ];
 
 export const PERMISSION_CATALOG: PermissionDef[] = modules.flatMap((m) =>

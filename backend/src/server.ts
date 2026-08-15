@@ -37,6 +37,7 @@ import taxMasterRoutes from './routes/taxMasterRoutes';
 import companyRoutes from './routes/companyRoutes';
 import attachmentRoutes from './routes/attachmentRoutes';
 import settingsRoutes from './routes/settingsRoutes';
+import integrationRoutes from './routes/integrationRoutes';
 
 // Import models in dependency order before sync
 import './models/Company';
@@ -65,6 +66,7 @@ import './models/LeadTax';
 import './models/QuoteProduct';
 import './models/QuoteTax';
 import './models/Attachment';
+import './models/Integration';
 
 // Import associations AFTER all models — defines belongsTo/hasMany relationships
 import './models/associations';
@@ -143,6 +145,7 @@ app.use('/api/taxes', taxMasterRoutes);
 app.use('/api/company', companyRoutes);
 app.use('/api/attachments', attachmentRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/integrations', integrationRoutes);
 
 // Serve uploaded files (attachments, generated PDFs) statically — but only to
 // authenticated users. Nothing in the frontend loads these via raw <img>/<a>

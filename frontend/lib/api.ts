@@ -486,6 +486,27 @@ export const companyApi = {
   updateCompany: async (data: any) => request<{ message: string; company: any }>('/company', { method: 'PUT', body: JSON.stringify(data) }),
 };
 
+export type IntegrationRow = {
+  provider: string;
+  label: string;
+  category: string;
+  description: string;
+  docsUrl: string | null;
+  credentialsConfigured: boolean;
+  missingEnvVars: string[];
+  status: string;
+  isEnabled: boolean;
+  connectedAt: string | null;
+  lastSyncAt: string | null;
+  lastError: string | null;
+};
+
+export const integrationsApi = {
+  getIntegrations: async () => request<{ integrations: IntegrationRow[] }>('/integrations'),
+  connect: async (provider: string) => request<{ message: string; missingEnvVars?: string[] }>(`/integrations/${provider}/connect`, { method: 'POST' }),
+  disconnect: async (provider: string) => request<{ message: string }>(`/integrations/${provider}/disconnect`, { method: 'POST' }),
+};
+
 // ─── System Settings API (Super Admin only) ──────────────────────────────────────
 
 export const settingsApi = {
