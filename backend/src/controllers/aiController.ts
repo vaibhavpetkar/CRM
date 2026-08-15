@@ -7,7 +7,7 @@ import Lead from '../models/Lead';
 import Quote from '../models/Quote';
 import Company from '../models/Company';
 import { getTimeline } from '../services/activityLogger';
-import { isAIConfigured, summarizeDeal, summarizeLead, generateQuoteFollowUp } from '../services/aiService';
+import { isAIConfigured, summarizeDeal, summarizeLead, generateQuoteFollowUp, getActiveProvider } from '../services/aiService';
 
 const getCurrencySymbol = (currency: string) => {
   try {
@@ -26,7 +26,8 @@ const timelineToLines = (timeline: any[]) =>
 export const getAIStatus = asyncHandler(async (_req: AuthRequest, res: Response) => {
   return res.json({
     configured: isAIConfigured(),
-    missingEnvVars: isAIConfigured() ? [] : ['ANTHROPIC_API_KEY'],
+    provider: getActiveProvider(),
+    missingEnvVars: isAIConfigured() ? [] : ['OLLAMA_BASE_URL (free, local) or ANTHROPIC_API_KEY (paid)'],
   });
 });
 

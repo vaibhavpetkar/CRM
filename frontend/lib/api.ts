@@ -511,7 +511,7 @@ export const integrationsApi = {
 // server-side; if ANTHROPIC_API_KEY isn't configured, these reject with a
 // clear message instead of the UI showing a fake result.
 export const aiApi = {
-  getStatus: async () => request<{ configured: boolean; missingEnvVars: string[] }>('/ai/status'),
+  getStatus: async () => request<{ configured: boolean; provider: 'ollama' | 'anthropic' | null; missingEnvVars: string[] }>('/ai/status'),
   summarizeDeal: async (id: string | number) => request<{ summary: string; nextAction: string | null }>(`/ai/deals/${id}/summary`, { method: 'POST' }),
   summarizeLead: async (id: string | number) => request<{ summary: string; nextAction: string | null }>(`/ai/leads/${id}/summary`, { method: 'POST' }),
   quoteFollowUpMessage: async (id: string | number) => request<{ message: string }>(`/ai/quotes/${id}/followup-message`, { method: 'POST' }),

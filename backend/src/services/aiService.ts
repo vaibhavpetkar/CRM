@@ -1,33 +1,89 @@
 import { AppError } from '../errors/AppError';
 
-// Phase 20 — AI Assistant. Real calls to the Anthropic API, gated behind
-// ANTHROPIC_API_KEY exactly like every other integration in this project
-// (see integrationController.ts): if the key isn't set, every function here
-// throws AIConfigError instead of returning a canned/fake response. Nothing
-// in this file ever fabricates an AI answer.
+// Phase 20 — AI Assistant. Two real, non-fake providers:
+//
+// 1. Ollama (free, local, self-hosted) — genuinely free and fast: it runs
+//    on your own server with no per-request cost and no external API key,
+//    using an open-source model (default: llama3.1). This is the "faster
+//    and free" option. It requires Ollama actually installed and running on
+//    the backend server — see backend/.env.production.example for setup.
+// 2. Anthropic's API (paid, requires ANTHROPIC_API_KEY) — higher quality,
+//    costs per request. Used as a fallback if Ollama isn't configured.
+//
+// Whichever is configured is used for real — if neither is, every function
+// here throws AIConfigError instead of returning a canned/fake response.
+
+const OLLAMA_BASE_URL = (process.env.OLLAMA_BASE_URL || 'http://localhost:11434').replace(/\/$/, '');
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'llama3.1';
 
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 const ANTHROPIC_VERSION = '2023-06-01';
-const DEFAULT_MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-5';
+const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-5';
+
+type AIProvider = 'ollama' | 'anthropic' | null;
+
+const isOllamaConfigured = (): boolean => !!process.env.OLLAMA_BASE_URL || process.env.AI_PROVIDER === 'ollama';
+const isAnthropicConfigured = (): boolean => !!process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_API_KEY.trim() !== '';
+
+/** Which provider will actually be used, or null if neither is configured. Ollama (free) wins if both are set, unless AI_PROVIDER explicitly says otherwise. */
+export const getActiveProvider = (): AIProvider => {
+  if (process.env.AI_PROVIDER === 'anthropic' && isAnthropicConfigured()) return 'anthropic';
+  if (process.env.AI_PROVIDER === 'ollama' && isOllamaConfigured()) return 'ollama';
+  if (isOllamaConfigured()) return 'ollama';
+  if (isAnthropicConfigured()) return 'anthropic';
+  return null;
+};
 
 export class AIConfigError extends AppError {
   constructor() {
-    super("AI Assistant isn't configured — set ANTHROPIC_API_KEY on the server.", 400);
+    super(
+      "AI Assistant isn't configured — set OLLAMA_BASE_URL (free, local) or ANTHROPIC_API_KEY (paid) on the server.",
+      400
+    );
     this.name = 'AIConfigError';
   }
 }
 
-export const isAIConfigured = (): boolean => !!process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_API_KEY.trim() !== '';
+export const isAIConfigured = (): boolean => getActiveProvider() !== null;
 
 interface CallOptions {
   system?: string;
   maxTokens?: number;
 }
 
-/** Low-level call to the Anthropic Messages API. */
-async function callClaude(userPrompt: string, options: CallOptions = {}): Promise<string> {
-  if (!isAIConfigured()) throw new AIConfigError();
+async function callOllama(userPrompt: string, options: CallOptions): Promise<string> {
+  let response: Response;
+  try {
+    response = await fetch(`${OLLAMA_BASE_URL}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: OLLAMA_MODEL,
+        stream: false,
+        messages: [
+          ...(options.system ? [{ role: 'system', content: options.system }] : []),
+          { role: 'user', content: userPrompt },
+        ],
+      }),
+    });
+  } catch (err) {
+    throw new Error(
+      `Could not reach Ollama at ${OLLAMA_BASE_URL}. Is it installed and running on this server? (curl -fsSL https://ollama.com/install.sh | sh && ollama pull ${OLLAMA_MODEL})`
+    );
+  }
 
+  if (!response.ok) {
+    const body = await response.text().catch(() => '');
+    throw new Error(`Ollama request failed (${response.status}): ${body.slice(0, 300)}`);
+  }
+
+  const data: any = await response.json();
+  const text = (data?.message?.content || '').trim();
+  if (!text) throw new Error('Ollama returned an empty response.');
+  return text;
+}
+
+async function callAnthropic(userPrompt: string, options: CallOptions): Promise<string> {
   let response: Response;
   try {
     response = await fetch(ANTHROPIC_API_URL, {
@@ -38,7 +94,7 @@ async function callClaude(userPrompt: string, options: CallOptions = {}): Promis
         'anthropic-version': ANTHROPIC_VERSION,
       },
       body: JSON.stringify({
-        model: DEFAULT_MODEL,
+        model: ANTHROPIC_MODEL,
         max_tokens: options.maxTokens || 400,
         ...(options.system ? { system: options.system } : {}),
         messages: [{ role: 'user', content: userPrompt }],
@@ -62,6 +118,13 @@ async function callClaude(userPrompt: string, options: CallOptions = {}): Promis
 
   if (!text) throw new Error('AI returned an empty response.');
   return text;
+}
+
+/** Dispatches to whichever provider is actually configured. */
+async function callClaude(userPrompt: string, options: CallOptions = {}): Promise<string> {
+  const provider = getActiveProvider();
+  if (!provider) throw new AIConfigError();
+  return provider === 'ollama' ? callOllama(userPrompt, options) : callAnthropic(userPrompt, options);
 }
 
 const SYSTEM_PROMPT =
