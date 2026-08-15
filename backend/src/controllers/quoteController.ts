@@ -1,10 +1,56 @@
 import { Response } from 'express';
 import path from 'path';
+import { Op } from 'sequelize';
 import { AuthRequest } from '../middleware/authMiddleware';
 import { asyncHandler } from '../utils/errorHandler';
 import quoteService from '../services/QuoteService';
+import Quote from '../models/Quote';
+import Notification from '../models/Notification';
+import { notifyUser } from '../utils/notificationService';
+
+/**
+ * Phase 21 automation: Quote reminders. Scans for Quotes still in 'draft' or
+ * 'sent' status whose validUntil date has passed, and notifies the assigned
+ * user once per quote — mirrors taskController.checkOverdueTasks exactly:
+ * lazily run from a commonly-hit endpoint (here, the Quotes list) rather
+ * than a background cron job, since this environment doesn't run a
+ * persistent process for scheduled jobs. Deduped via the same
+ * already-notified check, so it's safe to call on every request.
+ */
+export const checkExpiringQuotes = async (): Promise<number> => {
+  const expiredQuotes = await Quote.findAll({
+    where: {
+      status: { [Op.in]: ['draft', 'sent'] },
+      validUntil: { [Op.lt]: new Date() },
+    },
+  });
+
+  let notifiedCount = 0;
+  for (const quote of expiredQuotes) {
+    if (!quote.assignedToId) continue;
+
+    const alreadyNotified = await Notification.findOne({
+      where: { type: 'quote_expired', entityType: 'Quote', entityId: quote.id },
+    });
+    if (alreadyNotified) continue;
+
+    await notifyUser({
+      userId: quote.assignedToId,
+      type: 'quote_expired',
+      title: 'Quote expired',
+      message: `Quotation ${quote.quoteNumber} for ${quote.client} passed its valid-until date and is still ${quote.status}. Follow up or revise it.`,
+      entityType: 'Quote',
+      entityId: quote.id,
+    });
+    notifiedCount++;
+  }
+  return notifiedCount;
+};
 
 export const getQuotes = asyncHandler(async (req: AuthRequest, res: Response) => {
+  // Lazily surface expiry notifications whenever the Quotes list is viewed.
+  await checkExpiringQuotes();
+
   const result = await quoteService.list(req.query as any);
   return res.json(result);
 });

@@ -196,6 +196,8 @@ export default function Topbar({ onMobileMenuClick }: { onMobileMenuClick?: () =
       router.push('/tasks');
     } else if (notif.entityType === 'Invoice' && notif.entityId) {
       router.push('/invoices');
+    } else if (notif.entityType === 'Quote' && notif.entityId) {
+      router.push(`/quotes/${notif.entityId}`);
     }
   };
 
