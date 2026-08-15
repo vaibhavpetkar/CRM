@@ -13,6 +13,10 @@ import { useToast } from '@/components/ui/toast';
 const ENV_VAR_DEFINITIONS: Record<string, { label: string; type: 'text' | 'password' | 'url'; description: string }> = {
   GOOGLE_CLIENT_ID: { label: 'Google OAuth Client ID', type: 'text', description: 'Client ID from Google Cloud Console for OAuth login' },
   GOOGLE_CLIENT_SECRET: { label: 'Google OAuth Client Secret', type: 'password', description: 'Client Secret from Google Cloud Console' },
+  GOOGLE_BUSINESS_CLIENT_ID: { label: 'Google Business Client ID', type: 'text', description: 'Client ID for Google Business integration (Google My Business, etc.)' },
+  GOOGLE_BUSINESS_CLIENT_SECRET: { label: 'Google Business Client Secret', type: 'password', description: 'Client Secret for Google Business integration' },
+  GOOGLE_MEET_CLIENT_ID: { label: 'Google Meet Client ID', type: 'text', description: 'Client ID for Google Meet integration' },
+  GOOGLE_MEET_CLIENT_SECRET: { label: 'Google Meet Client Secret', type: 'password', description: 'Client Secret for Google Meet integration' },
   EMAIL_SERVICE: { label: 'Email Service', type: 'text', description: 'Email service provider (e.g., gmail, sendgrid, mailgun)' },
   EMAIL_USER: { label: 'Email User', type: 'text', description: 'Email address for sending emails' },
   EMAIL_PASS: { label: 'Email Password / App Password', type: 'password', description: 'Email password or app-specific password (for Gmail, use App Password)' },
