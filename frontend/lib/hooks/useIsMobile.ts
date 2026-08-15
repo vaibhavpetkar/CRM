@@ -15,6 +15,13 @@ export function useIsMobile(): boolean {
 
   useEffect(() => {
     const mql = window.matchMedia(MOBILE_QUERY);
+    // Deliberately synchronous, not a lazy useState initializer: the server
+    // never has `window`, so an initializer reading matchMedia directly
+    // would make the client's first render disagree with the server-rendered
+    // HTML and trigger a hydration mismatch. Starting at `false` (matching
+    // the server) and correcting it once here, post-hydration, is the
+    // standard safe pattern for viewport-dependent state in Next.js.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsMobile(mql.matches);
     const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
     mql.addEventListener('change', handler);
