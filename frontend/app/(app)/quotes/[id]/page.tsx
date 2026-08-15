@@ -3,13 +3,13 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { quotesApi, itemsApi } from '@/lib/api';
+import { quotesApi } from '@/lib/api';
 import Button from '@/components/ui/button';
 import Card from '@/components/ui/card';
 import StatusBadge from '@/components/ui/status-badge';
 import LoadingSpinner from '@/components/ui/loading-spinner';
 import CompanyAutocomplete from '@/components/ui/company-autocomplete';
-import ItemAutocomplete from '@/components/ui/item-autocomplete';
+import ItemAutocomplete, { ItemSuggestion } from '@/components/ui/item-autocomplete';
 import { formatCurrency } from '@/lib/utils';
 import { ArrowLeftIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { useToast } from '@/components/ui/toast';
@@ -34,7 +34,6 @@ export default function QuoteDetailPage() {
   const [formData, setFormData] = useState<any>({});
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
   const [taxLines, setTaxLines] = useState<TaxLine[]>([]);
-  const [itemCatalog, setItemCatalog] = useState<{ id: number; itemName: string; unit: string; sellingPrice: number; taxId: number | null; taxType: string | null; taxRate: number | null }[]>([]);
 
   // Handle company selection from autocomplete
   const handleCompanySelect = (company: any) => {
@@ -76,25 +75,6 @@ export default function QuoteDetailPage() {
     }
   }, [loading, quote, searchParams]);
 
-  useEffect(() => {
-    itemsApi
-      .getItems({ limit: 500, isActive: true })
-      .then((res) =>
-        setItemCatalog(
-          (res.items || []).map((i: any) => ({
-            id: i.id,
-            itemName: i.itemName,
-            unit: i.unit,
-            sellingPrice: Number(i.sellingPrice) || 0,
-            taxId: i.tax?.id ?? null,
-            taxType: i.tax?.taxType ?? null,
-            taxRate: i.tax ? Number(i.tax.rate) : null,
-          }))
-        )
-      )
-      .catch(() => {});
-  }, []);
-
   // Live client-side preview of totals — mirrors QuoteService.recalculateTotals on
   // the backend (subtotal -> discount -> +shipping -> tax on discounted subtotal).
   const totals = useMemo(() => {
@@ -107,7 +87,7 @@ export default function QuoteDetailPage() {
     return { subtotal, discountAmount, taxTotal, shipping, grandTotal: discountedSubtotal + taxTotal + shipping };
   }, [lineItems, taxLines, formData.discountType, formData.discountValue, formData.shippingCharges]);
 
-  const addTaxFromItem = (item: (typeof itemCatalog)[number]) => {
+  const addTaxFromItem = (item: ItemSuggestion) => {
     if (item.taxId == null) return;
     setTaxLines((prev) => (prev.some((t) => t.taxId === item.taxId) ? prev : [...prev, { taxId: item.taxId, taxType: item.taxType || 'Tax', percentage: item.taxRate || 0 }]));
   };
@@ -333,17 +313,20 @@ export default function QuoteDetailPage() {
                         row.productName
                       ) : (
                         <ItemAutocomplete
-                          value={row.itemId}
-                          onChange={(val) => {
-                            const id = val ? Number(val) : '';
-                            const match = itemCatalog.find((c) => c.id === id);
+                          value={row.productName}
+                          onChange={(text) => {
                             const next = [...lineItems];
-                            next[idx] = { ...next[idx], itemId: id, productName: match?.itemName || next[idx].productName, unit: match?.unit || next[idx].unit, rate: match ? match.sellingPrice : next[idx].rate };
+                            // Typing clears any prior match — itemId is only
+                            // ever set from an actual onSelect below, never
+                            // guessed from typed text.
+                            next[idx] = { ...next[idx], productName: text, itemId: '' };
                             setLineItems(next);
-                            if (match) addTaxFromItem(match);
                           }}
                           onSelect={(item) => {
-                            // ItemAutocomplete onSelect is called after onChange with the full item
+                            const next = [...lineItems];
+                            next[idx] = { ...next[idx], itemId: item.id, productName: item.itemName, unit: item.unit, rate: item.sellingPrice };
+                            setLineItems(next);
+                            addTaxFromItem(item);
                           }}
                           placeholder="Type item name..."
                         />

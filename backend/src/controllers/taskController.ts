@@ -98,7 +98,13 @@ export const createTask = async (req: Request & { user?: any }, res: Response) =
       details: `Task "${title}" assigned to user ID ${task.assignedToId}.`,
     });
 
-    if (task.assignedToId && task.assignedToId !== req.user?.id) {
+    // Normalize to string for comparison — same fix as updateTask below:
+    // body/JWT values can arrive as different types (string vs number), and
+    // a naive !== comparison between them is unreliable in either direction.
+    const createdAssigneeId = task.assignedToId !== null && task.assignedToId !== undefined ? String(task.assignedToId) : null;
+    const creatorId = req.user?.id !== undefined && req.user?.id !== null ? String(req.user.id) : null;
+
+    if (createdAssigneeId && createdAssigneeId !== creatorId) {
       await notifyUser({
         userId: task.assignedToId,
         type: 'task_assigned',
