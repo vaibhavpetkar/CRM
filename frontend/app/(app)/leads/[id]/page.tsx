@@ -3,12 +3,14 @@
 import { useState, useEffect } from 'react';
 import type { FormEvent } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { leadsApi, contactsApi, usersApi, quotesApi, itemsApi } from '@/lib/api';
+import { leadsApi, contactsApi, usersApi, quotesApi, itemsApi, aiApi, getStoredUser } from '@/lib/api';
+import { hasPermission } from '@/lib/permissions';
 import { ANNUAL_TURNOVER_OPTIONS, INDUSTRY_OPTIONS, DESIGNATION_OPTIONS, TERRITORY_OPTIONS } from '@/lib/lead-options';
 import Button from '@/components/ui/button';
 import Card from '@/components/ui/card';
 import DataTable from '@/components/ui/data-table';
 import CompanyAutocomplete from '@/components/ui/company-autocomplete';
+import AISummaryPanel from '@/components/ui/ai-summary-panel';
 import { ArrowLeftIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { useToast } from '@/components/ui/toast';
 import { useKeyboardShortcuts } from '@/lib/hooks/useKeyboardShortcuts';
@@ -717,7 +719,13 @@ export default function LeadDetailsPage() {
       )}
 
       {activeTab === 'activity' && (
-        <Card title="Activity Timeline">
+        <>
+          {hasPermission(getStoredUser(), 'ai:use') && (
+            <div className="mb-4">
+              <AISummaryPanel onGenerate={() => aiApi.summarizeLead(leadId)} />
+            </div>
+          )}
+          <Card title="Activity Timeline">
           {timelineLoading ? (
             <p className="py-8 text-center text-sm text-slate-400">Loading...</p>
           ) : timeline.length === 0 ? (
@@ -767,6 +775,7 @@ export default function LeadDetailsPage() {
             </div>
           )}
         </Card>
+        </>
       )}
     </div>
   );

@@ -11,9 +11,9 @@ import CompanyAutocomplete from '@/components/ui/company-autocomplete';
 import { QUOTE_FIELDS } from '@/lib/import-export/field-configs';
 import { formatCurrency } from '@/lib/utils';
 import { getCachedCurrency } from '@/lib/currency';
-import { quotesApi } from '@/lib/api';
+import { quotesApi, aiApi } from '@/lib/api';
 import Link from 'next/link';
-import { PlusIcon, XMarkIcon, TrashIcon, PaperAirplaneIcon, PrinterIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, XMarkIcon, TrashIcon, PaperAirplaneIcon, PrinterIcon, SparklesIcon } from '@heroicons/react/24/outline';
 import { useToast } from '@/components/ui/toast';
 
 const emptyForm = { deal: '', client: '', customerEmail: '', customerPhone: '', customerAddress: '', amount: '', status: 'draft', validUntil: '' };
@@ -31,6 +31,8 @@ export default function QuotesPage() {
   const [sendTarget, setSendTarget] = useState('');
   const [shareContent, setShareContent] = useState<{ message: string; quoteLink: string; customerPhone: string | null; customerEmail: string | null; quoteNumber: string } | null>(null);
   const [shareLoading, setShareLoading] = useState(false);
+  const [messageText, setMessageText] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
 
   // Handle company selection from autocomplete
   const handleCompanySelect = (company: any) => {
@@ -95,6 +97,7 @@ export default function QuotesPage() {
     try {
       const content = await quotesApi.getShareContent(quote.id);
       setShareContent(content);
+      setMessageText(content.message);
       // Prefer the freshly-fetched contact details (covers quotes loaded
       // before customerEmail/customerPhone were on the row) without
       // clobbering anything already typed.
@@ -103,6 +106,22 @@ export default function QuotesPage() {
       toast.error(err.message || 'Failed to prepare the quote share message.');
     } finally {
       setShareLoading(false);
+    }
+  };
+
+  // Phase 20 — AI Assistant. Replaces the template-based message with a
+  // freshly generated one via the real Anthropic API; falls back to leaving
+  // the template message in place if AI isn't configured/available.
+  const handleAIPersonalize = async () => {
+    if (!sendQuoteId) return;
+    setAiLoading(true);
+    try {
+      const res = await aiApi.quoteFollowUpMessage(sendQuoteId);
+      setMessageText(res.message);
+    } catch (err: any) {
+      toast.warning(err.message || 'Could not generate an AI message — kept the template instead.');
+    } finally {
+      setAiLoading(false);
     }
   };
 
@@ -137,11 +156,12 @@ export default function QuotesPage() {
         // (Phase 13, not available without credentials) — it opens a chat
         // pre-filled with the strategic message and public quote link, which
         // the recipient can open to view/download the full quote.
-        window.open(`https://wa.me/${digits}?text=${encodeURIComponent(shareContent.message)}`, '_blank');
+        window.open(`https://wa.me/${digits}?text=${encodeURIComponent(messageText)}`, '_blank');
         toast.info('WhatsApp opened with the quote message ready to send.');
         setSendQuoteId(null);
         setSendTarget('');
         setShareContent(null);
+        setMessageText('');
         return;
       }
 
@@ -314,7 +334,7 @@ export default function QuotesPage() {
           <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="text-lg font-semibold text-slate-900">Send Quote</h3>
-              <button onClick={() => { setSendQuoteId(null); setShareContent(null); }} className="text-slate-400 hover:text-slate-600">
+              <button onClick={() => { setSendQuoteId(null); setShareContent(null); setMessageText(''); }} className="text-slate-400 hover:text-slate-600">
                 <XMarkIcon className="h-5 w-5" />
               </button>
             </div>
@@ -364,21 +384,32 @@ export default function QuotesPage() {
               </div>
               {sendMethod === 'whatsapp' && (
                 <div>
-                  <label className="block text-xs font-medium text-slate-700">Message preview</label>
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-medium text-slate-700">Message</label>
+                    <button
+                      type="button"
+                      disabled={aiLoading || shareLoading || !shareContent}
+                      onClick={handleAIPersonalize}
+                      className="flex items-center gap-1 text-[11px] font-medium text-[#168eea] hover:underline disabled:opacity-50"
+                    >
+                      <SparklesIcon className="h-3.5 w-3.5" />
+                      {aiLoading ? 'Generating...' : 'Personalize with AI'}
+                    </button>
+                  </div>
                   {shareLoading ? (
                     <p className="mt-1 text-xs text-slate-400">Preparing message...</p>
                   ) : (
                     <textarea
-                      readOnly
                       rows={6}
-                      value={shareContent?.message || ''}
-                      className="mt-1 w-full resize-none rounded-md border border-slate-200 bg-slate-50 p-2 text-xs text-slate-600 focus:outline-none"
+                      value={messageText}
+                      onChange={(e) => setMessageText(e.target.value)}
+                      className="mt-1 w-full resize-none rounded-md border border-slate-200 bg-slate-50 p-2 text-xs text-slate-600 focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea]"
                     />
                   )}
                 </div>
               )}
               <div className="mt-4 flex justify-end gap-2 pt-2">
-                <Button type="button" variant="secondary" size="sm" onClick={() => { setSendQuoteId(null); setShareContent(null); }}>Cancel</Button>
+                <Button type="button" variant="secondary" size="sm" onClick={() => { setSendQuoteId(null); setShareContent(null); setMessageText(''); }}>Cancel</Button>
                 <Button type="submit" size="sm" disabled={submitting || (sendMethod === 'whatsapp' && shareLoading)}>{submitting ? 'Sending...' : 'Send'}</Button>
               </div>
             </form>

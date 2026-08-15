@@ -507,6 +507,16 @@ export const integrationsApi = {
   disconnect: async (provider: string) => request<{ message: string }>(`/integrations/${provider}/disconnect`, { method: 'POST' }),
 };
 
+// Phase 20 — AI Assistant. Every call here hits the real Anthropic API
+// server-side; if ANTHROPIC_API_KEY isn't configured, these reject with a
+// clear message instead of the UI showing a fake result.
+export const aiApi = {
+  getStatus: async () => request<{ configured: boolean; missingEnvVars: string[] }>('/ai/status'),
+  summarizeDeal: async (id: string | number) => request<{ summary: string; nextAction: string | null }>(`/ai/deals/${id}/summary`, { method: 'POST' }),
+  summarizeLead: async (id: string | number) => request<{ summary: string; nextAction: string | null }>(`/ai/leads/${id}/summary`, { method: 'POST' }),
+  quoteFollowUpMessage: async (id: string | number) => request<{ message: string }>(`/ai/quotes/${id}/followup-message`, { method: 'POST' }),
+};
+
 // ─── System Settings API (Super Admin only) ──────────────────────────────────────
 
 export const settingsApi = {

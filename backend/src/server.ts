@@ -38,6 +38,7 @@ import companyRoutes from './routes/companyRoutes';
 import attachmentRoutes from './routes/attachmentRoutes';
 import settingsRoutes from './routes/settingsRoutes';
 import integrationRoutes from './routes/integrationRoutes';
+import aiRoutes from './routes/aiRoutes';
 
 // Import models in dependency order before sync
 import './models/Company';
@@ -146,6 +147,7 @@ app.use('/api/company', companyRoutes);
 app.use('/api/attachments', attachmentRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/integrations', integrationRoutes);
+app.use('/api/ai', aiRoutes);
 
 // Serve uploaded files (attachments, generated PDFs) statically — but only to
 // authenticated users. Nothing in the frontend loads these via raw <img>/<a>

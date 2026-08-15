@@ -11,7 +11,9 @@ import DataTable, { DataTableColumn } from '@/components/ui/data-table';
 import ImportExportButtons from '@/components/ui/import-export-buttons';
 import { DEAL_FIELDS } from '@/lib/import-export/field-configs';
 import { formatCurrency, getCurrencySymbol } from '@/lib/utils';
-import { dealsApi, leadsApi, quotesApi } from '@/lib/api';
+import { dealsApi, leadsApi, quotesApi, aiApi, getStoredUser } from '@/lib/api';
+import { hasPermission } from '@/lib/permissions';
+import AISummaryPanel from '@/components/ui/ai-summary-panel';
 import { useKeyboardShortcuts } from '@/lib/hooks/useKeyboardShortcuts';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -416,6 +418,10 @@ export default function DealsPage() {
                   />
                 </div>
               </div>
+
+              {editingId && hasPermission(getStoredUser(), 'ai:use') && (
+                <AISummaryPanel onGenerate={() => aiApi.summarizeDeal(editingId)} />
+              )}
 
               <div className="mt-4 flex justify-end gap-2 pt-2">
                 {editingId && (

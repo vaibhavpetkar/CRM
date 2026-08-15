@@ -135,6 +135,11 @@ const modules: { module: string; label: string; actions: { action: string; label
     label: 'Integrations',
     actions: [{ action: 'manage', label: 'Connect/disconnect third-party integrations' }],
   },
+  {
+    module: 'ai',
+    label: 'AI Assistant',
+    actions: [{ action: 'use', label: 'Generate AI summaries & suggestions (leads, deals, quotes)' }],
+  },
 ];
 
 export const PERMISSION_CATALOG: PermissionDef[] = modules.flatMap((m) =>
@@ -171,6 +176,7 @@ export const DEFAULT_ROLES: { name: string; description: string; permissions: st
       'items:read', 'items:create', 'items:update',
       'item_categories:read', 'item_categories:create', 'item_categories:update',
       'taxes:read', 'taxes:create', 'taxes:update',
+      'ai:use',
     ],
   },
   {
@@ -182,6 +188,7 @@ export const DEFAULT_ROLES: { name: string; description: string; permissions: st
       'contacts:read', 'contacts:create', 'contacts:update',
       'quotes:view', 'tasks:view', 'meetings:view',
       'items:read', 'item_categories:read', 'taxes:read',
+      'ai:use',
     ],
   },
   {
