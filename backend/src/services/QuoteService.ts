@@ -20,6 +20,7 @@ import { renderPrintHtml } from '../utils/printFormat';
 import { sendMailWithAttachment } from '../utils/mailer';
 import { sanitizeDateFields } from '../utils/sanitize';
 import path from 'path';
+import crypto from 'crypto';
 import { NotFoundError, ConflictError, ValidationError } from '../errors/AppError';
 
 interface ProductInput {
@@ -50,6 +51,49 @@ const serializeQuote = (quote: Quote) => {
 const computeDiscountAmount = (subtotal: number, discountType: string, discountValue: number): number => {
   if (!discountValue) return 0;
   return discountType === 'percentage' ? (subtotal * discountValue) / 100 : discountValue;
+};
+
+// Used when Company.quoteMessageTemplate hasn't been configured — a sensible
+// default, not a permanently hardcoded message (Settings > Company lets any
+// user override this). Supports the placeholders documented on the Company
+// model's quoteMessageTemplate field.
+const DEFAULT_SHARE_TEMPLATE = [
+  'Hi {{customerName}},',
+  '',
+  'We\'ve prepared your quotation {{quoteNumber}} from {{companyName}}.',
+  '',
+  'Quote Value: {{quoteValue}}',
+  '',
+  'You can review it here:',
+  '{{quoteLink}}',
+  '',
+  'If everything looks good, we can proceed with the next step and get started.',
+  '',
+  '{{companySocialLinks}}',
+].join('\n');
+
+const formatShareAmount = (amount: number, currency: string): string => {
+  try {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency, maximumFractionDigits: 0 }).format(amount);
+  } catch {
+    return `${currency} ${amount}`;
+  }
+};
+
+// Only the social links a company has actually configured are ever included
+// — never fabricated placeholder URLs (Phase 10 requirement).
+const buildSocialLinksBlock = (company: any): string => {
+  const entries: Array<[string, string | null | undefined]> = [
+    ['Website', company?.website],
+    ['Instagram', company?.instagram],
+    ['Facebook', company?.facebook],
+    ['LinkedIn', company?.linkedin],
+    ['YouTube', company?.youtube],
+    ['X/Twitter', company?.twitter],
+  ];
+  const present = entries.filter(([, v]) => !!v);
+  if (!present.length) return '';
+  return present.map(([label, v]) => `${label}: ${v}`).join('\n');
 };
 
 class QuoteService {
@@ -169,6 +213,7 @@ class QuoteService {
 
     return sequelize.transaction(async (t) => {
       const quoteNumber = await generateCode('QUOTE', 'QTN', 5, true);
+      const publicToken = crypto.randomBytes(24).toString('hex');
 
       const quote = await quoteRepository.create(
         {
@@ -190,6 +235,7 @@ class QuoteService {
           salesPersonId: data.assignedToId ?? null,
           validUntil: data.validUntil ?? null,
           createdById: userId ?? null,
+          publicToken,
         },
         t
       );
@@ -289,6 +335,59 @@ class QuoteService {
     if (!quote) throw new NotFoundError('Quote', id);
     const doc = await this.buildPrintableDocument(quote);
     return renderPrintHtml(doc);
+  }
+
+  /**
+   * Customer-facing view: looked up by the opaque `publicToken`, never the
+   * internal numeric id, and mounted on a route with no auth middleware
+   * (Phase 4: real public route instead of exposing an internal one). Reuses
+   * the same rendering as the authenticated print view so both stay in sync.
+   */
+  async getPublicPrintHtml(token: string): Promise<string> {
+    const quote = await Quote.findOne({ where: { publicToken: token } });
+    if (!quote) throw new NotFoundError('Quote', token);
+    const full = await quoteRepository.getByIdWithDetails(quote.id);
+    const doc = await this.buildPrintableDocument(full!);
+    return renderPrintHtml(doc);
+  }
+
+  /**
+   * Builds the strategic share message (Phase 8) plus the dynamic public
+   * Quote link (Phase 4/9) for the WhatsApp/email "Send Quote" flow. Backfills
+   * a `publicToken` for quotes created before this existed, so nothing that
+   * was working before breaks.
+   */
+  async getShareContent(id: number | string) {
+    const quote = await Quote.findByPk(id);
+    if (!quote) throw new NotFoundError('Quote', id);
+
+    if (!quote.publicToken) {
+      await quote.update({ publicToken: crypto.randomBytes(24).toString('hex') });
+    }
+
+    const company = await Company.findOne({ order: [['id', 'ASC']] });
+    const baseUrl = (process.env.CLIENT_URL || 'http://localhost:3000').replace(/\/$/, '');
+    const quoteLink = `${baseUrl}/api/quotes/public/${quote.publicToken}`;
+
+    const template = (company?.quoteMessageTemplate && company.quoteMessageTemplate.trim()) || DEFAULT_SHARE_TEMPLATE;
+    const message = template
+      .replace(/\{\{\s*customerName\s*\}\}/g, quote.client || 'there')
+      .replace(/\{\{\s*quoteNumber\s*\}\}/g, quote.quoteNumber)
+      .replace(/\{\{\s*quoteValue\s*\}\}/g, formatShareAmount(Number(quote.amount), company?.currency || 'INR'))
+      .replace(/\{\{\s*quoteLink\s*\}\}/g, quoteLink)
+      .replace(/\{\{\s*companyName\s*\}\}/g, company?.name || 'our team')
+      .replace(/\{\{\s*companySocialLinks\s*\}\}/g, buildSocialLinksBlock(company))
+      // Collapse a leftover blank line if companySocialLinks resolved empty.
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+
+    return {
+      message,
+      quoteLink,
+      customerPhone: quote.customerPhone || null,
+      customerEmail: quote.customerEmail || null,
+      quoteNumber: quote.quoteNumber,
+    };
   }
 
   async sendEmail(id: number | string, toEmail: string | undefined, userId?: number | null) {

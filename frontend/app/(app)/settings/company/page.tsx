@@ -29,7 +29,27 @@ const emptyForm = {
   website: '',
   employeeCount: '51-100',
   currency: 'USD',
+  whatsapp: '',
+  instagram: '',
+  facebook: '',
+  linkedin: '',
+  youtube: '',
+  twitter: '',
+  quoteMessageTemplate: '',
 };
+
+const DEFAULT_TEMPLATE_PLACEHOLDER = `Hi {{customerName}},
+
+We've prepared your quotation {{quoteNumber}} from {{companyName}}.
+
+Quote Value: {{quoteValue}}
+
+You can review it here:
+{{quoteLink}}
+
+If everything looks good, we can proceed with the next step and get started.
+
+{{companySocialLinks}}`;
 
 export default function CompanySettingsPage() {
   const [formData, setFormData] = useState(emptyForm);
@@ -51,6 +71,13 @@ export default function CompanySettingsPage() {
           website: company.website || '',
           employeeCount: company.employeeCount || '51-100',
           currency: company.currency || 'USD',
+          whatsapp: company.whatsapp || '',
+          instagram: company.instagram || '',
+          facebook: company.facebook || '',
+          linkedin: company.linkedin || '',
+          youtube: company.youtube || '',
+          twitter: company.twitter || '',
+          quoteMessageTemplate: company.quoteMessageTemplate || '',
         });
       })
       .catch((err) => setError(err.message || 'Failed to load company settings. Is the backend running?'))
@@ -181,6 +208,101 @@ export default function CompanySettingsPage() {
           </form>
         )}
       </Card>
+
+      {!loading && (
+        <>
+          <Card title="Social Links" className="mt-6">
+            <p className="mb-4 text-xs text-slate-400">
+              Only links you fill in here are ever shown to customers — nothing is fabricated. Used in Quote-sharing messages (WhatsApp/email).
+            </p>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-slate-700">WhatsApp Business Number</label>
+                  <input
+                    value={formData.whatsapp}
+                    onChange={(e) => setFormData({ ...formData, whatsapp: e.target.value })}
+                    placeholder="e.g. 919876543210 (with country code, no +)"
+                    className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea]"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-slate-700">Instagram</label>
+                  <input
+                    value={formData.instagram}
+                    onChange={(e) => setFormData({ ...formData, instagram: e.target.value })}
+                    placeholder="https://instagram.com/yourhandle"
+                    className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea]"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-slate-700">Facebook</label>
+                  <input
+                    value={formData.facebook}
+                    onChange={(e) => setFormData({ ...formData, facebook: e.target.value })}
+                    placeholder="https://facebook.com/yourpage"
+                    className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea]"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-slate-700">LinkedIn</label>
+                  <input
+                    value={formData.linkedin}
+                    onChange={(e) => setFormData({ ...formData, linkedin: e.target.value })}
+                    placeholder="https://linkedin.com/company/yourcompany"
+                    className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea]"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-slate-700">YouTube</label>
+                  <input
+                    value={formData.youtube}
+                    onChange={(e) => setFormData({ ...formData, youtube: e.target.value })}
+                    placeholder="https://youtube.com/@yourchannel"
+                    className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea]"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-slate-700">X / Twitter</label>
+                  <input
+                    value={formData.twitter}
+                    onChange={(e) => setFormData({ ...formData, twitter: e.target.value })}
+                    placeholder="https://x.com/yourhandle"
+                    className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea]"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end pt-2">
+                <Button type="submit" disabled={saving}>{saving ? 'Saving...' : 'Save Social Links'}</Button>
+              </div>
+            </form>
+          </Card>
+
+          <Card title="Quote Share Message" className="mt-6">
+            <p className="mb-4 text-xs text-slate-400">
+              Used whenever a Quote is shared via WhatsApp or email. Leave blank to use the default below. Placeholders:{' '}
+              <code className="rounded bg-slate-100 px-1 py-0.5">{'{{customerName}}'}</code>,{' '}
+              <code className="rounded bg-slate-100 px-1 py-0.5">{'{{quoteNumber}}'}</code>,{' '}
+              <code className="rounded bg-slate-100 px-1 py-0.5">{'{{quoteValue}}'}</code>,{' '}
+              <code className="rounded bg-slate-100 px-1 py-0.5">{'{{quoteLink}}'}</code>,{' '}
+              <code className="rounded bg-slate-100 px-1 py-0.5">{'{{companyName}}'}</code>,{' '}
+              <code className="rounded bg-slate-100 px-1 py-0.5">{'{{companySocialLinks}}'}</code>
+            </p>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <textarea
+                rows={9}
+                value={formData.quoteMessageTemplate}
+                onChange={(e) => setFormData({ ...formData, quoteMessageTemplate: e.target.value })}
+                placeholder={DEFAULT_TEMPLATE_PLACEHOLDER}
+                className="w-full rounded-md border border-slate-200 px-3 py-2 font-mono text-sm focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea]"
+              />
+              <div className="flex justify-end pt-2">
+                <Button type="submit" disabled={saving}>{saving ? 'Saving...' : 'Save Message Template'}</Button>
+              </div>
+            </form>
+          </Card>
+        </>
+      )}
     </>
   );
 }

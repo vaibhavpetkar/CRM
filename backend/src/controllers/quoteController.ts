@@ -50,6 +50,20 @@ export const printQuote = asyncHandler(async (req: AuthRequest, res: Response) =
   return res.send(html);
 });
 
+// Customer-facing, unauthenticated — looked up by opaque publicToken only.
+export const getPublicQuote = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const html = await quoteService.getPublicPrintHtml(req.params.token);
+  res.setHeader('Content-Type', 'text/html');
+  return res.send(html);
+});
+
+// Internal/authenticated — builds the strategic share message + dynamic
+// public link for the "Send Quote" (WhatsApp/email) UI.
+export const getQuoteShareContent = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const content = await quoteService.getShareContent(req.params.id);
+  return res.json(content);
+});
+
 export const sendQuoteEmail = asyncHandler(async (req: AuthRequest, res: Response) => {
   const result = await quoteService.sendEmail(req.params.id, req.body?.email, req.user?.id);
   return res.json({ message: result.sent ? 'Quotation emailed successfully' : 'Email not sent (SMTP not configured) — see server logs', ...result });

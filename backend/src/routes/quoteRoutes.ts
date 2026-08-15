@@ -6,6 +6,11 @@ import { createQuoteValidation, updateQuoteValidation, sendEmailValidation } fro
 
 const router = Router();
 
+// Customer-facing public view — no auth. Looked up by opaque publicToken,
+// never the internal numeric id (Phase 4: real public route, not an exposed
+// internal one). Two path segments, so this can't collide with GET /:id.
+router.get('/public/:token', quoteController.getPublicQuote);
+
 // Generate directly from a Lead or a Deal (Opportunity) — auto-pulls
 // customer, address, products and taxes.
 router.post('/from-lead/:leadId', protect, authorize('quotes:view'), quoteController.createQuoteFromLead);
@@ -20,6 +25,7 @@ router.delete('/:id', protect, authorize('Administrator', 'Sales Manager'), quot
 // PDF / Print / Email
 router.get('/:id/pdf', protect, authorize('quotes:view'), quoteController.downloadQuotePdf);
 router.get('/:id/print', protect, authorize('quotes:view'), quoteController.printQuote);
+router.get('/:id/share-preview', protect, authorize('quotes:view'), quoteController.getQuoteShareContent);
 router.post('/:id/send-email', protect, authorize('quotes:view'), validate(sendEmailValidation), quoteController.sendQuoteEmail);
 
 // Revisions

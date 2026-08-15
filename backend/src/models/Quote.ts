@@ -48,6 +48,10 @@ interface QuoteAttributes {
   approvedAt?: Date | null;
   approvedById?: number | null;
 
+  // Opaque, unguessable token for the customer-facing public quote view
+  // (GET /api/quotes/public/:token, no auth) — never the internal numeric id.
+  publicToken?: string | null;
+
   createdById?: number | null;
 }
 
@@ -97,6 +101,7 @@ class Quote extends Model<QuoteAttributes, QuoteCreationAttributes> implements Q
   public rejectedAt?: Date | null;
   public approvedAt?: Date | null;
   public approvedById?: number | null;
+  public publicToken?: string | null;
   public createdById?: number | null;
 
   public readonly createdAt!: Date;
@@ -144,6 +149,7 @@ Quote.init(
     rejectedAt: { type: DataTypes.DATE, allowNull: true },
     approvedAt: { type: DataTypes.DATE, allowNull: true },
     approvedById: { type: DataTypes.INTEGER.UNSIGNED, allowNull: true, references: { model: 'users', key: 'id' } },
+    publicToken: { type: DataTypes.STRING(64), allowNull: true, unique: true },
 
     createdById: { type: DataTypes.INTEGER.UNSIGNED, allowNull: true, references: { model: 'users', key: 'id' } },
   },

@@ -29,6 +29,8 @@ export default function QuotesPage() {
   const [sendQuoteId, setSendQuoteId] = useState<string | number | null>(null);
   const [sendMethod, setSendMethod] = useState<'email' | 'whatsapp'>('email');
   const [sendTarget, setSendTarget] = useState('');
+  const [shareContent, setShareContent] = useState<{ message: string; quoteLink: string; customerPhone: string | null; customerEmail: string | null; quoteNumber: string } | null>(null);
+  const [shareLoading, setShareLoading] = useState(false);
 
   // Handle company selection from autocomplete
   const handleCompanySelect = (company: any) => {
@@ -84,17 +86,62 @@ export default function QuotesPage() {
     }
   };
 
+  const openSendModal = async (quote: any) => {
+    setSendQuoteId(quote.id);
+    setSendMethod('email');
+    setSendTarget(quote.customerEmail || '');
+    setShareContent(null);
+    setShareLoading(true);
+    try {
+      const content = await quotesApi.getShareContent(quote.id);
+      setShareContent(content);
+      // Prefer the freshly-fetched contact details (covers quotes loaded
+      // before customerEmail/customerPhone were on the row) without
+      // clobbering anything already typed.
+      setSendTarget((prev) => prev || content.customerEmail || '');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to prepare the quote share message.');
+    } finally {
+      setShareLoading(false);
+    }
+  };
+
+  // Keep the target field in sync with the right contact channel when the
+  // user switches Email <-> WhatsApp, without overwriting a manual edit.
+  const handleMethodChange = (method: 'email' | 'whatsapp') => {
+    setSendMethod(method);
+    if (!shareContent) return;
+    setSendTarget(method === 'email' ? shareContent.customerEmail || '' : shareContent.customerPhone || '');
+  };
+
   const handleSendQuote = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!sendQuoteId) return;
     setSubmitting(true);
     try {
       if (sendMethod === 'whatsapp') {
-        // WhatsApp sending isn't implemented server-side — open a wa.me chat instead.
         const digits = sendTarget.replace(/[^\d]/g, '');
-        window.open(`https://wa.me/${digits}`, '_blank');
+        if (!digits) {
+          toast.error('Enter a WhatsApp number (with country code) before sending.');
+          return;
+        }
+        if (digits.length < 10 || digits.length > 15) {
+          toast.error('That doesn\'t look like a valid phone number with country code.');
+          return;
+        }
+        if (!shareContent) {
+          toast.error('Quote message is still loading — try again in a moment.');
+          return;
+        }
+        // wa.me can't attach an image/PDF without the WhatsApp Business API
+        // (Phase 13, not available without credentials) — it opens a chat
+        // pre-filled with the strategic message and public quote link, which
+        // the recipient can open to view/download the full quote.
+        window.open(`https://wa.me/${digits}?text=${encodeURIComponent(shareContent.message)}`, '_blank');
+        toast.info('WhatsApp opened with the quote message ready to send.');
         setSendQuoteId(null);
         setSendTarget('');
+        setShareContent(null);
         return;
       }
 
@@ -106,6 +153,7 @@ export default function QuotesPage() {
       }
       setSendQuoteId(null);
       setSendTarget('');
+      setShareContent(null);
       fetchQuotes();
     } catch (err: any) {
       toast.error(err.message || 'Failed to send quote');
@@ -172,7 +220,7 @@ export default function QuotesPage() {
           emptyMessage='No quotes yet. Click "New Quote" to create one.'
           actions={(quote) => (
             <div className="flex justify-end gap-3">
-              <button onClick={() => setSendQuoteId(quote.id)} className="text-slate-400 hover:text-[#168eea]" aria-label="Send">
+              <button onClick={() => openSendModal(quote)} className="text-slate-400 hover:text-[#168eea]" aria-label="Send">
                 <PaperAirplaneIcon className="h-4 w-4" />
               </button>
               {/* Task 3.1: Print Format — opens the quote detail page's print view directly */}
@@ -266,7 +314,7 @@ export default function QuotesPage() {
           <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="text-lg font-semibold text-slate-900">Send Quote</h3>
-              <button onClick={() => setSendQuoteId(null)} className="text-slate-400 hover:text-slate-600">
+              <button onClick={() => { setSendQuoteId(null); setShareContent(null); }} className="text-slate-400 hover:text-slate-600">
                 <XMarkIcon className="h-5 w-5" />
               </button>
             </div>
@@ -280,7 +328,7 @@ export default function QuotesPage() {
                       name="method"
                       value="email"
                       checked={sendMethod === 'email'}
-                      onChange={() => setSendMethod('email')}
+                      onChange={() => handleMethodChange('email')}
                       className="text-[#168eea] focus:ring-[#168eea]"
                     />
                     Email
@@ -291,7 +339,7 @@ export default function QuotesPage() {
                       name="method"
                       value="whatsapp"
                       checked={sendMethod === 'whatsapp'}
-                      onChange={() => setSendMethod('whatsapp')}
+                      onChange={() => handleMethodChange('whatsapp')}
                       className="text-[#168eea] focus:ring-[#168eea]"
                     />
                     WhatsApp
@@ -307,13 +355,31 @@ export default function QuotesPage() {
                   required
                   value={sendTarget}
                   onChange={(e) => setSendTarget(e.target.value)}
-                  placeholder={sendMethod === 'email' ? 'client@example.com' : 'e.g. +1234567890'}
+                  placeholder={sendMethod === 'email' ? 'client@example.com' : 'e.g. 919876543210'}
                   className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
                 />
+                {sendMethod === 'whatsapp' && !shareLoading && shareContent && !shareContent.customerPhone && (
+                  <p className="mt-1 text-[11px] text-amber-600">No phone number on file for this quote — enter one to continue.</p>
+                )}
               </div>
+              {sendMethod === 'whatsapp' && (
+                <div>
+                  <label className="block text-xs font-medium text-slate-700">Message preview</label>
+                  {shareLoading ? (
+                    <p className="mt-1 text-xs text-slate-400">Preparing message...</p>
+                  ) : (
+                    <textarea
+                      readOnly
+                      rows={6}
+                      value={shareContent?.message || ''}
+                      className="mt-1 w-full resize-none rounded-md border border-slate-200 bg-slate-50 p-2 text-xs text-slate-600 focus:outline-none"
+                    />
+                  )}
+                </div>
+              )}
               <div className="mt-4 flex justify-end gap-2 pt-2">
-                <Button type="button" variant="secondary" size="sm" onClick={() => setSendQuoteId(null)}>Cancel</Button>
-                <Button type="submit" size="sm" disabled={submitting}>{submitting ? 'Sending...' : 'Send'}</Button>
+                <Button type="button" variant="secondary" size="sm" onClick={() => { setSendQuoteId(null); setShareContent(null); }}>Cancel</Button>
+                <Button type="submit" size="sm" disabled={submitting || (sendMethod === 'whatsapp' && shareLoading)}>{submitting ? 'Sending...' : 'Send'}</Button>
               </div>
             </form>
           </div>

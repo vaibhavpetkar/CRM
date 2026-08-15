@@ -14,6 +14,21 @@ interface CompanyAttributes {
   employeeCount?: string | null; // stored as a range label, e.g. "51-100"
   currency: string; // ISO 4217 code, e.g. "USD", "INR" — drives formatCurrency() app-wide
   isActive: boolean;
+
+  // Social links (Settings > Company). All optional — only populated/shown
+  // links should ever be surfaced in Quote-sharing messages, etc.
+  whatsapp?: string | null; // business number, digits only (e.g. "919876543210")
+  instagram?: string | null;
+  facebook?: string | null;
+  linkedin?: string | null;
+  youtube?: string | null;
+  twitter?: string | null;
+
+  // Configurable strategic message used when sharing a Quote (WhatsApp/email).
+  // Supports {{customerName}}, {{quoteNumber}}, {{quoteValue}}, {{quoteLink}},
+  // {{companyName}}, {{companySocialLinks}} placeholders. Null -> a sensible
+  // built-in default is used instead (see QuoteService.DEFAULT_SHARE_TEMPLATE).
+  quoteMessageTemplate?: string | null;
 }
 
 // Define the creation attributes (excluding auto-generated fields)
@@ -31,6 +46,14 @@ class Company extends Model<CompanyAttributes, CompanyCreationAttributes> implem
   public employeeCount?: string | null;
   public currency!: string;
   public isActive!: boolean;
+
+  public whatsapp?: string | null;
+  public instagram?: string | null;
+  public facebook?: string | null;
+  public linkedin?: string | null;
+  public youtube?: string | null;
+  public twitter?: string | null;
+  public quoteMessageTemplate?: string | null;
 
   // Timestamps
   public readonly createdAt!: Date;
@@ -95,6 +118,13 @@ Company.init(
       allowNull: false,
       defaultValue: true,
     },
+    whatsapp: { type: DataTypes.STRING(255), allowNull: true },
+    instagram: { type: DataTypes.STRING(255), allowNull: true },
+    facebook: { type: DataTypes.STRING(255), allowNull: true },
+    linkedin: { type: DataTypes.STRING(255), allowNull: true },
+    youtube: { type: DataTypes.STRING(255), allowNull: true },
+    twitter: { type: DataTypes.STRING(255), allowNull: true },
+    quoteMessageTemplate: { type: DataTypes.TEXT, allowNull: true },
   },
   {
     tableName: 'companies',

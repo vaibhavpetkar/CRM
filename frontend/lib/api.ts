@@ -574,6 +574,11 @@ export const quotesApi = {
   rejectQuote: async (id: string | number) => request<{ message: string; quote: any }>(`/quotes/${id}/reject`, { method: 'POST' }),
   getQuotePdfUrl: (id: string | number) => `${API_BASE}/quotes/${id}/pdf`,
   getQuotePrintUrl: (id: string | number) => `${API_BASE}/quotes/${id}/print`,
+  // Strategic share message (Phase 8) + dynamic public link (Phase 4/9) for the "Send Quote" flow.
+  getShareContent: async (id: string | number) =>
+    request<{ message: string; quoteLink: string; customerPhone: string | null; customerEmail: string | null; quoteNumber: string }>(
+      `/quotes/${id}/share-preview`
+    ),
 };
 
 // ─── Invoices API ──────────────────────────────────────────────────────────────
