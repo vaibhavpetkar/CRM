@@ -14,6 +14,7 @@ import {
   CheckCircleIcon,
   CalendarIcon,
   XMarkIcon,
+  Bars3Icon,
 } from '@heroicons/react/24/outline';
 import {
   getStoredUser,
@@ -45,7 +46,7 @@ function timeAgo(dateStr: string): string {
   return `${days}d ago`;
 }
 
-export default function Topbar() {
+export default function Topbar({ onMobileMenuClick }: { onMobileMenuClick?: () => void }) {
   const router = useRouter();
   const toast = useToast();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -193,6 +194,8 @@ export default function Topbar() {
       router.push('/deals');
     } else if (notif.entityType === 'Task' && notif.entityId) {
       router.push('/tasks');
+    } else if (notif.entityType === 'Invoice' && notif.entityId) {
+      router.push('/invoices');
     }
   };
 
@@ -227,7 +230,15 @@ export default function Topbar() {
     : 'JD';
 
   return (
-    <header className="no-print sticky top-0 z-20 flex h-14 items-center justify-between border-b border-slate-200/60 bg-white px-6">
+    <header className="no-print sticky top-0 z-20 flex h-14 items-center justify-between gap-2 border-b border-slate-200/60 bg-white px-3 sm:px-6">
+      <button
+        type="button"
+        onClick={onMobileMenuClick}
+        className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700 md:hidden"
+        aria-label="Open menu"
+      >
+        <Bars3Icon className="h-5 w-5" />
+      </button>
       <div className="relative max-w-md flex-1">
         <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
         <input

@@ -81,6 +81,12 @@ const app: Express = express();
 const httpServer = http.createServer(app);
 const port = process.env.PORT || 5000;
 
+// Deployed behind nginx (see nginx/*.conf, which sets X-Forwarded-For) — one
+// hop. Without this, req.ip resolves to nginx's own address for every
+// request, which would make IP-based rate limiting below treat all users as
+// a single client.
+app.set('trust proxy', 1);
+
 // ─── Middleware ───────────────────────────────────────────────────────────────
 
 const allowedOrigins = [
