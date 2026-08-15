@@ -9,6 +9,7 @@ import LeadTax from '../models/LeadTax';
 import Deal from '../models/Deal';
 import Invoice from '../models/Invoice';
 import Company from '../models/Company';
+import Contact from '../models/Contact';
 import quoteRepository from '../repositories/QuoteRepository';
 import { ListQueryParams } from '../repositories/BaseRepository';
 import { generateCode } from '../utils/codeGenerator';
@@ -100,14 +101,26 @@ class QuoteService {
 
   /** Generates a new draft Quotation directly from a Deal (Opportunity), auto-pulling customer/contact details. */
   async createFromDeal(dealId: number | string, userId?: number | null, overrides: Record<string, unknown> = {}) {
-    const deal = await Deal.findByPk(dealId);
+    const deal = await Deal.findByPk(dealId, {
+      include: [
+        { model: Contact, as: 'contact', required: false },
+        { model: Company, as: 'account', required: false },
+      ],
+    });
     if (!deal) throw new NotFoundError('Deal', dealId);
+    const dealPlain = deal.toJSON() as any;
 
     return this.create(
       {
         dealId: deal.id,
         leadId: deal.leadId,
         client: deal.client,
+        // Pull the linked Contact/Company so the generated Quotation carries
+        // real customer details — falls back to null (existing behavior)
+        // when the Deal has no linked contact/account.
+        customerEmail: dealPlain.contact?.email || dealPlain.account?.email || null,
+        customerPhone: dealPlain.contact?.phone || dealPlain.account?.phone || null,
+        customerAddress: dealPlain.account?.address || null,
         assignedToId: deal.assignedToId,
         products: [],
         taxes: [],
@@ -115,6 +128,39 @@ class QuoteService {
       },
       userId
     );
+  }
+
+  /**
+   * Automation: when a Deal is saved in the 'prospecting' stage with a
+   * positive value, auto-generate a matching draft Quotation — Quote amount
+   * equals Deal value, added as a single editable line item — so the team
+   * has something ready to send the prospect immediately.
+   *
+   * Duplicate-safe by design: it checks for any existing Quote already
+   * linked to this Deal (whether created by this automation, by the
+   * existing manual "Send Quotation" action, or otherwise) via the real
+   * `Quote.dealId` relationship, and skips silently if one is found — so
+   * re-saving or reloading the same Deal never creates a second Quote.
+   */
+  async autoCreateForProspectingDeal(deal: Deal, userId?: number | null) {
+    if (deal.stage !== 'prospecting') return null;
+
+    const value = Number(deal.value);
+    if (!Number.isFinite(value) || value <= 0) return null;
+
+    const existing = await Quote.findOne({ where: { dealId: deal.id } });
+    if (existing) return null;
+
+    return this.createFromDeal(deal.id, userId, {
+      products: [
+        {
+          productName: `${deal.title} — Prospecting Value`,
+          quantity: 1,
+          unit: 'Nos',
+          rate: value,
+        },
+      ],
+    });
   }
 
   async create(data: Record<string, any>, userId?: number | null) {
