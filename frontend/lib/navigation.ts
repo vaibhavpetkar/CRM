@@ -23,6 +23,7 @@ import {
   TagIcon,
   ReceiptRefundIcon,
   PuzzlePieceIcon,
+  UserCircleIcon,
 } from '@heroicons/react/24/outline';
 
 export type NavItem = {
@@ -43,6 +44,7 @@ export const navigation: NavSection[] = [
     title: 'Overview',
     items: [
       { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
+      { name: 'My Profile', href: '/profile', icon: UserCircleIcon },
       { name: 'Reports', href: '/reports', icon: ChartBarIcon, permission: 'reports:view' },
       { name: 'Analytics', href: '/marketing/analytics', icon: PresentationChartLineIcon, permission: 'marketing:view' },
     ],

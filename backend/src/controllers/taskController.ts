@@ -9,6 +9,7 @@ import ActivityLog from '../models/ActivityLog';
 import Role from '../models/Role';
 import Notification from '../models/Notification';
 import { notifyUser } from '../utils/notificationService';
+import { syncTaskToGoogle } from '../services/googleTasksService';
 
 // Included whenever a Task is fetched so the API returns the linked
 // Lead/Deal/Contact record itself, not just a typed-in "relatedTo" string.
@@ -115,6 +116,14 @@ export const createTask = async (req: Request & { user?: any }, res: Response) =
       });
     }
 
+    // Item 2: mirror to the assignee's own Google Tasks if they've connected
+    // one — silently no-ops if they haven't. Never blocks the response.
+    if (task.assignedToId) {
+      syncTaskToGoogle(task.assignedToId, task.title, task.description, task.dueDate).catch((err) =>
+        console.error('Google Tasks sync failed for task', task.id, err)
+      );
+    }
+
     return res.status(201).json({ message: 'Task created successfully', task: serialize(task) });
   } catch (error) {
     console.error('Create task error:', error);
@@ -176,6 +185,17 @@ export const updateTask = async (req: Request & { user?: any }, res: Response) =
         entityType: 'Task',
         entityId: task.id,
       });
+    }
+
+    // Item 2: keep Google Tasks in sync whenever the assignee actually
+    // changes (not on every unrelated edit) — same trigger condition as the
+    // notification above, minus the "don't notify yourself" exclusion,
+    // since re-assigning a task to yourself should still add it to your
+    // own Google Tasks list.
+    if (newAssigneeId && newAssigneeId !== prevAssigneeId) {
+      syncTaskToGoogle(Number(newAssigneeId), task.title, task.description, task.dueDate).catch((err) =>
+        console.error('Google Tasks sync failed for task', task.id, err)
+      );
     }
 
     return res.json({ message: 'Task updated successfully', task: serialize(task) });

@@ -513,6 +513,15 @@ export const integrationsApi = {
   disconnect: async (provider: string) => request<{ message: string }>(`/integrations/${provider}/disconnect`, { method: 'POST' }),
 };
 
+// Item 2 — per-user Google Tasks sync. connect() returns a Google consent
+// URL to redirect the browser to; the backend handles the OAuth callback
+// directly (not an API call this client makes).
+export const googleTasksApi = {
+  getStatus: async () => request<{ configured: boolean; connected: boolean; lastSyncAt: string | null; lastError: string | null }>('/integrations/google-tasks/status'),
+  connect: async () => request<{ url: string }>('/integrations/google-tasks/connect', { method: 'POST' }),
+  disconnect: async () => request<{ message: string }>('/integrations/google-tasks/disconnect', { method: 'POST' }),
+};
+
 // Phase 20 — AI Assistant. Every call here hits the real Anthropic API
 // server-side; if ANTHROPIC_API_KEY isn't configured, these reject with a
 // clear message instead of the UI showing a fake result.
