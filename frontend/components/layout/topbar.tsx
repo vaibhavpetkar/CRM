@@ -423,7 +423,7 @@ export default function Topbar({ onMobileMenuClick }: { onMobileMenuClick?: () =
             <>
               <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
               <div className="absolute right-0 z-20 mt-1 w-48 rounded-md border border-slate-200 bg-white py-1 shadow-lg">
-                <Link href="/settings" className="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
+                <Link href="/settings?tab=profile" className="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
                   My Profile
                 </Link>
                 <Link href="/settings" className="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
