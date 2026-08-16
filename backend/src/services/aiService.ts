@@ -4,9 +4,12 @@ import { AppError } from '../errors/AppError';
 //
 // 1. Ollama (free, local, self-hosted) — genuinely free and fast: it runs
 //    on your own server with no per-request cost and no external API key,
-//    using an open-source model (default: llama3.1). This is the "faster
-//    and free" option. It requires Ollama actually installed and running on
-//    the backend server — see backend/.env.production.example for setup.
+//    using an open-source model (default: llama3.2:3b — a small, fast
+//    model with accuracy that's plenty for CRM summaries/chat; swap in
+//    llama3.2:1b for an even lighter footprint, or llama3.1 for higher
+//    quality at the cost of speed). This is the "faster and free" option.
+//    `docker compose up` starts Ollama automatically (see docker-compose.yml);
+//    for a bare-metal deploy see backend/.env.production.example for setup.
 // 2. Anthropic's API (paid, requires ANTHROPIC_API_KEY) — higher quality,
 //    costs per request. Used as a fallback if Ollama isn't configured.
 //
@@ -14,7 +17,7 @@ import { AppError } from '../errors/AppError';
 // here throws AIConfigError instead of returning a canned/fake response.
 
 const OLLAMA_BASE_URL = (process.env.OLLAMA_BASE_URL || 'http://localhost:11434').replace(/\/$/, '');
-const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'llama3.1';
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'llama3.2:3b';
 
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 const ANTHROPIC_VERSION = '2023-06-01';
@@ -68,7 +71,7 @@ async function callOllama(userPrompt: string, options: CallOptions): Promise<str
     });
   } catch (err) {
     throw new Error(
-      `Could not reach Ollama at ${OLLAMA_BASE_URL}. Is it installed and running on this server? (curl -fsSL https://ollama.com/install.sh | sh && ollama pull ${OLLAMA_MODEL})`
+      `Could not reach Ollama at ${OLLAMA_BASE_URL}. If you're running via docker compose it should start automatically — check \`docker compose logs ollama\`. For a bare-metal install: curl -fsSL https://ollama.com/install.sh | sh && ollama pull ${OLLAMA_MODEL}`
     );
   }
 

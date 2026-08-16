@@ -41,6 +41,8 @@ Built with Next.js, Express, PostgreSQL, Redis, and Socket.IO — Dockerized wit
 | **Team Management** | Invite users via email, assign roles, manage departments |
 | **Roles & Permissions** | Granular module-level role-based access control |
 | **Company Settings** | Company profile, logo upload, and global settings |
+| **My Profile** | Account info + personal Google Tasks sync, under Settings > Profile |
+| **AI Assistant** | Lead/deal summaries, next-action suggestions, quote follow-ups, and a chat widget — powered by a free local Ollama model by default (or Anthropic's API if configured) |
 | **Activity Logs** | Full audit trail of all user actions with revert support |
 | **Recycle Bin** | Soft-delete with restore support for leads, deals, and contacts |
 
@@ -154,6 +156,9 @@ SUPER_ADMIN_PASSWORD=your_admin_password
 ```bash
 docker compose up --build
 ```
+> First run also pulls the free local AI model (`ollama` service, ~2GB) in
+> the background — the app works immediately, the AI Assistant just needs a
+> minute or two after first startup before it responds.
 
 ### 4. Access the App
 | Service | URL |
@@ -251,6 +256,10 @@ graph LR
 | `CLIENT_URL` | Frontend origin for CORS (e.g. `https://crm.eleviq.buzz`) |
 | `SUPER_ADMIN_EMAIL` | Initial super admin email |
 | `SUPER_ADMIN_PASSWORD` | Initial super admin password |
+| `OLLAMA_BASE_URL` | AI Assistant, free/local option — set automatically in `docker-compose.yml` to the built-in `ollama` service; leave unset outside Docker to disable |
+| `OLLAMA_MODEL` | Ollama model to use (default: `llama3.2:3b` — lightweight and fast) |
+| `ANTHROPIC_API_KEY` | AI Assistant, paid option — used as a fallback if Ollama isn't configured |
+| `AI_PROVIDER` | Force `ollama` or `anthropic` explicitly if both are configured (Ollama wins by default) |
 
 ### Frontend (`frontend/.env.production.example`)
 | Variable | Description |

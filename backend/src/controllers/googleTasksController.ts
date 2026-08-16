@@ -21,15 +21,15 @@ export const googleTasksCallback = asyncHandler(async (req: AuthRequest, res: Re
   const clientUrl = (process.env.CLIENT_URL || 'http://localhost:3000').replace(/\/$/, '');
 
   if (error || !code || !state) {
-    return res.redirect(`${clientUrl}/profile?googleTasks=error`);
+    return res.redirect(`${clientUrl}/settings?tab=profile&googleTasks=error`);
   }
 
   try {
     await googleTasksService.handleOAuthCallback(code, state);
-    return res.redirect(`${clientUrl}/profile?googleTasks=connected`);
+    return res.redirect(`${clientUrl}/settings?tab=profile&googleTasks=connected`);
   } catch (err) {
     console.error('Google Tasks callback error:', err);
-    return res.redirect(`${clientUrl}/profile?googleTasks=error`);
+    return res.redirect(`${clientUrl}/settings?tab=profile&googleTasks=error`);
   }
 });
 

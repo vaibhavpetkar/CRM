@@ -1,12 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import PageHeader from '@/components/ui/page-header';
 import Button from '@/components/ui/button';
 import Card from '@/components/ui/card';
-import { authApi, getStoredUser } from '@/lib/api';
+import StatusBadge from '@/components/ui/status-badge';
+import { authApi, googleTasksApi, getStoredUser } from '@/lib/api';
 import Link from 'next/link';
 import { Cog6ToothIcon } from '@heroicons/react/24/outline';
+import { useToast } from '@/components/ui/toast';
 
 const tabs = [
   { id: 'profile', label: 'Profile' },
@@ -18,6 +21,9 @@ const tabs = [
 type Tab = { id: string; label: string; icon?: React.ReactNode };
 
 export default function SettingsPage() {
+  const toast = useToast();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState('profile');
   const [user, setUser] = useState<any>(null);
 
@@ -25,6 +31,67 @@ export default function SettingsPage() {
     setUser(getStoredUser());
     authApi.getMe().then(setUser).catch(() => {});
   }, []);
+
+  // Deep-link support: /settings?tab=security, etc.
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab) setActiveTab(tab);
+  }, [searchParams]);
+
+  // ─── My Profile: Google Tasks personal integration (moved here from the
+  // old standalone /profile page) ─────────────────────────────────────────
+  const [gTasksStatus, setGTasksStatus] = useState<{ configured: boolean; connected: boolean; lastSyncAt: string | null; lastError: string | null } | null>(null);
+  const [gTasksLoading, setGTasksLoading] = useState(true);
+  const [gTasksActing, setGTasksActing] = useState(false);
+
+  const loadGTasksStatus = () => {
+    setGTasksLoading(true);
+    googleTasksApi
+      .getStatus()
+      .then(setGTasksStatus)
+      .catch(() => setGTasksStatus(null))
+      .finally(() => setGTasksLoading(false));
+  };
+
+  useEffect(loadGTasksStatus, []);
+
+  // Backend redirects here (with ?tab=profile) after the Google OAuth round-trip completes.
+  useEffect(() => {
+    const result = searchParams.get('googleTasks');
+    if (result === 'connected') {
+      toast.success('Google Tasks connected.');
+      loadGTasksStatus();
+      router.replace('/settings?tab=profile');
+    } else if (result === 'error') {
+      toast.error('Could not connect Google Tasks — please try again.');
+      router.replace('/settings?tab=profile');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  const handleGTasksConnect = async () => {
+    setGTasksActing(true);
+    try {
+      const res = await googleTasksApi.connect();
+      window.location.href = res.url; // hand off to Google's consent screen
+    } catch (err: any) {
+      toast.error(err.message || 'Could not start the Google Tasks connection.');
+      setGTasksActing(false);
+    }
+  };
+
+  const handleGTasksDisconnect = async () => {
+    setGTasksActing(true);
+    try {
+      await googleTasksApi.disconnect();
+      toast.success('Google Tasks disconnected.');
+      loadGTasksStatus();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to disconnect.');
+    } finally {
+      setGTasksActing(false);
+    }
+  };
 
   const isSuperAdmin = user?.isSuperAdmin;
 
@@ -134,6 +201,47 @@ export default function SettingsPage() {
           <p className="mt-3 text-xs text-slate-400">
             Profile details are managed by your administrator. Contact them to update this information.
           </p>
+        </Card>
+      )}
+
+      {activeTab === 'profile' && (
+        <Card title="Google Tasks" className="mt-6">
+          <p className="mb-4 text-xs text-slate-500">
+            Connect your own Google account so tasks assigned to you here automatically show up in your Google Tasks list.
+            This is personal — connecting doesn&apos;t affect any other user.
+          </p>
+
+          {gTasksLoading ? (
+            <p className="text-sm text-slate-500">Loading...</p>
+          ) : !gTasksStatus?.configured ? (
+            <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700">
+              Not available yet — an admin needs to set <code className="rounded bg-white/60 px-1 py-0.5">GOOGLE_CLIENT_ID</code> and{' '}
+              <code className="rounded bg-white/60 px-1 py-0.5">GOOGLE_CLIENT_SECRET</code> on the server first.
+            </div>
+          ) : (
+            <>
+              <div className="mb-4 flex items-center justify-between">
+                <StatusBadge status={gTasksStatus.connected ? 'active' : 'not_configured'} />
+                {gTasksStatus.connected ? (
+                  <Button type="button" variant="secondary" size="sm" disabled={gTasksActing} onClick={handleGTasksDisconnect}>
+                    Disconnect
+                  </Button>
+                ) : (
+                  <Button type="button" size="sm" disabled={gTasksActing} onClick={handleGTasksConnect}>
+                    Connect Google Tasks
+                  </Button>
+                )}
+              </div>
+              {gTasksStatus.connected && (
+                <p className="text-[11px] text-slate-400">
+                  Last sync: {gTasksStatus.lastSyncAt ? new Date(gTasksStatus.lastSyncAt).toLocaleString() : 'not yet — assign yourself a task to try it'}
+                </p>
+              )}
+              {gTasksStatus.lastError && (
+                <div className="mt-3 rounded-md border border-red-200 bg-red-50 p-2.5 text-[11px] text-red-700">{gTasksStatus.lastError}</div>
+              )}
+            </>
+          )}
         </Card>
       )}
 

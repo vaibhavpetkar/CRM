@@ -39,8 +39,25 @@ export default function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose
   }, [pathname]);
 
   const isActive = (href: string) => {
-    if (href === '/dashboard') return pathname === '/dashboard';
-    return pathname === href || pathname.startsWith(href + '/');
+    const [hrefPath, hrefQuery] = href.split('?');
+    if (hrefPath === '/dashboard') return pathname === '/dashboard';
+
+    const pathMatches = pathname === hrefPath || pathname.startsWith(hrefPath + '/');
+    if (!pathMatches) return false;
+    if (!hrefQuery) return true;
+
+    // Query-specific items (e.g. "My Profile" -> /settings?tab=profile) only
+    // light up when that tab is actually selected. The settings page itself
+    // defaults to the "profile" tab when no ?tab= is present. Read the query
+    // straight off window (like the developer-tab check elsewhere in this
+    // app) instead of useSearchParams, which would force every page using
+    // this shared sidebar into a Suspense boundary just for this highlight.
+    const currentSearch = typeof window !== 'undefined' ? window.location.search : '';
+    const currentParams = new URLSearchParams(currentSearch);
+    const hrefParams = new URLSearchParams(hrefQuery);
+    return Array.from(hrefParams.entries()).every(
+      ([key, value]) => (currentParams.get(key) ?? (key === 'tab' ? 'profile' : null)) === value
+    );
   };
 
   const visibleSections = navigation

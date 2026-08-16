@@ -44,7 +44,7 @@ export const navigation: NavSection[] = [
     title: 'Overview',
     items: [
       { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
-      { name: 'My Profile', href: '/profile', icon: UserCircleIcon },
+      { name: 'My Profile', href: '/settings?tab=profile', icon: UserCircleIcon },
       { name: 'Reports', href: '/reports', icon: ChartBarIcon, permission: 'reports:view' },
       { name: 'Analytics', href: '/marketing/analytics', icon: PresentationChartLineIcon, permission: 'marketing:view' },
     ],
