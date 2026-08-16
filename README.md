@@ -260,6 +260,9 @@ graph LR
 | `OLLAMA_MODEL` | Ollama model to use (default: `llama3.2:3b` — lightweight and fast) |
 | `ANTHROPIC_API_KEY` | AI Assistant, paid option — used as a fallback if Ollama isn't configured |
 | `AI_PROVIDER` | Force `ollama` or `anthropic` explicitly if both are configured (Ollama wins by default) |
+| `AI_MAX_CONCURRENT` | Max AI requests forwarded to the provider at once (default `4`) — extras queue briefly, then fail fast with a clear error instead of a raw nginx timeout |
+| `AI_QUEUE_WAIT_MS` | How long a queued AI request waits for a free slot before failing (default `20000`) |
+| `AI_REQUEST_TIMEOUT_MS` | Hard timeout per AI request to the provider itself (default `45000`) |
 
 ### Frontend (`frontend/.env.production.example`)
 | Variable | Description |

@@ -30,10 +30,38 @@ services:
   # responses, and solid accuracy for CRM-style summarization/chat. Swap
   # OLLAMA_MODEL below (e.g. llama3.2:1b for even less RAM, or llama3.1 for
   # higher quality at the cost of speed) if you want something different.
+  #
+  # Concurrency: this is CPU inference sharing the box with everything else,
+  # it does NOT get faster just by raising OLLAMA_NUM_PARALLEL — that only
+  # controls how many of the queued requests are *allowed* to run at once,
+  # not how much CPU is available to run them. On a 2-4 vCPU VPS, 10
+  # simultaneous AI requests will still take real wall-clock time; what these
+  # settings (together with AI_MAX_CONCURRENT on the backend) buy you is
+  # *predictable* behavior — a bounded queue with clear errors — instead of
+  # everything queuing silently until nginx's proxy times out with an HTML
+  # error page. For genuinely fast concurrent AI at 10+ simultaneous users,
+  # either give this container more CPU/a GPU, drop to llama3.2:1b, or set
+  # ANTHROPIC_API_KEY so bursts fall back to Anthropic's infrastructure
+  # instead of this one box.
   ollama:
     image: ollama/ollama:latest
     container_name: crm_ollama
     restart: always
+    environment:
+      # Requests Ollama will actually run at once (extra ones queue inside
+      # Ollama itself, on top of the backend's own AI_MAX_CONCURRENT queue —
+      # keep the two roughly in step). Raise this only if you've also given
+      # the container more CPU; otherwise it just increases contention.
+      - OLLAMA_NUM_PARALLEL=${OLLAMA_NUM_PARALLEL:-4}
+      # How many requests can sit in Ollama's queue before it starts
+      # rejecting new ones outright.
+      - OLLAMA_MAX_QUEUE=${OLLAMA_MAX_QUEUE:-512}
+      # Only one model in use here, so just keep it resident.
+      - OLLAMA_MAX_LOADED_MODELS=1
+      # Keep the model loaded in RAM between requests — without this, Ollama
+      # unloads it after a few minutes idle and the next request pays a slow
+      # reload on top of generation time. Matches the backend's keep_alive.
+      - OLLAMA_KEEP_ALIVE=30m
     volumes:
       - ollama_data:/root/.ollama
     ports:
@@ -81,6 +109,13 @@ services:
       - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2:3b}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-claude-sonnet-5}
+      # How many AI requests the backend forwards to the provider at once —
+      # extras wait briefly (AI_QUEUE_WAIT_MS) then fail fast with a clean
+      # "AI Assistant is busy" JSON error instead of hanging until nginx
+      # returns a raw 504 page. See the `ollama` service above for context.
+      - AI_MAX_CONCURRENT=${AI_MAX_CONCURRENT:-4}
+      - AI_QUEUE_WAIT_MS=${AI_QUEUE_WAIT_MS:-20000}
+      - AI_REQUEST_TIMEOUT_MS=${AI_REQUEST_TIMEOUT_MS:-45000}
       # Path to .env file on host (mounted at /host/.env inside container)
       - ENV_FILE_PATH=/host/.env
     volumes:

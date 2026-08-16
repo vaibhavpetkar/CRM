@@ -23,6 +23,58 @@ const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 const ANTHROPIC_VERSION = '2023-06-01';
 const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-5';
 
+// ── Concurrency control ─────────────────────────────────────────────────────
+// A local Ollama instance runs on the same CPU as everything else on the
+// server, so it can't actually run unlimited requests in parallel — without
+// a cap here, 10 people clicking "Summarize" at once would all sit in
+// Ollama's internal queue until nginx's proxy_read_timeout gives up and
+// returns its own HTML error page (the "non-JSON response" you saw). These
+// two settings turn that into a fast, clear JSON error instead:
+//   AI_MAX_CONCURRENT     — requests actually sent to the provider at once.
+//                           Keep this at or below Ollama's OLLAMA_NUM_PARALLEL
+//                           (see docker-compose.yml) so requests don't queue
+//                           twice. Default 4 is reasonable for a 2-4 vCPU box.
+//   AI_QUEUE_WAIT_MS      — how long an extra request waits for a free slot
+//                           before failing fast with "AI Assistant is busy".
+//   AI_REQUEST_TIMEOUT_MS — hard cap per request to the provider itself, so a
+//                           stuck one can't hold its slot (and the whole
+//                           queue behind it) forever.
+const MAX_CONCURRENT = Math.max(1, parseInt(process.env.AI_MAX_CONCURRENT || '4', 10) || 4);
+const QUEUE_WAIT_MS = Math.max(0, parseInt(process.env.AI_QUEUE_WAIT_MS || '20000', 10) || 20000);
+const REQUEST_TIMEOUT_MS = Math.max(1000, parseInt(process.env.AI_REQUEST_TIMEOUT_MS || '45000', 10) || 45000);
+
+let activeRequests = 0;
+const waitQueue: Array<() => void> = [];
+
+/** Waits for a free concurrency slot (or throws AIBusyError if the queue doesn't clear in time). Always pair with the returned release() in a finally block. */
+async function acquireSlot(): Promise<() => void> {
+  const release = () => {
+    activeRequests--;
+    const next = waitQueue.shift();
+    if (next) next();
+  };
+
+  if (activeRequests < MAX_CONCURRENT) {
+    activeRequests++;
+    return release;
+  }
+
+  await new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      const idx = waitQueue.indexOf(onTurn);
+      if (idx !== -1) waitQueue.splice(idx, 1);
+      reject(new AIBusyError());
+    }, QUEUE_WAIT_MS);
+    const onTurn = () => {
+      clearTimeout(timer);
+      resolve();
+    };
+    waitQueue.push(onTurn);
+  });
+  activeRequests++;
+  return release;
+}
+
 type AIProvider = 'ollama' | 'anthropic' | null;
 
 const isOllamaConfigured = (): boolean => !!process.env.OLLAMA_BASE_URL || process.env.AI_PROVIDER === 'ollama';
@@ -47,6 +99,22 @@ export class AIConfigError extends AppError {
   }
 }
 
+/** Every concurrency slot is in use and the queue didn't clear within AI_QUEUE_WAIT_MS. 503 so the frontend can show "try again shortly" instead of a raw timeout. */
+export class AIBusyError extends AppError {
+  constructor() {
+    super('The AI Assistant is handling a lot of requests right now — please try again in a few seconds.', 503);
+    this.name = 'AIBusyError';
+  }
+}
+
+/** The provider itself didn't respond within AI_REQUEST_TIMEOUT_MS. 504 (matches the semantics, even though we're the ones returning it as clean JSON instead of letting nginx do it as HTML). */
+export class AITimeoutError extends AppError {
+  constructor() {
+    super('The AI Assistant took too long to respond. Please try again — if this keeps happening, a smaller/faster model or more server resources may help.', 504);
+    this.name = 'AITimeoutError';
+  }
+}
+
 export const isAIConfigured = (): boolean => getActiveProvider() !== null;
 
 interface CallOptions {
@@ -55,24 +123,35 @@ interface CallOptions {
 }
 
 async function callOllama(userPrompt: string, options: CallOptions): Promise<string> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
   let response: Response;
   try {
     response = await fetch(`${OLLAMA_BASE_URL}/api/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
       body: JSON.stringify({
         model: OLLAMA_MODEL,
         stream: false,
+        // Keep the model resident in memory between requests — reloading it
+        // from disk on every call is a major source of slow first-responses
+        // under load. Matches OLLAMA_KEEP_ALIVE on the ollama service itself.
+        keep_alive: '30m',
         messages: [
           ...(options.system ? [{ role: 'system', content: options.system }] : []),
           { role: 'user', content: userPrompt },
         ],
       }),
     });
-  } catch (err) {
+  } catch (err: any) {
+    if (err?.name === 'AbortError') throw new AITimeoutError();
     throw new Error(
       `Could not reach Ollama at ${OLLAMA_BASE_URL}. If you're running via docker compose it should start automatically — check \`docker compose logs ollama\`. For a bare-metal install: curl -fsSL https://ollama.com/install.sh | sh && ollama pull ${OLLAMA_MODEL}`
     );
+  } finally {
+    clearTimeout(timer);
   }
 
   if (!response.ok) {
@@ -87,6 +166,9 @@ async function callOllama(userPrompt: string, options: CallOptions): Promise<str
 }
 
 async function callAnthropic(userPrompt: string, options: CallOptions): Promise<string> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
   let response: Response;
   try {
     response = await fetch(ANTHROPIC_API_URL, {
@@ -96,6 +178,7 @@ async function callAnthropic(userPrompt: string, options: CallOptions): Promise<
         'x-api-key': process.env.ANTHROPIC_API_KEY!,
         'anthropic-version': ANTHROPIC_VERSION,
       },
+      signal: controller.signal,
       body: JSON.stringify({
         model: ANTHROPIC_MODEL,
         max_tokens: options.maxTokens || 400,
@@ -103,8 +186,11 @@ async function callAnthropic(userPrompt: string, options: CallOptions): Promise<
         messages: [{ role: 'user', content: userPrompt }],
       }),
     });
-  } catch (err) {
+  } catch (err: any) {
+    if (err?.name === 'AbortError') throw new AITimeoutError();
     throw new Error('Could not reach the AI service. Check network access to api.anthropic.com.');
+  } finally {
+    clearTimeout(timer);
   }
 
   if (!response.ok) {
@@ -123,11 +209,17 @@ async function callAnthropic(userPrompt: string, options: CallOptions): Promise<
   return text;
 }
 
-/** Dispatches to whichever provider is actually configured. */
+/** Dispatches to whichever provider is actually configured, behind the concurrency limiter above. */
 async function callClaude(userPrompt: string, options: CallOptions = {}): Promise<string> {
   const provider = getActiveProvider();
   if (!provider) throw new AIConfigError();
-  return provider === 'ollama' ? callOllama(userPrompt, options) : callAnthropic(userPrompt, options);
+
+  const release = await acquireSlot();
+  try {
+    return await (provider === 'ollama' ? callOllama(userPrompt, options) : callAnthropic(userPrompt, options));
+  } finally {
+    release();
+  }
 }
 
 const SYSTEM_PROMPT =
