@@ -8,5 +8,6 @@ router.get('/status', protect, aiController.getAIStatus);
 router.post('/deals/:id/summary', protect, authorize('ai:use'), aiController.getDealSummary);
 router.post('/leads/:id/summary', protect, authorize('ai:use'), aiController.getLeadSummary);
 router.post('/quotes/:id/followup-message', protect, authorize('ai:use'), aiController.getQuoteFollowUpMessage);
+router.post('/chat', protect, authorize('ai:use'), aiController.chatWithAssistant);
 
 export default router;

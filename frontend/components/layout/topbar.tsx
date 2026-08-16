@@ -26,6 +26,7 @@ import {
 } from '@/lib/api';
 import { getSocket, disconnectSocket } from '@/lib/socket';
 import { useToast } from '@/components/ui/toast';
+import AIChatWidget from './ai-chat-widget';
 
 const QUICK_CREATE_OPTIONS = [
   { label: 'New Lead', href: '/leads?quickCreate=1', icon: UserPlusIcon },
@@ -338,6 +339,8 @@ export default function Topbar({ onMobileMenuClick }: { onMobileMenuClick?: () =
         >
           <CalendarIcon className="h-[18px] w-[18px]" />
         </Link>
+
+        <AIChatWidget />
 
         <div className="relative">
           <button

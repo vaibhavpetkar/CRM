@@ -1,4 +1,5 @@
 import { Response } from 'express';
+import { Op } from 'sequelize';
 import { AuthRequest } from '../middleware/authMiddleware';
 import { asyncHandler } from '../utils/errorHandler';
 import { NotFoundError } from '../errors/AppError';
@@ -6,8 +7,9 @@ import Deal from '../models/Deal';
 import Lead from '../models/Lead';
 import Quote from '../models/Quote';
 import Company from '../models/Company';
+import Task from '../models/Task';
 import { getTimeline } from '../services/activityLogger';
-import { isAIConfigured, summarizeDeal, summarizeLead, generateQuoteFollowUp, getActiveProvider } from '../services/aiService';
+import { isAIConfigured, summarizeDeal, summarizeLead, generateQuoteFollowUp, chatReply, getActiveProvider } from '../services/aiService';
 
 const getCurrencySymbol = (currency: string) => {
   try {
@@ -60,4 +62,43 @@ export const getQuoteFollowUpMessage = asyncHandler(async (req: AuthRequest, res
 
   const message = await generateQuoteFollowUp(quote, company?.name || 'our team', currencySymbol);
   return res.json({ message });
+});
+
+const OPEN_DEAL_STAGES = { [Op.notIn]: ['closed-won', 'closed-lost'] };
+
+/**
+ * Real, current, aggregate-only snapshot of the CRM — deliberately not
+ * individual records (that would need a much larger retrieval system).
+ * The chat system prompt tells the model exactly that boundary, so it
+ * doesn't invent specific names/details beyond these counts.
+ */
+const buildCrmSnapshot = async (currencySymbol: string) => {
+  const [totalLeads, openDeals, openDealsValue, overdueTasks, pendingQuotes] = await Promise.all([
+    Lead.count(),
+    Deal.count({ where: { stage: OPEN_DEAL_STAGES } }),
+    Deal.sum('value', { where: { stage: OPEN_DEAL_STAGES } }),
+    Task.count({ where: { status: { [Op.ne]: 'completed' }, dueDate: { [Op.lt]: new Date() } } }),
+    Quote.count({ where: { status: { [Op.in]: ['draft', 'sent'] } } }),
+  ]);
+
+  return [
+    `- Total leads: ${totalLeads}`,
+    `- Open deals: ${openDeals} (total value: ${currencySymbol}${Math.round(openDealsValue || 0)})`,
+    `- Overdue tasks: ${overdueTasks}`,
+    `- Pending quotes (draft/sent): ${pendingQuotes}`,
+  ].join('\n');
+};
+
+export const chatWithAssistant = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const { message, history } = req.body as { message?: string; history?: { role: 'user' | 'assistant'; text: string }[] };
+  if (!message || typeof message !== 'string' || !message.trim()) {
+    return res.status(400).json({ message: 'A message is required.' });
+  }
+
+  const company = await Company.findOne({ order: [['id', 'ASC']] });
+  const currencySymbol = getCurrencySymbol(company?.currency || 'INR');
+  const snapshot = await buildCrmSnapshot(currencySymbol);
+
+  const reply = await chatReply(message.trim(), Array.isArray(history) ? history : [], snapshot);
+  return res.json({ reply });
 });

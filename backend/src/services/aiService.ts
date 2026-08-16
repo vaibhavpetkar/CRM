@@ -194,3 +194,27 @@ export async function generateQuoteFollowUp(quote: any, companyName: string, cur
 
   return callClaude(prompt, { system: SYSTEM_PROMPT, maxTokens: 200 });
 }
+
+/**
+ * Item 9 — general chat widget. Grounded only in the real, aggregate CRM
+ * snapshot passed in by the caller (see aiController.buildCrmSnapshot) —
+ * the system prompt explicitly tells the model it does NOT have access to
+ * individual records, only these counts, so it doesn't invent specific
+ * names/numbers beyond what's actually provided.
+ */
+export async function chatReply(message: string, history: { role: 'user' | 'assistant'; text: string }[], snapshotContext: string) {
+  const system = [
+    'You are the AI assistant embedded in a CRM application. Answer helpfully and concisely (a few sentences unless more detail is truly needed).',
+    'You have this real, current snapshot of the CRM — use it when relevant:',
+    snapshotContext,
+    'You do NOT have access to individual lead/deal/contact records beyond this snapshot — if the question needs that level of detail, say so plainly and suggest where in the app to look, rather than inventing specific names or numbers.',
+  ].join('\n');
+
+  const conversation = history
+    .slice(-8)
+    .map((h) => `${h.role === 'user' ? 'User' : 'Assistant'}: ${h.text}`)
+    .join('\n');
+
+  const prompt = conversation ? `${conversation}\nUser: ${message}` : message;
+  return callClaude(prompt, { system, maxTokens: 500 });
+}

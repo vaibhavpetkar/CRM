@@ -521,6 +521,8 @@ export const aiApi = {
   summarizeDeal: async (id: string | number) => request<{ summary: string; nextAction: string | null }>(`/ai/deals/${id}/summary`, { method: 'POST' }),
   summarizeLead: async (id: string | number) => request<{ summary: string; nextAction: string | null }>(`/ai/leads/${id}/summary`, { method: 'POST' }),
   quoteFollowUpMessage: async (id: string | number) => request<{ message: string }>(`/ai/quotes/${id}/followup-message`, { method: 'POST' }),
+  chat: async (message: string, history: { role: 'user' | 'assistant'; text: string }[]) =>
+    request<{ reply: string }>('/ai/chat', { method: 'POST', body: JSON.stringify({ message, history }) }),
 };
 
 // ─── System Settings API (Super Admin only) ──────────────────────────────────────
