@@ -2,83 +2,105 @@ import { AppError } from '../errors/AppError';
 
 // Phase 20 — AI Assistant. Two real, non-fake providers:
 //
-// 1. Ollama (free, local, self-hosted) — genuinely free and fast: it runs
-//    on your own server with no per-request cost and no external API key,
-//    using an open-source model (default: llama3.2:3b — a small, fast
-//    model with accuracy that's plenty for CRM summaries/chat; swap in
-//    llama3.2:1b for an even lighter footprint, or llama3.1 for higher
-//    quality at the cost of speed). This is the "faster and free" option.
+// 1. Ollama (free, local, self-hosted) — genuinely free, runs on your own
+//    server with no per-request cost and no external API key, using an
+//    open-source model (default: llama3.2:1b — the smallest/fastest Llama
+//    model, tuned for small CPU-only boxes; swap in llama3.2:3b or llama3.1
+//    for better accuracy if your server has more CPU to spare). This is the
+//    "free" option — how fast it is depends entirely on your server's CPU.
 //    `docker compose up` starts Ollama automatically (see docker-compose.yml);
 //    for a bare-metal deploy see backend/.env.production.example for setup.
 // 2. Anthropic's API (paid, requires ANTHROPIC_API_KEY) — higher quality,
-//    costs per request. Used as a fallback if Ollama isn't configured.
+//    genuinely fast under real concurrency since it runs on Anthropic's own
+//    infrastructure rather than this server's CPU, costs per request. Used
+//    as a fallback if Ollama isn't configured, and as automatic overflow
+//    for individual requests when Ollama is busy (see below).
 //
 // Whichever is configured is used for real — if neither is, every function
 // here throws AIConfigError instead of returning a canned/fake response.
 
 const OLLAMA_BASE_URL = (process.env.OLLAMA_BASE_URL || 'http://localhost:11434').replace(/\/$/, '');
-const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'llama3.2:3b';
+// Default is llama3.2:1b, not a bigger model — tuned for small (2 vCPU / no
+// GPU) boxes where per-request speed matters more than raw model quality.
+// Bump to llama3.2:3b (better accuracy, noticeably slower) or llama3.1
+// (best accuracy, slowest) if your server has more CPU to spare.
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'llama3.2:1b';
 
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 const ANTHROPIC_VERSION = '2023-06-01';
 const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-5';
 
 // ── Concurrency control ─────────────────────────────────────────────────────
-// A local Ollama instance runs on the same CPU as everything else on the
-// server, so it can't actually run unlimited requests in parallel — without
-// a cap here, 10 people clicking "Summarize" at once would all sit in
-// Ollama's internal queue until nginx's proxy_read_timeout gives up and
-// returns its own HTML error page (the "non-JSON response" you saw). These
-// two settings turn that into a fast, clear JSON error instead:
-//   AI_MAX_CONCURRENT     — requests actually sent to the provider at once.
-//                           Keep this at or below Ollama's OLLAMA_NUM_PARALLEL
-//                           (see docker-compose.yml) so requests don't queue
-//                           twice. Default 4 is reasonable for a 2-4 vCPU box.
-//   AI_QUEUE_WAIT_MS      — how long an extra request waits for a free slot
-//                           before failing fast with "AI Assistant is busy".
-//   AI_REQUEST_TIMEOUT_MS — hard cap per request to the provider itself, so a
-//                           stuck one can't hold its slot (and the whole
-//                           queue behind it) forever.
-const MAX_CONCURRENT = Math.max(1, parseInt(process.env.AI_MAX_CONCURRENT || '4', 10) || 4);
+// Ollama runs on this server's own CPU, so it can't actually run unlimited
+// requests in parallel — on a small box (e.g. 2 vCPUs), match
+// AI_MAX_CONCURRENT to real thread count, not an aspirational number.
+// Requests beyond that queue briefly then fail fast and clean instead of
+// hanging until nginx's proxy_read_timeout returns an HTML error page (the
+// "non-JSON response" issue).
+//
+// If ANTHROPIC_API_KEY is *also* set and AI_PROVIDER isn't forcing one
+// provider, Ollama stays the default (free) path but any request that can't
+// get an Ollama slot immediately spills over to Anthropic instead of
+// queueing — that's the only way to get genuinely fast responses under
+// real concurrency (10+ simultaneous users) on CPU-only hardware, since
+// Anthropic's infrastructure isn't limited by this box's core count.
+// ANTHROPIC_MAX_CONCURRENT bounds that overflow so a traffic spike can't run
+// up an unbounded bill.
+const OLLAMA_MAX_CONCURRENT = Math.max(1, parseInt(process.env.AI_MAX_CONCURRENT || '2', 10) || 2);
+const ANTHROPIC_MAX_CONCURRENT = Math.max(1, parseInt(process.env.ANTHROPIC_MAX_CONCURRENT || '8', 10) || 8);
 const QUEUE_WAIT_MS = Math.max(0, parseInt(process.env.AI_QUEUE_WAIT_MS || '20000', 10) || 20000);
 const REQUEST_TIMEOUT_MS = Math.max(1000, parseInt(process.env.AI_REQUEST_TIMEOUT_MS || '45000', 10) || 45000);
 
-let activeRequests = 0;
-const waitQueue: Array<() => void> = [];
+type Pool = { active: number; max: number; queue: Array<() => void> };
+const pools: Record<'ollama' | 'anthropic', Pool> = {
+  ollama: { active: 0, max: OLLAMA_MAX_CONCURRENT, queue: [] },
+  anthropic: { active: 0, max: ANTHROPIC_MAX_CONCURRENT, queue: [] },
+};
 
-/** Waits for a free concurrency slot (or throws AIBusyError if the queue doesn't clear in time). Always pair with the returned release() in a finally block. */
-async function acquireSlot(): Promise<() => void> {
-  const release = () => {
-    activeRequests--;
-    const next = waitQueue.shift();
+/** Grabs a slot only if one is free right now — never queues. Returns null (no slot held) if the pool is currently full. */
+function tryAcquireSlotNow(name: 'ollama' | 'anthropic'): (() => void) | null {
+  const pool = pools[name];
+  if (pool.active >= pool.max) return null;
+  pool.active++;
+  return () => {
+    pool.active--;
+    const next = pool.queue.shift();
     if (next) next();
   };
+}
 
-  if (activeRequests < MAX_CONCURRENT) {
-    activeRequests++;
-    return release;
-  }
+/** Waits for a free concurrency slot (or throws AIBusyError if the queue doesn't clear within QUEUE_WAIT_MS). Always pair with the returned release() in a finally block. */
+async function acquireSlot(name: 'ollama' | 'anthropic'): Promise<() => void> {
+  const immediate = tryAcquireSlotNow(name);
+  if (immediate) return immediate;
 
+  const pool = pools[name];
   await new Promise<void>((resolve, reject) => {
     const timer = setTimeout(() => {
-      const idx = waitQueue.indexOf(onTurn);
-      if (idx !== -1) waitQueue.splice(idx, 1);
+      const idx = pool.queue.indexOf(onTurn);
+      if (idx !== -1) pool.queue.splice(idx, 1);
       reject(new AIBusyError());
     }, QUEUE_WAIT_MS);
     const onTurn = () => {
       clearTimeout(timer);
       resolve();
     };
-    waitQueue.push(onTurn);
+    pool.queue.push(onTurn);
   });
-  activeRequests++;
-  return release;
+  pool.active++;
+  return () => {
+    pool.active--;
+    const next = pool.queue.shift();
+    if (next) next();
+  };
 }
 
 type AIProvider = 'ollama' | 'anthropic' | null;
 
 const isOllamaConfigured = (): boolean => !!process.env.OLLAMA_BASE_URL || process.env.AI_PROVIDER === 'ollama';
 const isAnthropicConfigured = (): boolean => !!process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_API_KEY.trim() !== '';
+/** True only when the admin hasn't pinned AI_PROVIDER to one provider explicitly — overflow respects an explicit choice instead of second-guessing it. */
+const isProviderPinned = (): boolean => process.env.AI_PROVIDER === 'ollama' || process.env.AI_PROVIDER === 'anthropic';
 
 /** Which provider will actually be used, or null if neither is configured. Ollama (free) wins if both are set, unless AI_PROVIDER explicitly says otherwise. */
 export const getActiveProvider = (): AIProvider => {
@@ -209,14 +231,41 @@ async function callAnthropic(userPrompt: string, options: CallOptions): Promise<
   return text;
 }
 
-/** Dispatches to whichever provider is actually configured, behind the concurrency limiter above. */
+/**
+ * Dispatches to whichever provider is actually configured, behind the
+ * concurrency limiter above. When both providers are configured and
+ * AI_PROVIDER isn't pinning one, tries for an Ollama slot immediately; if
+ * Ollama is fully busy right now, overflows this one request to Anthropic
+ * instead of making the user wait behind the local CPU queue.
+ */
 async function callClaude(userPrompt: string, options: CallOptions = {}): Promise<string> {
-  const provider = getActiveProvider();
-  if (!provider) throw new AIConfigError();
+  const primary = getActiveProvider();
+  if (!primary) throw new AIConfigError();
 
-  const release = await acquireSlot();
+  const canOverflow = primary === 'ollama' && isAnthropicConfigured() && !isProviderPinned();
+
+  if (canOverflow) {
+    const immediate = tryAcquireSlotNow('ollama');
+    if (immediate) {
+      try {
+        return await callOllama(userPrompt, options);
+      } finally {
+        immediate();
+      }
+    }
+    // Ollama has no free slot right now — spill over to Anthropic rather
+    // than queue behind a slow local CPU generation.
+    const release = await acquireSlot('anthropic');
+    try {
+      return await callAnthropic(userPrompt, options);
+    } finally {
+      release();
+    }
+  }
+
+  const release = await acquireSlot(primary);
   try {
-    return await (provider === 'ollama' ? callOllama(userPrompt, options) : callAnthropic(userPrompt, options));
+    return await (primary === 'ollama' ? callOllama(userPrompt, options) : callAnthropic(userPrompt, options));
   } finally {
     release();
   }

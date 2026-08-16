@@ -257,10 +257,11 @@ graph LR
 | `SUPER_ADMIN_EMAIL` | Initial super admin email |
 | `SUPER_ADMIN_PASSWORD` | Initial super admin password |
 | `OLLAMA_BASE_URL` | AI Assistant, free/local option — set automatically in `docker-compose.yml` to the built-in `ollama` service; leave unset outside Docker to disable |
-| `OLLAMA_MODEL` | Ollama model to use (default: `llama3.2:3b` — lightweight and fast) |
-| `ANTHROPIC_API_KEY` | AI Assistant, paid option — used as a fallback if Ollama isn't configured |
-| `AI_PROVIDER` | Force `ollama` or `anthropic` explicitly if both are configured (Ollama wins by default) |
-| `AI_MAX_CONCURRENT` | Max AI requests forwarded to the provider at once (default `4`) — extras queue briefly, then fail fast with a clear error instead of a raw nginx timeout |
+| `OLLAMA_MODEL` | Ollama model to use (default: `llama3.2:1b` — smallest/fastest, tuned for small CPU-only boxes; use `llama3.2:3b`/`llama3.1` for better accuracy if you have more CPU) |
+| `ANTHROPIC_API_KEY` | AI Assistant, paid option — used as a fallback if Ollama isn't configured, and as automatic per-request overflow when Ollama is busy and both are configured |
+| `AI_PROVIDER` | Force `ollama` or `anthropic` explicitly if both are configured (disables overflow; Ollama wins by default) |
+| `AI_MAX_CONCURRENT` | Max AI requests forwarded to Ollama at once (default `2`) — match your real vCPU/thread count (`nproc`). Extras overflow to Anthropic (if configured) or queue briefly then fail fast with a clear error instead of a raw nginx timeout |
+| `ANTHROPIC_MAX_CONCURRENT` | Ceiling on concurrent Anthropic overflow requests (default `8`) — not CPU-bound like Ollama, so can be higher |
 | `AI_QUEUE_WAIT_MS` | How long a queued AI request waits for a free slot before failing (default `20000`) |
 | `AI_REQUEST_TIMEOUT_MS` | Hard timeout per AI request to the provider itself (default `45000`) |
 

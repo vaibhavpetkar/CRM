@@ -25,34 +25,31 @@ services:
       - crm_network
 
   # Free, local AI provider for the AI Assistant (item: lead/deal summaries,
-  # quote follow-ups, chat widget). No API key, no per-request cost. Runs the
-  # lightweight llama3.2:3b model by default — small footprint, fast
-  # responses, and solid accuracy for CRM-style summarization/chat. Swap
-  # OLLAMA_MODEL below (e.g. llama3.2:1b for even less RAM, or llama3.1 for
-  # higher quality at the cost of speed) if you want something different.
+  # quote follow-ups, chat widget). No API key, no per-request cost. Runs
+  # llama3.2:1b by default — the smallest/fastest Llama model, chosen for
+  # small (2 vCPU, no GPU) VPS boxes where per-request speed matters more
+  # than model size. Bump OLLAMA_MODEL to llama3.2:3b or llama3.1 for better
+  # accuracy if your server has more CPU to spare.
   #
   # Concurrency: this is CPU inference sharing the box with everything else,
   # it does NOT get faster just by raising OLLAMA_NUM_PARALLEL — that only
   # controls how many of the queued requests are *allowed* to run at once,
-  # not how much CPU is available to run them. On a 2-4 vCPU VPS, 10
-  # simultaneous AI requests will still take real wall-clock time; what these
-  # settings (together with AI_MAX_CONCURRENT on the backend) buy you is
-  # *predictable* behavior — a bounded queue with clear errors — instead of
-  # everything queuing silently until nginx's proxy times out with an HTML
-  # error page. For genuinely fast concurrent AI at 10+ simultaneous users,
-  # either give this container more CPU/a GPU, drop to llama3.2:1b, or set
-  # ANTHROPIC_API_KEY so bursts fall back to Anthropic's infrastructure
-  # instead of this one box.
+  # not how much CPU is available to run them. Set both this and the
+  # backend's AI_MAX_CONCURRENT to your actual vCPU/thread count (check with
+  # `nproc`), not higher — a bigger number just adds context-switching
+  # overhead without adding real throughput. For genuinely fast responses
+  # under real concurrency (10+ simultaneous users) on small hardware, set
+  # ANTHROPIC_API_KEY below so requests Ollama can't get to immediately
+  # overflow to Anthropic's infrastructure instead of queuing on this CPU.
   ollama:
     image: ollama/ollama:latest
     container_name: crm_ollama
     restart: always
     environment:
-      # Requests Ollama will actually run at once (extra ones queue inside
-      # Ollama itself, on top of the backend's own AI_MAX_CONCURRENT queue —
-      # keep the two roughly in step). Raise this only if you've also given
-      # the container more CPU; otherwise it just increases contention.
-      - OLLAMA_NUM_PARALLEL=${OLLAMA_NUM_PARALLEL:-4}
+      # Requests Ollama will actually run at once. Match your real thread
+      # count (`nproc`) — e.g. 2 for a 2 vCPU box — and keep this roughly in
+      # step with the backend's AI_MAX_CONCURRENT below.
+      - OLLAMA_NUM_PARALLEL=${OLLAMA_NUM_PARALLEL:-2}
       # How many requests can sit in Ollama's queue before it starts
       # rejecting new ones outright.
       - OLLAMA_MAX_QUEUE=${OLLAMA_MAX_QUEUE:-512}
@@ -68,7 +65,7 @@ services:
       - "127.0.0.1:11434:11434"
     networks:
       - crm_network
-    entrypoint: ["/bin/sh", "-c", "ollama serve & sleep 5 && ollama pull ${OLLAMA_MODEL:-llama3.2:3b}; wait"]
+    entrypoint: ["/bin/sh", "-c", "ollama serve & sleep 5 && ollama pull ${OLLAMA_MODEL:-llama3.2:1b}; wait"]
 
   backend:
     build:
@@ -103,17 +100,24 @@ services:
       - SUPER_ADMIN_PASSWORD=${SUPER_ADMIN_PASSWORD:-et4t8HjfnhRYocM3Z22p!Aa1}
       # AI Assistant — free, local Ollama provider (see the `ollama` service
       # above). Set ANTHROPIC_API_KEY instead (and leave OLLAMA_BASE_URL
-      # unset) if you'd rather use the paid Anthropic API.
+      # unset) if you'd rather use the paid Anthropic API. If both are set,
+      # Ollama handles what it can and busy overflow spills to Anthropic —
+      # see AI_MAX_CONCURRENT below.
       - AI_PROVIDER=${AI_PROVIDER:-ollama}
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://ollama:11434}
-      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2:3b}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2:1b}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-claude-sonnet-5}
-      # How many AI requests the backend forwards to the provider at once —
-      # extras wait briefly (AI_QUEUE_WAIT_MS) then fail fast with a clean
-      # "AI Assistant is busy" JSON error instead of hanging until nginx
-      # returns a raw 504 page. See the `ollama` service above for context.
-      - AI_MAX_CONCURRENT=${AI_MAX_CONCURRENT:-4}
+      # How many AI requests go to Ollama at once — match your real vCPU/
+      # thread count (`nproc` on the host), same as OLLAMA_NUM_PARALLEL
+      # above. Extras wait briefly (AI_QUEUE_WAIT_MS) then either overflow to
+      # Anthropic (if ANTHROPIC_API_KEY is set) or fail fast with a clean
+      # "AI Assistant is busy" JSON error — never a raw nginx 504 page.
+      - AI_MAX_CONCURRENT=${AI_MAX_CONCURRENT:-2}
+      # Ceiling on concurrent Anthropic overflow requests, so a traffic spike
+      # can't run up an unbounded bill. Anthropic isn't CPU-bound like Ollama
+      # so this can be much higher than AI_MAX_CONCURRENT.
+      - ANTHROPIC_MAX_CONCURRENT=${ANTHROPIC_MAX_CONCURRENT:-8}
       - AI_QUEUE_WAIT_MS=${AI_QUEUE_WAIT_MS:-20000}
       - AI_REQUEST_TIMEOUT_MS=${AI_REQUEST_TIMEOUT_MS:-45000}
       # Path to .env file on host (mounted at /host/.env inside container)
