@@ -14,6 +14,9 @@ router.get(
   contactController.getContactStats
 );
 
+// Item 8: relationship graph — same reason, must precede /:id.
+router.get('/relationships', protect, authorize('contacts:read'), contactController.getContactRelationships);
+
 // Contact CRUD routes
 router.get('/', protect, authorize('contacts:read'), contactController.getContacts);
 router.post('/', protect, authorize('contacts:create'), contactController.createContact);

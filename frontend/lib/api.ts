@@ -373,6 +373,12 @@ export const dealsApi = {
 // ─── Contacts API ─────────────────────────────────────────────────────────────
 
 export const contactsApi = {
+  getRelationships: async () =>
+    request<{
+      nodes: { id: string; type: 'contact' | 'company'; label: string; company?: string | null; email?: string | null; phone?: string | null; jobTitle?: string | null }[];
+      edges: { source: string; target: string; type: 'company' | 'phone' | 'email' }[];
+      totalContacts: number;
+    }>('/contacts/relationships'),
   getContacts: async (params: { page?: number; limit?: number; search?: string; source?: string; leadId?: number | string } = {}) => {
     const query = new URLSearchParams();
     if (params.page) query.append('page', String(params.page));

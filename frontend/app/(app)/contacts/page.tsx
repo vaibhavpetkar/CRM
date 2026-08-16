@@ -12,7 +12,7 @@ import { contactsApi, getStoredUser } from '@/lib/api';
 import { hasPermission } from '@/lib/permissions';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { PlusIcon, XMarkIcon, PencilSquareIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, XMarkIcon, PencilSquareIcon, TrashIcon, ShareIcon } from '@heroicons/react/24/outline';
 import { useToast } from '@/components/ui/toast';
 
 const emptyForm = {
@@ -199,6 +199,11 @@ export default function ContactsPage() {
         description="Manage your customer and prospect relationships"
         actions={
           <>
+            <Link href="/contacts/relationships">
+              <Button type="button" variant="secondary" size="sm">
+                <ShareIcon className="h-4 w-4" /> Relationships
+              </Button>
+            </Link>
             <ImportExportButtons
               config={{
                 entityName: 'Contact',

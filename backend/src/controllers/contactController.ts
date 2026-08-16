@@ -276,3 +276,86 @@ export const getContactStats = async (req: Request, res: Response) => {
     return res.status(500).json({ message: 'Server error' });
   }
 };
+
+/**
+ * Item 8: relationship graph — connects contacts that share a company, a
+ * phone number, or an email address, so the same person/number showing up
+ * under two different companies (or two people sharing a work line) is
+ * visible at a glance instead of buried in separate flat records.
+ *
+ * Returns a plain node/edge graph the frontend renders — company nodes are
+ * synthetic hubs (id `company:<name>`), every contact links to its company
+ * hub, and contacts sharing a phone/email get a direct edge between them
+ * (only when 2+ contacts actually share that value — a phone/email used by
+ * just one contact isn't a "relationship").
+ */
+export const getContactRelationships = async (req: Request, res: Response) => {
+  try {
+    const contacts = await Contact.findAll({
+      attributes: ['id', 'firstName', 'lastName', 'email', 'phone', 'company', 'jobTitle'],
+      where: { isActive: true },
+      limit: 500, // keep the graph readable; this is a visualization, not a full export
+      order: [['company', 'ASC'], ['firstName', 'ASC']],
+    });
+
+    const nodes: any[] = [];
+    const edges: any[] = [];
+    const companyHubs = new Map<string, string>(); // company name -> hub node id
+
+    const normalizedPhone = (p?: string | null) => (p ? p.replace(/[^\d]/g, '') : '');
+    const byPhone = new Map<string, number[]>();
+    const byEmail = new Map<string, number[]>();
+
+    for (const c of contacts) {
+      const contactNodeId = `contact:${c.id}`;
+      nodes.push({
+        id: contactNodeId,
+        type: 'contact',
+        label: `${c.firstName} ${c.lastName}`.trim(),
+        company: c.company || null,
+        email: c.email || null,
+        phone: c.phone || null,
+        jobTitle: c.jobTitle || null,
+      });
+
+      if (c.company) {
+        const hubId = `company:${c.company}`;
+        if (!companyHubs.has(c.company)) {
+          companyHubs.set(c.company, hubId);
+          nodes.push({ id: hubId, type: 'company', label: c.company });
+        }
+        edges.push({ source: hubId, target: contactNodeId, type: 'company' });
+      }
+
+      const phoneKey = normalizedPhone(c.phone);
+      if (phoneKey) {
+        if (!byPhone.has(phoneKey)) byPhone.set(phoneKey, []);
+        byPhone.get(phoneKey)!.push(c.id);
+      }
+      const emailKey = c.email?.trim().toLowerCase();
+      if (emailKey) {
+        if (!byEmail.has(emailKey)) byEmail.set(emailKey, []);
+        byEmail.get(emailKey)!.push(c.id);
+      }
+    }
+
+    // Connect every pair within each shared-phone / shared-email group.
+    const addPairEdges = (groups: Map<string, number[]>, type: 'phone' | 'email') => {
+      for (const ids of groups.values()) {
+        if (ids.length < 2) continue;
+        for (let i = 0; i < ids.length; i++) {
+          for (let j = i + 1; j < ids.length; j++) {
+            edges.push({ source: `contact:${ids[i]}`, target: `contact:${ids[j]}`, type });
+          }
+        }
+      }
+    };
+    addPairEdges(byPhone, 'phone');
+    addPairEdges(byEmail, 'email');
+
+    return res.json({ nodes, edges, totalContacts: contacts.length });
+  } catch (error) {
+    console.error('Get contact relationships error:', error);
+    return res.status(500).json({ message: 'Server error' });
+  }
+};
