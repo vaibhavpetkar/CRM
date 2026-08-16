@@ -8,6 +8,7 @@ import Card from '@/components/ui/card';
 import LoadingSpinner from '@/components/ui/loading-spinner';
 import { meetingsApi, leadsApi } from '@/lib/api';
 import SearchableSelect from '@/components/ui/searchable-select';
+import CompanyContactCcPicker from '@/components/ui/company-contact-cc-picker';
 import { useRouter, useSearchParams } from 'next/navigation';
 import ImportExportButtons from '@/components/ui/import-export-buttons';
 import { MEETING_FIELDS } from '@/lib/import-export/field-configs';
@@ -23,6 +24,8 @@ const emptyForm = {
   duration: '30 min',
   type: 'video',
   status: 'scheduled',
+  customerEmail: '',
+  ccEmails: [] as string[],
 };
 
 export default function MeetingsPage() {
@@ -229,6 +232,24 @@ export default function MeetingsPage() {
                     : 'Pick a suggestion to link this meeting to an existing Lead, or type freely for a one-off client.'}
                 </p>
               </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-700">Client Email</label>
+                <input
+                  type="email"
+                  value={formData.customerEmail}
+                  onChange={(e) => setFormData({ ...formData, customerEmail: e.target.value })}
+                  placeholder="client@example.com"
+                  className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                />
+                <p className="mt-1 text-[11px] text-slate-400">
+                  A meeting invite is emailed automatically to this address (and to whoever it's assigned to) when scheduled.
+                </p>
+              </div>
+              <CompanyContactCcPicker
+                companyName={formData.client}
+                value={formData.ccEmails}
+                onChange={(emails) => setFormData({ ...formData, ccEmails: emails })}
+              />
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-slate-700">Date</label>

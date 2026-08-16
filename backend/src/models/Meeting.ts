@@ -15,6 +15,11 @@ interface MeetingAttributes {
   status: string; // 'scheduled' | 'completed' | 'cancelled'
   notes?: string | null;
   assignedToId?: number | null;
+  // Auto-email on create: client's email + a picked list of CC recipients
+  // (typically other contacts at the same company). ccEmails is stored as a
+  // JSON-stringified array of email addresses.
+  customerEmail?: string | null;
+  ccEmails?: string | null;
 }
 
 interface MeetingCreationAttributes extends Optional<MeetingAttributes, 'id'> {}
@@ -33,6 +38,8 @@ class Meeting extends Model<MeetingAttributes, MeetingCreationAttributes> implem
   public status!: string;
   public notes?: string | null;
   public assignedToId?: number | null;
+  public customerEmail?: string | null;
+  public ccEmails?: string | null;
 
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
@@ -53,6 +60,8 @@ Meeting.init(
     status: { type: DataTypes.STRING(20), allowNull: false, defaultValue: 'scheduled' },
     notes: { type: DataTypes.TEXT, allowNull: true },
     assignedToId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: true, references: { model: 'users', key: 'id' } },
+    customerEmail: { type: DataTypes.STRING(255), allowNull: true },
+    ccEmails: { type: DataTypes.TEXT, allowNull: true },
   },
   { tableName: 'meetings', sequelize }
 );

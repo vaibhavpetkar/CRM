@@ -26,7 +26,7 @@ const getTransporter = (): nodemailer.Transporter | null => {
   return transporter;
 };
 
-const sendMail = async (to: string, subject: string, html: string): Promise<boolean> => {
+const sendMail = async (to: string, subject: string, html: string, cc?: string[]): Promise<boolean> => {
   const transport = getTransporter();
   if (!transport) {
     logger.warn(`Email not sent to ${to} ("${subject}") — SMTP is not configured.`);
@@ -37,6 +37,7 @@ const sendMail = async (to: string, subject: string, html: string): Promise<bool
     await transport.sendMail({
       from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
       to,
+      ...(cc && cc.length ? { cc } : {}),
       subject,
       html,
     });
@@ -124,4 +125,30 @@ export const sendGenericNotificationEmail = async (
     <p>${message}</p>
   `;
   return sendMail(email, title, html);
+};
+
+/**
+ * Auto-sent when a Meeting is scheduled — one email to the client, CC'd to
+ * the assigned rep and any picked CC recipients (typically other contacts
+ * at the same company). Falls back the same way every other email in this
+ * app does when SMTP isn't configured (logs + returns false, doesn't throw
+ * and never blocks the Meeting from being created).
+ */
+export const sendMeetingInviteEmail = async (
+  toEmail: string,
+  meeting: { title: string; date: string | Date; time?: string | null; duration?: string | null; type: string; notes?: string | null },
+  ccEmails: string[] = []
+): Promise<boolean> => {
+  const dateStr = new Date(meeting.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  const subject = `Meeting scheduled: ${meeting.title}`;
+  const html = `
+    <p>A meeting has been scheduled:</p>
+    <p>
+      <strong>${meeting.title}</strong><br/>
+      ${dateStr}${meeting.time ? ` at ${meeting.time}` : ''}${meeting.duration ? ` (${meeting.duration})` : ''}<br/>
+      Type: ${meeting.type}
+    </p>
+    ${meeting.notes ? `<p>${meeting.notes}</p>` : ''}
+  `;
+  return sendMail(toEmail, subject, html, ccEmails);
 };
