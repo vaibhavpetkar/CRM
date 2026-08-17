@@ -45,6 +45,7 @@ Built with Next.js, Express, PostgreSQL, Redis, and Socket.IO — Dockerized wit
 | **AI Assistant** | Lead/deal summaries, next-action suggestions, quote follow-ups, and a chat widget — powered by a free local Ollama model by default (or Anthropic's API if configured) |
 | **Activity Logs** | Full audit trail of all user actions with revert support |
 | **Recycle Bin** | Soft-delete with restore support for leads, deals, and contacts |
+| **Expenses & Profit/Loss** | Record business costs by category; Reports > Profit & Loss shows real revenue (from collected payments) minus expenses, cash-basis, with a monthly trend chart |
 
 ### Marketing
 | Feature | Description |

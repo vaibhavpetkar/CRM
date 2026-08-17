@@ -40,6 +40,8 @@ import settingsRoutes from './routes/settingsRoutes';
 import integrationRoutes from './routes/integrationRoutes';
 import aiRoutes from './routes/aiRoutes';
 import googleTasksRoutes from './routes/googleTasksRoutes';
+import expenseRoutes from './routes/expenseRoutes';
+import reportRoutes from './routes/reportRoutes';
 
 // Import models in dependency order before sync
 import './models/Company';
@@ -157,6 +159,8 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/integrations', integrationRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/integrations/google-tasks', googleTasksRoutes);
+app.use('/api/expenses', expenseRoutes);
+app.use('/api/reports', reportRoutes);
 
 // Serve uploaded files (attachments, generated PDFs) statically — but only to
 // authenticated users. Nothing in the frontend loads these via raw <img>/<a>

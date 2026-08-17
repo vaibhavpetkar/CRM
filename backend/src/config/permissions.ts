@@ -91,6 +91,16 @@ const modules: { module: string; label: string; actions: { action: string; label
     actions: [{ action: 'view', label: 'View reports' }],
   },
   {
+    module: 'expenses',
+    label: 'Expenses',
+    actions: [
+      { action: 'read', label: 'View expenses' },
+      { action: 'create', label: 'Add expenses' },
+      { action: 'update', label: 'Edit expenses' },
+      { action: 'delete', label: 'Delete expenses' },
+    ],
+  },
+  {
     module: 'items',
     label: 'Items',
     actions: [
@@ -173,6 +183,7 @@ export const DEFAULT_ROLES: { name: string; description: string; permissions: st
       'quotes:view', 'invoices:view', 'tasks:view', 'meetings:view',
       'users:read',
       'reports:view',
+      'expenses:read', 'expenses:create', 'expenses:update',
       'items:read', 'items:create', 'items:update',
       'item_categories:read', 'item_categories:create', 'item_categories:update',
       'taxes:read', 'taxes:create', 'taxes:update',

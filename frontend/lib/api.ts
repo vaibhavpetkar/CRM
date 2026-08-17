@@ -764,3 +764,59 @@ export const notificationsApi = {
     return request<{ message: string }>(`/notifications/${id}`, { method: 'DELETE' });
   },
 };
+
+// ─── Expenses API ────────────────────────────────────────────────────────────
+
+export interface Expense {
+  id: number;
+  category: string;
+  description: string;
+  amount: number;
+  expenseDate: string;
+  paymentMethod: string;
+  vendor?: string | null;
+  notes?: string | null;
+  recordedBy?: string | null;
+  createdAt: string;
+}
+
+export const expensesApi = {
+  getExpenses: async (params: { search?: string; category?: string; startDate?: string; endDate?: string; page?: number; limit?: number } = {}) => {
+    const query = new URLSearchParams();
+    if (params.search) query.append('search', params.search);
+    if (params.category && params.category !== 'all') query.append('category', params.category);
+    if (params.startDate) query.append('startDate', params.startDate);
+    if (params.endDate) query.append('endDate', params.endDate);
+    if (params.page) query.append('page', String(params.page));
+    if (params.limit) query.append('limit', String(params.limit));
+    const qs = query.toString();
+    return request<{ expenses: Expense[]; total: number; page: number; totalPages: number }>(`/expenses${qs ? `?${qs}` : ''}`);
+  },
+  getCategories: async () => request<{ categories: string[] }>('/expenses/categories'),
+  createExpense: async (data: Partial<Expense>) => request<{ expense: Expense }>('/expenses', { method: 'POST', body: JSON.stringify(data) }),
+  updateExpense: async (id: string | number, data: Partial<Expense>) => request<{ expense: Expense }>(`/expenses/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteExpense: async (id: string | number) => request<{ message: string }>(`/expenses/${id}`, { method: 'DELETE' }),
+};
+
+// ─── Reports API ─────────────────────────────────────────────────────────────
+
+export interface ProfitLossReport {
+  startDate: string;
+  endDate: string;
+  totalRevenue: number;
+  totalExpenses: number;
+  netProfit: number;
+  monthly: { month: string; revenue: number; expenses: number; net: number }[];
+  expensesByCategory: { category: string; total: number }[];
+  basis: string;
+}
+
+export const reportsApi = {
+  getProfitLoss: async (params: { startDate?: string; endDate?: string } = {}) => {
+    const query = new URLSearchParams();
+    if (params.startDate) query.append('startDate', params.startDate);
+    if (params.endDate) query.append('endDate', params.endDate);
+    const qs = query.toString();
+    return request<ProfitLossReport>(`/reports/profit-loss${qs ? `?${qs}` : ''}`);
+  },
+};

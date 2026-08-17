@@ -20,6 +20,7 @@ import {
   ClockIcon,
   TrashIcon,
   CubeIcon,
+  BanknotesIcon,
   TagIcon,
   ReceiptRefundIcon,
   PuzzlePieceIcon,
@@ -73,6 +74,12 @@ export const navigation: NavSection[] = [
       { name: 'Items', href: '/items', icon: CubeIcon, permission: 'items:read' },
       { name: 'Categories', href: '/items/categories', icon: TagIcon, permission: 'item_categories:read' },
       { name: 'Tax Master', href: '/items/taxes', icon: ReceiptRefundIcon, permission: 'taxes:read' },
+    ],
+  },
+  {
+    title: 'Finance',
+    items: [
+      { name: 'Expenses', href: '/expenses', icon: BanknotesIcon, permission: 'expenses:read' },
     ],
   },
   {

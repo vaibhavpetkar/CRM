@@ -17,6 +17,7 @@ import Quote from './Quote';
 import Invoice from './Invoice';
 import Campaign from './Campaign';
 import Template from './Template';
+import Expense from './Expense';
 import ActivityLog from './ActivityLog';
 import Payment from './Payment';
 import Notification from './Notification';
@@ -128,6 +129,10 @@ User.hasMany(Payment, { foreignKey: 'recordedById', as: 'recordedPayments' });
 // ─── Notification Associations ────────────────────────────────────────────────
 Notification.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 User.hasMany(Notification, { foreignKey: 'userId', as: 'notifications' });
+
+// ─── Expense Associations ──────────────────────────────────────────────────────
+Expense.belongsTo(User, { foreignKey: 'recordedById', as: 'recordedBy' });
+User.hasMany(Expense, { foreignKey: 'recordedById', as: 'recordedExpenses' });
 
 // ─── Item / Item Category / Tax Master Associations ───────────────────────────
 Item.belongsTo(ItemCategory, { foreignKey: 'categoryId', as: 'category' });
