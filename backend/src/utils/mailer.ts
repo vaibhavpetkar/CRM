@@ -136,7 +136,7 @@ export const sendGenericNotificationEmail = async (
  */
 export const sendMeetingInviteEmail = async (
   toEmail: string,
-  meeting: { title: string; date: string | Date; time?: string | null; duration?: string | null; type: string; notes?: string | null },
+  meeting: { title: string; date: string | Date; time?: string | null; duration?: string | null; type: string; notes?: string | null; meetLink?: string | null },
   ccEmails: string[] = []
 ): Promise<boolean> => {
   const dateStr = new Date(meeting.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
@@ -148,6 +148,7 @@ export const sendMeetingInviteEmail = async (
       ${dateStr}${meeting.time ? ` at ${meeting.time}` : ''}${meeting.duration ? ` (${meeting.duration})` : ''}<br/>
       Type: ${meeting.type}
     </p>
+    ${meeting.meetLink ? `<p><a href="${meeting.meetLink}">Join with Google Meet</a></p>` : ''}
     ${meeting.notes ? `<p>${meeting.notes}</p>` : ''}
   `;
   return sendMail(toEmail, subject, html, ccEmails);

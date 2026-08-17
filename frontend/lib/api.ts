@@ -820,3 +820,23 @@ export const reportsApi = {
     return request<ProfitLossReport>(`/reports/profit-loss${qs ? `?${qs}` : ''}`);
   },
 };
+
+// Org-wide Google Meet connection (admin connects once for the whole
+// company) — separate from the generic integrationsApi catalog since this
+// has a real OAuth connect flow, not a "not implemented yet" stub.
+export const googleMeetApi = {
+  getStatus: async () => request<{ configured: boolean; connected: boolean; lastSyncAt: string | null; lastError: string | null }>('/integrations/google-meet/status'),
+  connect: async () => request<{ url: string }>('/integrations/google-meet/connect', { method: 'POST' }),
+  disconnect: async () => request<{ message: string }>('/integrations/google-meet/disconnect', { method: 'POST' }),
+};
+
+// Org-wide Google Business Profile connection. The OAuth connect flow works
+// regardless of API approval status; getAccounts() will surface Google's
+// own error until this app has been through Google's Business Profile API
+// access review (see googleBusinessService.ts) — that's expected, not a bug.
+export const googleBusinessApi = {
+  getStatus: async () => request<{ configured: boolean; connected: boolean; lastSyncAt: string | null; lastError: string | null }>('/integrations/google-business/status'),
+  connect: async () => request<{ url: string }>('/integrations/google-business/connect', { method: 'POST' }),
+  disconnect: async () => request<{ message: string }>('/integrations/google-business/disconnect', { method: 'POST' }),
+  getAccounts: async () => request<{ accounts: any[] }>('/integrations/google-business/accounts'),
+};

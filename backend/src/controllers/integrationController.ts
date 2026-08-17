@@ -31,14 +31,6 @@ export const PROVIDER_CATALOG: ProviderDef[] = [
     docsUrl: 'https://developers.facebook.com/docs',
   },
   {
-    key: 'google_business',
-    label: 'Google Business Profile',
-    category: 'local-business',
-    description: 'Sync store info, reviews, and leads for local/store-front businesses.',
-    requiredEnvVars: ['GOOGLE_BUSINESS_CLIENT_ID', 'GOOGLE_BUSINESS_CLIENT_SECRET'],
-    docsUrl: 'https://developers.google.com/my-business',
-  },
-  {
     key: 'linkedin',
     label: 'LinkedIn',
     category: 'professional',
@@ -55,14 +47,6 @@ export const PROVIDER_CATALOG: ProviderDef[] = [
     docsUrl: 'https://developer.calendly.com',
   },
   {
-    key: 'google_meet',
-    label: 'Google Meet',
-    category: 'video',
-    description: 'Create real Google Calendar/Meet meetings from Campaigns and Deals.',
-    requiredEnvVars: ['GOOGLE_MEET_CLIENT_ID', 'GOOGLE_MEET_CLIENT_SECRET'],
-    docsUrl: 'https://developers.google.com/meet',
-  },
-  {
     key: 'mailchimp',
     label: 'Mailchimp',
     category: 'marketing',
@@ -70,6 +54,11 @@ export const PROVIDER_CATALOG: ProviderDef[] = [
     requiredEnvVars: ['MAILCHIMP_API_KEY', 'MAILCHIMP_SERVER_PREFIX'],
     docsUrl: 'https://mailchimp.com/developer/',
   },
+  // Google Meet and Google Business Profile are NOT in this catalog — they
+  // have real, dedicated OAuth flows (googleMeetController/Routes and
+  // googleBusinessController/Routes) instead of the generic
+  // credentials-configured-but-not-implemented stub below. See the
+  // Integrations page, which renders them as separate real cards.
 ];
 
 const findProvider = (key: string) => PROVIDER_CATALOG.find((p) => p.key === key);

@@ -6,6 +6,7 @@ import Lead from '../models/Lead';
 import Deal from '../models/Deal';
 import Contact from '../models/Contact';
 import { sendMeetingInviteEmail } from '../utils/mailer';
+import { createMeetLink } from '../services/googleMeetService';
 
 // Included whenever a Meeting is fetched so the API returns the linked
 // Lead/Deal/Contact record itself, not just a typed-in "client" string.
@@ -31,6 +32,28 @@ const serialize = (meeting: any) => {
 const isBadReferenceError = (error: unknown) =>
   error instanceof ForeignKeyConstraintError ||
   (error instanceof ValidationError && error.name === 'SequelizeValidationError');
+
+// `time` and `duration` are free-text display fields elsewhere in this
+// codebase (e.g. "2:00 PM", "30 min", "1h") — not strictly validated. This
+// is a best-effort parse for building a real Calendar event start/end when
+// creating a Google Meet link; returns null (skip the Meet link, don't
+// error) rather than guessing wrong on genuinely unparseable input.
+const parseMeetingStartEnd = (date: string, time?: string | null, duration?: string | null): { start: Date; end: Date } | null => {
+  const timeMatch = time ? String(time).match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i) : null;
+  let hours = timeMatch ? parseInt(timeMatch[1], 10) : 10;
+  const minutes = timeMatch ? parseInt(timeMatch[2], 10) : 0;
+  const meridiem = timeMatch?.[3]?.toUpperCase();
+  if (meridiem === 'PM' && hours < 12) hours += 12;
+  if (meridiem === 'AM' && hours === 12) hours = 0;
+
+  const start = new Date(`${date}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`);
+  if (isNaN(start.getTime())) return null;
+
+  const durationMatch = duration ? String(duration).match(/(\d+(?:\.\d+)?)/) : null;
+  const durationMinutes = durationMatch ? Math.max(15, parseFloat(durationMatch[1])) : 30;
+  const end = new Date(start.getTime() + durationMinutes * 60_000);
+  return { start, end };
+};
 
 export const getMeetings = async (req: Request, res: Response) => {
   try {
@@ -65,6 +88,25 @@ export const createMeeting = async (req: Request, res: Response) => {
 
     const normalizedCc: string[] = Array.isArray(ccEmails) ? ccEmails.filter((e: unknown) => typeof e === 'string' && e.trim()) : [];
 
+    // Best-effort real Google Meet link for video meetings — never blocks
+    // meeting creation. Returns null immediately (no network call) if Meet
+    // isn't connected, or if the date/time can't be parsed into a concrete
+    // start/end (duration/time here are free-text display fields, not
+    // strictly validated elsewhere in this codebase).
+    let meetLink: string | null = null;
+    if ((type || 'video') === 'video') {
+      const startEnd = parseMeetingStartEnd(date, time, duration);
+      if (startEnd) {
+        meetLink = await createMeetLink({
+          summary: title,
+          description: notes || undefined,
+          startTime: startEnd.start,
+          endTime: startEnd.end,
+          attendeeEmails: [customerEmail, ...normalizedCc].filter((e): e is string => !!e),
+        });
+      }
+    }
+
     const meeting = await Meeting.create({
       title,
       client: client || null,
@@ -80,6 +122,7 @@ export const createMeeting = async (req: Request, res: Response) => {
       assignedToId: assignedToId || null,
       customerEmail: customerEmail || null,
       ccEmails: normalizedCc.length ? JSON.stringify(normalizedCc) : null,
+      meetLink,
     });
 
     await meeting.reload({ include: relationIncludes });

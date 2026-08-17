@@ -40,6 +40,8 @@ import settingsRoutes from './routes/settingsRoutes';
 import integrationRoutes from './routes/integrationRoutes';
 import aiRoutes from './routes/aiRoutes';
 import googleTasksRoutes from './routes/googleTasksRoutes';
+import googleMeetRoutes from './routes/googleMeetRoutes';
+import googleBusinessRoutes from './routes/googleBusinessRoutes';
 import expenseRoutes from './routes/expenseRoutes';
 import reportRoutes from './routes/reportRoutes';
 
@@ -156,9 +158,17 @@ app.use('/api/taxes', taxMasterRoutes);
 app.use('/api/company', companyRoutes);
 app.use('/api/attachments', attachmentRoutes);
 app.use('/api/settings', settingsRoutes);
+// Must come BEFORE the generic /api/integrations mount below — Express
+// matches by mount order, and integrationRoutes has a wildcard
+// POST /:provider/connect that would otherwise intercept
+// /api/integrations/google-tasks/connect with provider='google-tasks'
+// (not in the generic PROVIDER_CATALOG), returning "Unknown integration"
+// before the real handler below is ever reached.
+app.use('/api/integrations/google-tasks', googleTasksRoutes);
+app.use('/api/integrations/google-meet', googleMeetRoutes);
+app.use('/api/integrations/google-business', googleBusinessRoutes);
 app.use('/api/integrations', integrationRoutes);
 app.use('/api/ai', aiRoutes);
-app.use('/api/integrations/google-tasks', googleTasksRoutes);
 app.use('/api/expenses', expenseRoutes);
 app.use('/api/reports', reportRoutes);
 

@@ -20,6 +20,10 @@ interface MeetingAttributes {
   // JSON-stringified array of email addresses.
   customerEmail?: string | null;
   ccEmails?: string | null;
+  // Real Google Meet link (see googleMeetService.createMeetLink), populated
+  // automatically for type:'video' meetings if Google Meet is connected.
+  // Never blocks meeting creation if it's not — stays null instead.
+  meetLink?: string | null;
 }
 
 interface MeetingCreationAttributes extends Optional<MeetingAttributes, 'id'> {}
@@ -40,6 +44,7 @@ class Meeting extends Model<MeetingAttributes, MeetingCreationAttributes> implem
   public assignedToId?: number | null;
   public customerEmail?: string | null;
   public ccEmails?: string | null;
+  public meetLink?: string | null;
 
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
@@ -62,6 +67,7 @@ Meeting.init(
     assignedToId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: true, references: { model: 'users', key: 'id' } },
     customerEmail: { type: DataTypes.STRING(255), allowNull: true },
     ccEmails: { type: DataTypes.TEXT, allowNull: true },
+    meetLink: { type: DataTypes.STRING(500), allowNull: true },
   },
   { tableName: 'meetings', sequelize }
 );

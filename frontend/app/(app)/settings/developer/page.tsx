@@ -10,12 +10,33 @@ import { useRouter } from 'next/navigation';
 import { LockClosedIcon, EyeIcon, EyeSlashIcon, KeyIcon, Cog6ToothIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 import { useToast } from '@/components/ui/toast';
 
-const ENV_VAR_DEFINITIONS: Record<string, { label: string; type: 'text' | 'password' | 'url'; description: string }> = {
-  GOOGLE_CLIENT_ID: { label: 'Google OAuth Client ID', type: 'text', description: 'Client ID from Google Cloud Console for OAuth login' },
+const ENV_VAR_DEFINITIONS: Record<string, { label: string; type: 'text' | 'password' | 'url'; description: string; redirectPath?: string; testHref?: string; testLabel?: string }> = {
+  GOOGLE_CLIENT_ID: {
+    label: 'Google OAuth Client ID',
+    type: 'text',
+    description: 'Client ID from Google Cloud Console for OAuth login and Google Tasks sync',
+    redirectPath: '/api/integrations/google-tasks/callback',
+    testHref: '/settings?tab=profile',
+    testLabel: 'Test: Settings > Profile > Google Tasks',
+  },
   GOOGLE_CLIENT_SECRET: { label: 'Google OAuth Client Secret', type: 'password', description: 'Client Secret from Google Cloud Console' },
-  GOOGLE_BUSINESS_CLIENT_ID: { label: 'Google Business Client ID', type: 'text', description: 'Client ID for Google Business integration (Google My Business, etc.)' },
-  GOOGLE_BUSINESS_CLIENT_SECRET: { label: 'Google Business Client Secret', type: 'password', description: 'Client Secret for Google Business integration' },
-  GOOGLE_MEET_CLIENT_ID: { label: 'Google Meet Client ID', type: 'text', description: 'Client ID for Google Meet integration' },
+  GOOGLE_BUSINESS_CLIENT_ID: {
+    label: 'Google Business Client ID',
+    type: 'text',
+    description: 'Client ID for Google Business Profile integration',
+    redirectPath: '/api/integrations/google-business/callback',
+    testHref: '/settings/integrations',
+    testLabel: 'Test: Settings > Integrations',
+  },
+  GOOGLE_BUSINESS_CLIENT_SECRET: { label: 'Google Business Client Secret', type: 'password', description: 'Client Secret for Google Business Profile integration' },
+  GOOGLE_MEET_CLIENT_ID: {
+    label: 'Google Meet Client ID',
+    type: 'text',
+    description: 'Client ID for Google Meet integration (Calendar API — creates real Meet links)',
+    redirectPath: '/api/integrations/google-meet/callback',
+    testHref: '/settings/integrations',
+    testLabel: 'Test: Settings > Integrations',
+  },
   GOOGLE_MEET_CLIENT_SECRET: { label: 'Google Meet Client Secret', type: 'password', description: 'Client Secret for Google Meet integration' },
   EMAIL_SERVICE: { label: 'Email Service', type: 'text', description: 'Email service provider (e.g., gmail, sendgrid, mailgun)' },
   EMAIL_USER: { label: 'Email User', type: 'text', description: 'Email address for sending emails' },
@@ -173,6 +194,22 @@ export default function DeveloperSettingsPage() {
                     </button>
                   </div>
                   <p className="text-[10px] text-slate-400">{def.description}</p>
+                  {def.redirectPath && (
+                    <div className="rounded border border-slate-200 bg-slate-50 p-1.5">
+                      <p className="text-[9px] font-medium uppercase tracking-wide text-slate-400">
+                        Redirect URI — register this exactly in Google Cloud Console
+                      </p>
+                      <code className="block break-all text-[10px] text-slate-600">
+                        {(envVars.CLIENT_URL?.value || 'https://your-domain.com').replace(/\/$/, '')}
+                        {def.redirectPath}
+                      </code>
+                    </div>
+                  )}
+                  {def.testHref && (
+                    <a href={def.testHref} className="inline-block text-[10px] text-[#168eea] hover:underline">
+                      {def.testLabel} →
+                    </a>
+                  )}
                 </div>
               ))}
             </div>

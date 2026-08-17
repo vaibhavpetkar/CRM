@@ -18,6 +18,8 @@ import Invoice from './Invoice';
 import Campaign from './Campaign';
 import Template from './Template';
 import Expense from './Expense';
+import GoogleMeetConnection from './GoogleMeetConnection';
+import GoogleBusinessConnection from './GoogleBusinessConnection';
 import ActivityLog from './ActivityLog';
 import Payment from './Payment';
 import Notification from './Notification';
@@ -133,6 +135,10 @@ User.hasMany(Notification, { foreignKey: 'userId', as: 'notifications' });
 // ─── Expense Associations ──────────────────────────────────────────────────────
 Expense.belongsTo(User, { foreignKey: 'recordedById', as: 'recordedBy' });
 User.hasMany(Expense, { foreignKey: 'recordedById', as: 'recordedExpenses' });
+
+// ─── Google Meet / Business Profile Connection Associations ───────────────────
+GoogleMeetConnection.belongsTo(User, { foreignKey: 'connectedById', as: 'connectedBy' });
+GoogleBusinessConnection.belongsTo(User, { foreignKey: 'connectedById', as: 'connectedBy' });
 
 // ─── Item / Item Category / Tax Master Associations ───────────────────────────
 Item.belongsTo(ItemCategory, { foreignKey: 'categoryId', as: 'category' });
