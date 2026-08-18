@@ -101,6 +101,16 @@ const modules: { module: string; label: string; actions: { action: string; label
     ],
   },
   {
+    module: 'document_templates',
+    label: 'Document Templates',
+    actions: [
+      { action: 'read', label: 'View templates' },
+      { action: 'create', label: 'Create templates' },
+      { action: 'update', label: 'Edit templates' },
+      { action: 'delete', label: 'Delete templates' },
+    ],
+  },
+  {
     module: 'items',
     label: 'Items',
     actions: [

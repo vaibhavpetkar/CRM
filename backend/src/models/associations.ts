@@ -20,6 +20,7 @@ import Template from './Template';
 import Expense from './Expense';
 import GoogleMeetConnection from './GoogleMeetConnection';
 import GoogleBusinessConnection from './GoogleBusinessConnection';
+import DocumentTemplate from './DocumentTemplate';
 import ActivityLog from './ActivityLog';
 import Payment from './Payment';
 import Notification from './Notification';
@@ -139,6 +140,9 @@ User.hasMany(Expense, { foreignKey: 'recordedById', as: 'recordedExpenses' });
 // ─── Google Meet / Business Profile Connection Associations ───────────────────
 GoogleMeetConnection.belongsTo(User, { foreignKey: 'connectedById', as: 'connectedBy' });
 GoogleBusinessConnection.belongsTo(User, { foreignKey: 'connectedById', as: 'connectedBy' });
+
+// ─── Document Template Associations ────────────────────────────────────────────
+DocumentTemplate.belongsTo(User, { foreignKey: 'createdById', as: 'createdBy' });
 
 // ─── Item / Item Category / Tax Master Associations ───────────────────────────
 Item.belongsTo(ItemCategory, { foreignKey: 'categoryId', as: 'category' });

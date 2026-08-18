@@ -19,6 +19,9 @@ import { generateDocumentPdf, PrintableDocument } from '../utils/pdfGenerator';
 import { renderPrintHtml } from '../utils/printFormat';
 import { sendMailWithAttachment } from '../utils/mailer';
 import { sanitizeDateFields } from '../utils/sanitize';
+import DocumentTemplate from '../models/DocumentTemplate';
+import { renderTemplate } from '../utils/templateRenderer';
+import { formatMoney } from '../utils/format';
 import path from 'path';
 import crypto from 'crypto';
 import { NotFoundError, ConflictError, ValidationError } from '../errors/AppError';
@@ -400,10 +403,12 @@ class QuoteService {
     const pdfPath = await this.generatePdf(id);
     const absolutePath = path.join(__dirname, '../../', pdfPath);
 
+    const { subject, html } = await this.buildQuoteEmailContent(quote);
+
     const sent = await sendMailWithAttachment(
       recipient,
-      `Quotation ${quote.quoteNumber} from ${await this.getCompanyName()}`,
-      `<p>Hi,</p><p>Please find attached Quotation <strong>${quote.quoteNumber}</strong> for your review.</p>`,
+      subject,
+      html,
       { filename: `${quote.quoteNumber}.pdf`, path: absolutePath }
     );
 
@@ -692,6 +697,42 @@ class QuoteService {
   private async getCompanyName(): Promise<string> {
     const company = await Company.findOne({ order: [['id', 'ASC']] });
     return company?.name || 'Our Company';
+  }
+
+  /**
+   * Uses the admin's default 'quote' DocumentTemplate (Settings > Document
+   * Templates) if one is set, rendering its {{field}} placeholders with this
+   * quote's real data. Falls back to the original hardcoded subject/body
+   * when no default template exists, so nothing changes for anyone who
+   * hasn't touched this feature.
+   */
+  private async buildQuoteEmailContent(quote: any): Promise<{ subject: string; html: string }> {
+    const company = await Company.findOne({ order: [['id', 'ASC']] });
+    const companyName = company?.name || 'Our Company';
+
+    const template = await DocumentTemplate.findOne({ where: { docType: 'quote', isDefault: true } });
+    if (!template) {
+      return {
+        subject: `Quotation ${quote.quoteNumber} from ${companyName}`,
+        html: `<p>Hi,</p><p>Please find attached Quotation <strong>${quote.quoteNumber}</strong> for your review.</p>`,
+      };
+    }
+
+    const data = {
+      quote_number: quote.quoteNumber,
+      client_name: quote.client,
+      customer_email: quote.customerEmail || '',
+      company_name: companyName,
+      total_amount: formatMoney(Number(quote.amount), company?.currency || 'USD'),
+      valid_until: quote.validUntil ? new Date(quote.validUntil).toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' }) : '',
+      sent_date: new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' }),
+      status: quote.status,
+    };
+
+    return {
+      subject: renderTemplate(template.subject, data) || `Quotation ${quote.quoteNumber} from ${companyName}`,
+      html: renderTemplate(template.htmlBody, data),
+    };
   }
 
   private async buildPrintableDocument(quote: Quote): Promise<PrintableDocument> {

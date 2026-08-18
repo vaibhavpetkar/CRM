@@ -840,3 +840,33 @@ export const googleBusinessApi = {
   disconnect: async () => request<{ message: string }>('/integrations/google-business/disconnect', { method: 'POST' }),
   getAccounts: async () => request<{ accounts: any[] }>('/integrations/google-business/accounts'),
 };
+
+// ─── Document Templates API ──────────────────────────────────────────────────
+// Distinct from the marketing `templatesApi` above (campaign emails) — these
+// are transactional/auto-send document templates (quotes, invoices, etc.)
+// with {{field}} placeholders. See documentTemplateController on the backend.
+
+export interface DocTypeOption { value: string; label: string }
+export interface MergeField { key: string; label: string; sample: string }
+export interface DocumentTemplate {
+  id: number;
+  name: string;
+  docType: string;
+  subject: string;
+  htmlBody: string;
+  isDefault: boolean;
+  createdBy?: string | null;
+  createdAt: string;
+}
+
+export const documentTemplatesApi = {
+  getDocTypes: async () => request<{ docTypes: DocTypeOption[] }>('/document-templates/doc-types'),
+  getMergeFields: async (docType: string) => request<{ fields: MergeField[]; sample: Record<string, string> }>(`/document-templates/merge-fields/${docType}`),
+  getTemplates: async (docType?: string) => request<{ templates: DocumentTemplate[] }>(`/document-templates${docType ? `?docType=${docType}` : ''}`),
+  getTemplate: async (id: string | number) => request<{ template: DocumentTemplate }>(`/document-templates/${id}`),
+  createTemplate: async (data: Partial<DocumentTemplate>) => request<{ template: DocumentTemplate }>('/document-templates', { method: 'POST', body: JSON.stringify(data) }),
+  updateTemplate: async (id: string | number, data: Partial<DocumentTemplate>) => request<{ template: DocumentTemplate }>(`/document-templates/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteTemplate: async (id: string | number) => request<{ message: string }>(`/document-templates/${id}`, { method: 'DELETE' }),
+  preview: async (data: { docType: string; subject: string; htmlBody: string }) =>
+    request<{ subject: string; html: string; unknownFields: string[] }>('/document-templates/preview', { method: 'POST', body: JSON.stringify(data) }),
+};

@@ -83,6 +83,12 @@ export const navigation: NavSection[] = [
     ],
   },
   {
+    title: 'Automation',
+    items: [
+      { name: 'Document Templates', href: '/document-templates', icon: DocumentTextIcon, permission: 'document_templates:read' },
+    ],
+  },
+  {
     title: 'Administration',
     items: [
       { name: 'Team', href: '/team', icon: UsersIcon, permission: 'users:read' },

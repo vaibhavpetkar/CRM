@@ -44,6 +44,7 @@ import googleMeetRoutes from './routes/googleMeetRoutes';
 import googleBusinessRoutes from './routes/googleBusinessRoutes';
 import expenseRoutes from './routes/expenseRoutes';
 import reportRoutes from './routes/reportRoutes';
+import documentTemplateRoutes from './routes/documentTemplateRoutes';
 
 // Import models in dependency order before sync
 import './models/Company';
@@ -171,6 +172,7 @@ app.use('/api/integrations', integrationRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/expenses', expenseRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/document-templates', documentTemplateRoutes);
 
 // Serve uploaded files (attachments, generated PDFs) statically — but only to
 // authenticated users. Nothing in the frontend loads these via raw <img>/<a>
