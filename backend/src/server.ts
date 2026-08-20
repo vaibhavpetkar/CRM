@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import cors from 'cors';
 import bcrypt from 'bcryptjs';
 import sequelize from './config/database';
+import { runSchemaPatches } from './utils/ensureSchema';
 import User from './models/User';
 import Role from './models/Role';
 import { DEFAULT_ROLES } from './config/permissions';
@@ -291,6 +292,13 @@ const startServer = async () => {
   try {
     await sequelize.authenticate();
     logger.info('✅ Database connection established successfully.');
+
+    // Runs in EVERY environment (unlike sync's alter below, which is
+    // dev-only for safety) — additive-only, idempotent schema patches for
+    // changes shipped since the last full alter-sync. See ensureSchema.ts
+    // for why this exists; without it, new columns/tables silently never
+    // reach production. Runs before sync so sync sees the up-to-date schema.
+    await runSchemaPatches(sequelize);
 
     // Sync models — use alter:true in dev to apply schema changes
     await sequelize.sync({ alter: process.env.NODE_ENV === 'development' });
