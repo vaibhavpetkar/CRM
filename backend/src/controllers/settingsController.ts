@@ -93,12 +93,29 @@ export const updateEnvVars = async (req: Request, res: Response) => {
       }
     });
     
-    // Update with new values
-    Object.entries(envVars).forEach(([key, value]) => {
-      if (value && value !== '•'.repeat(8)) {
+    // Update with new values. Reject anything containing a newline outright
+    // rather than writing it — a stray newline in a pasted secret would
+    // otherwise corrupt the .env file (splits into an extra, unparseable
+    // line) with no clear error, which is a much worse failure mode than
+    // just telling the admin why it wasn't accepted.
+    const badValueKeys: string[] = [];
+    Object.entries(envVars).forEach(([key, rawValue]) => {
+      const value = typeof rawValue === 'string' ? rawValue.trim() : rawValue;
+      if (!value) return;
+      if (/[\r\n]/.test(value)) {
+        badValueKeys.push(key);
+        return;
+      }
+      if (value !== '•'.repeat(8)) {
         envMap.set(key, value);
       }
     });
+
+    if (badValueKeys.length > 0) {
+      return res.status(400).json({
+        message: `These values contain a line break, which isn't allowed in a .env file (usually from pasting): ${badValueKeys.join(', ')}`,
+      });
+    }
     
     // Write back to .env file
     const newEnvContent = Array.from(envMap.entries())

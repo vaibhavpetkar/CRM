@@ -57,6 +57,12 @@ export default function DeveloperSettingsPage() {
   const router = useRouter();
   const toast = useToast();
   const [envVars, setEnvVars] = useState<Record<string, { value: string; isSet: boolean }>>({});
+  // Only fields the admin has actually typed into land here — always a
+  // clean raw string, never derived from a masked display value. This is
+  // what fixes the old bug: the old version rendered '••••••••' as the
+  // input's controlled `value`, so typing appended onto those literal dots
+  // instead of a real value, and THAT corrupted string got saved.
+  const [edits, setEdits] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -80,6 +86,7 @@ export default function DeveloperSettingsPage() {
         vars[v.key] = { value: v.value, isSet: v.isSet };
       });
       setEnvVars(vars);
+      setEdits({}); // discard any in-progress edits — we just got fresh server state
     } catch (err: any) {
       toast.error(err.message || 'Failed to load environment variables');
     } finally {
@@ -92,24 +99,41 @@ export default function DeveloperSettingsPage() {
   }, []);
 
   const handleChange = (key: string, value: string) => {
-    setEnvVars(prev => ({
-      ...prev,
-      [key]: { ...prev[key], value, isSet: Boolean(value) },
-    }));
+    setEdits((prev) => ({ ...prev, [key]: value }));
   };
+
+  const isSensitive = (key: string) => ENV_VAR_DEFINITIONS[key]?.type === 'password';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     setMessage(null);
     try {
-      // Only send values that have been changed (not masked)
       const toSend: Record<string, string> = {};
-      Object.entries(envVars).forEach(([key, { value }]) => {
-        if (value && value !== '•'.repeat(8)) {
-          toSend[key] = value;
+      Object.keys(ENV_VAR_DEFINITIONS).forEach((key) => {
+        const edited = edits[key];
+        if (isSensitive(key)) {
+          // Secret fields: the server never sends the real value back (it's
+          // masked as dots for display purposes only), so there's nothing
+          // meaningful to "resend unchanged" — only send if the admin
+          // actually typed a new one this session.
+          if (edited && edited.trim()) toSend[key] = edited.trim();
+        } else {
+          // Non-secret fields: the server does return the real current
+          // value, so send either the edited value or fall back to what's
+          // already there — either way it's always a clean value, never a
+          // masked placeholder.
+          const current = edited !== undefined ? edited : envVars[key]?.value || '';
+          if (current.trim()) toSend[key] = current.trim();
         }
       });
+
+      if (Object.keys(toSend).length === 0) {
+        toast.warning('No changes to save.');
+        setSaving(false);
+        return;
+      }
+
       await settingsApi.updateEnvVars(toSend);
       setMessage({ type: 'success', text: 'Environment variables updated. Restart containers to apply changes.' });
       toast.success('Environment variables updated successfully');
@@ -123,20 +147,22 @@ export default function DeveloperSettingsPage() {
   };
 
   const toggleVisibility = (key: string) => {
-    setShowValues(prev => ({ ...prev, [key]: !prev[key] }));
+    setShowValues((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
-  const getDisplayValue = (key: string) => {
-    const { value, isSet } = envVars[key] || { value: '', isSet: false };
-    if (!isSet) return '';
-    if (showValues[key]) return value;
-    return '•'.repeat(8);
+  // The actual value shown in the input, always clean (never mixes in a
+  // masked placeholder string with typed text).
+  const getFieldValue = (key: string): string => {
+    if (edits[key] !== undefined) return edits[key];
+    if (isSensitive(key)) return ''; // never pre-fill secrets — server doesn't give us the real value anyway
+    return envVars[key]?.value || '';
   };
 
   const getInputType = (key: string) => {
     const def = ENV_VAR_DEFINITIONS[key];
     if (!def) return 'text';
-    return showValues[key] ? def.type : 'password';
+    if (def.type !== 'password') return def.type; // text/url fields are never masked — nothing sensitive to hide
+    return showValues[key] ? 'text' : 'password'; // native browser masking — never touches the underlying value
   };
 
   return (
@@ -180,18 +206,25 @@ export default function DeveloperSettingsPage() {
                   <div className="relative">
                     <input
                       type={getInputType(key)}
-                      value={getDisplayValue(key)}
+                      value={getFieldValue(key)}
                       onChange={(e) => handleChange(key, e.target.value)}
-                      placeholder={envVars[key]?.isSet ? 'Leave empty to keep current value' : 'Enter value...'}
+                      placeholder={
+                        isSensitive(key) && envVars[key]?.isSet
+                          ? 'Currently set — leave blank to keep, or type a new value to replace it'
+                          : 'Enter value...'
+                      }
+                      autoComplete="off"
                       className="w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea]"
                     />
-                    <button
-                      type="button"
-                      onClick={() => toggleVisibility(key)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                    >
-                      {showValues[key] ? <EyeSlashIcon className="h-4 w-4" /> : <EyeIcon className="h-4 w-4" />}
-                    </button>
+                    {def.type === 'password' && (
+                      <button
+                        type="button"
+                        onClick={() => toggleVisibility(key)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                      >
+                        {showValues[key] ? <EyeSlashIcon className="h-4 w-4" /> : <EyeIcon className="h-4 w-4" />}
+                      </button>
+                    )}
                   </div>
                   <p className="text-[10px] text-slate-400">{def.description}</p>
                   {def.redirectPath && (
@@ -200,7 +233,7 @@ export default function DeveloperSettingsPage() {
                         Redirect URI — register this exactly in Google Cloud Console
                       </p>
                       <code className="block break-all text-[10px] text-slate-600">
-                        {(envVars.CLIENT_URL?.value || 'https://your-domain.com').replace(/\/$/, '')}
+                        {(getFieldValue('CLIENT_URL') || 'https://your-domain.com').replace(/\/$/, '')}
                         {def.redirectPath}
                       </code>
                     </div>
