@@ -77,5 +77,6 @@ jobs:
             sudo docker image prune -f
             
             # Update and reload host Nginx config automatically
-            sudo cp ${{ secrets.VPS_DEPLOY_PATH }}/nginx/crm.eleviq.buzz.conf /etc/nginx/sites-available/crm.eleviq.buzz
+            sudo cp ${{ secrets.VPS_DEPLOY_PATH }}/nginx/crm.inveontechnologies.in.conf /etc/nginx/sites-available/crm.inveontechnologies.in
+            sudo cp ${{ secrets.VPS_DEPLOY_PATH }}/nginx/api.inveontechnologies.in.conf /etc/nginx/sites-available/api.inveontechnologies.in
             sudo nginx -t && sudo systemctl reload nginx
