@@ -17,6 +17,8 @@ jobs:
 
       - name: Deploy to VPS
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          VPS_DEPLOY_PATH: ${{ secrets.VPS_DEPLOY_PATH }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
@@ -24,8 +26,6 @@ jobs:
           port: ${{ secrets.VPS_PORT || 22 }}
           script_stop: true
           envs: VPS_DEPLOY_PATH
-        env:
-          VPS_DEPLOY_PATH: ${{ secrets.VPS_DEPLOY_PATH }}
           script: |
             # Navigate to the project directory on the VPS
             cd ${{ secrets.VPS_DEPLOY_PATH }}
