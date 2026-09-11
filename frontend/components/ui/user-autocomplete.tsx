@@ -140,6 +140,28 @@ export default function UserAutocomplete({
     }
   };
 
+  // Every keystroke calls onChange with the raw typed text (see
+  // handleInputChange) so the field can work as a live search box — but if
+  // the user types a name and then clicks/tabs away without picking a
+  // suggestion, that free text was left sitting in the field's value and
+  // would get submitted as-is. Since this value is ultimately used as a
+  // user id (assignedToId/qualifiedById/leadOwnerId), that either 500s
+  // ("invalid input syntax for type integer") or, if it happens to look
+  // numeric, fails a foreign key check ("Referenced record does not
+  // exist"). Clear anything that was never resolved to an actual
+  // selection so only a real user id (or nothing) can reach submit.
+  const handleBlur = () => {
+    setTimeout(() => {
+      if (value !== '' && isNaN(Number(value))) {
+        onChange('');
+        setSuggestions([]);
+        setSelectedUserName('');
+      }
+      setIsOpen(false);
+      setHighlightedIndex(-1);
+    }, 150);
+  };
+
   const clearInput = () => {
     onChange('');
     setSuggestions([]);
@@ -167,6 +189,7 @@ export default function UserAutocomplete({
           value={displayValue}
           onChange={handleInputChange}
           onFocus={handleFocus}
+          onBlur={handleBlur}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           disabled={disabled}

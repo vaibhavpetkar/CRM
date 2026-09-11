@@ -9,6 +9,7 @@ import Deal from '../models/Deal';
 import Attachment from '../models/Attachment';
 import Task from '../models/Task';
 import ActivityLog from '../models/ActivityLog';
+import User from '../models/User';
 import leadRepository from '../repositories/LeadRepository';
 import { ListQueryParams } from '../repositories/BaseRepository';
 import { generateCode } from '../utils/codeGenerator';
@@ -45,6 +46,46 @@ export interface CreateLeadInput {
 // generic "updated" one, because they represent a meaningful business event.
 const STATUS_FIELD = 'status';
 const ASSIGNEE_FIELD = 'assignedToId';
+
+// User-reference fields on Lead (all FK -> users.id). Left unchecked, a bad
+// value here (a non-numeric string from a search box the user never picked a
+// suggestion from, or a stale/nonexistent id from a CSV import) reaches
+// Postgres and surfaces as either an unhandled 500 ("invalid input syntax
+// for type integer") or a vague, un-actionable 400 ("Referenced record does
+// not exist") that doesn't say which field was the problem. Validating here
+// first turns both into a specific, correctable 422.
+const USER_REF_FIELD_LABELS: Record<string, string> = {
+  leadOwnerId: 'Lead Owner',
+  assignedToId: 'Assigned To',
+  qualifiedById: 'Qualified By',
+};
+
+const validateUserReferences = async (data: Record<string, unknown>) => {
+  const fields = Object.keys(USER_REF_FIELD_LABELS).filter(
+    (field) => data[field] !== undefined && data[field] !== null
+  );
+  if (fields.length === 0) return;
+
+  const invalid = fields.filter((field) => !Number.isInteger(Number(data[field])) || Number(data[field]) <= 0);
+  if (invalid.length > 0) {
+    throw new ValidationError(
+      `${USER_REF_FIELD_LABELS[invalid[0]]} must be a valid user`,
+      invalid.map((field) => ({ field, message: `"${data[field]}" is not a valid user id` }))
+    );
+  }
+
+  const ids = [...new Set(fields.map((field) => Number(data[field])))];
+  const existingUsers = await User.findAll({ where: { id: ids }, attributes: ['id'] });
+  const existingIds = new Set(existingUsers.map((u) => u.id));
+
+  const missing = fields.filter((field) => !existingIds.has(Number(data[field])));
+  if (missing.length > 0) {
+    throw new ValidationError(
+      `${USER_REF_FIELD_LABELS[missing[0]]} does not match an existing user`,
+      missing.map((field) => ({ field, message: `User ${data[field]} was not found` }))
+    );
+  }
+};
 
 // Serializes a lead to match the shape the frontend already expects (see the
 // original leadController), plus the new doctype fields/child tables.
@@ -107,6 +148,7 @@ class LeadService {
       'noOfEmployees', 'leadOwnerId', 'assignedToId', 'qualifiedById',
       'latitude', 'longitude', 'value', 'score',
     ]);
+    await validateUserReferences(data);
 
     // '' is falsy but not null/undefined, so the `??` defaults below wouldn't
     // catch it — Sequelize's isEmail validator rejects an empty string even
@@ -233,6 +275,7 @@ class LeadService {
       'noOfEmployees', 'leadOwnerId', 'assignedToId', 'qualifiedById',
       'latitude', 'longitude', 'value', 'score',
     ]);
+    await validateUserReferences(data);
 
     if (data.email === '') data.email = null;
     if (data.secondaryEmail === '') data.secondaryEmail = null;
