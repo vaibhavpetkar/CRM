@@ -76,7 +76,16 @@ jobs:
             # Prune unused images to save disk space
             sudo docker image prune -f
             
-            # Update and reload host Nginx config automatically
-            sudo cp ${{ secrets.VPS_DEPLOY_PATH }}/nginx/crm.inveontechnologies.in.conf /etc/nginx/sites-available/crm.inveontechnologies.in
-            sudo cp ${{ secrets.VPS_DEPLOY_PATH }}/nginx/api.inveontechnologies.in.conf /etc/nginx/sites-available/api.inveontechnologies.in
-            sudo nginx -t && sudo systemctl reload nginx
+            # NOTE: routing for crm.inveontechnologies.in and
+            # api.inveontechnologies.in is handled by the separate
+            # containerized nginx in the inveontechnologies-website repo
+            # (nginx/inveontechnologies.in.conf, built into its own Docker
+            # image and bound to host ports 80/443 — confirmed via
+            # `ss -tlnp`, which showed only docker-proxy on those ports).
+            # There is no host-installed nginx on this VPS (`/etc/nginx`
+            # doesn't exist), so this step used to fail every deploy trying
+            # to write to /etc/nginx/sites-available. The nginx/*.conf files
+            # in this repo are unused leftovers from an earlier host-nginx
+            # setup; if that setup is ever reintroduced, this step (and a
+            # sites-enabled symlink step, which was also missing) would need
+            # to come back too.
