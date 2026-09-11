@@ -38,6 +38,16 @@ export default function UserAutocomplete({
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
+  // handleSelect below calls onChange(suggestion.id) then immediately
+  // inputRef.current?.blur() in the same synchronous tick, before React has
+  // re-rendered with the new value — so a blur handler that reads `value`
+  // from its own closure still sees the pre-selection typed text. Mirroring
+  // the latest value into a ref (kept current via the effect below) lets
+  // handleBlur's setTimeout read the real, up-to-date value instead.
+  const valueRef = useRef(value);
+  useEffect(() => {
+    valueRef.current = value;
+  }, [value]);
 
   const fetchSuggestions = useCallback(async (query: string) => {
     if (query.length < 2) {
@@ -152,7 +162,8 @@ export default function UserAutocomplete({
   // selection so only a real user id (or nothing) can reach submit.
   const handleBlur = () => {
     setTimeout(() => {
-      if (value !== '' && isNaN(Number(value))) {
+      const current = valueRef.current;
+      if (current !== '' && isNaN(Number(current))) {
         onChange('');
         setSuggestions([]);
         setSelectedUserName('');
