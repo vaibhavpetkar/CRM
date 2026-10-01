@@ -7,6 +7,14 @@ import Deal from '../models/Deal';
 import Contact from '../models/Contact';
 import { sendMeetingInviteEmail } from '../utils/mailer';
 import { createMeetLink } from '../services/googleMeetService';
+import { findInvalidReference } from '../utils/referenceValidation';
+
+const REFERENCE_FIELDS = {
+  leadId: { label: 'Lead', model: Lead },
+  dealId: { label: 'Deal', model: Deal },
+  contactId: { label: 'Contact', model: Contact },
+  assignedToId: { label: 'Assigned To', model: User },
+};
 
 // Included whenever a Meeting is fetched so the API returns the linked
 // Lead/Deal/Contact record itself, not just a typed-in "client" string.
@@ -86,6 +94,9 @@ export const createMeeting = async (req: Request, res: Response) => {
     const { title, client, leadId, dealId, contactId, date, time, duration, type, status, notes, assignedToId, customerEmail, ccEmails } = req.body;
     if (!title || !date) return res.status(400).json({ message: 'Title and date are required' });
 
+    const badReference = await findInvalidReference(req.body, REFERENCE_FIELDS);
+    if (badReference) return res.status(422).json({ message: badReference });
+
     const normalizedCc: string[] = Array.isArray(ccEmails) ? ccEmails.filter((e: unknown) => typeof e === 'string' && e.trim()) : [];
 
     // Best-effort real Google Meet link for video meetings — never blocks
@@ -157,6 +168,9 @@ export const updateMeeting = async (req: Request, res: Response) => {
     if (!meeting) return res.status(404).json({ message: 'Meeting not found' });
 
     const { title, client, leadId, dealId, contactId, date, time, duration, type, status, notes, assignedToId, customerEmail, ccEmails } = req.body;
+
+    const badReference = await findInvalidReference(req.body, REFERENCE_FIELDS);
+    if (badReference) return res.status(422).json({ message: badReference });
 
     // duration is stored as STRING in DB (e.g. "60" or "1h"), so don't parse as number.
     // Just validate it's a non-empty string if provided.
