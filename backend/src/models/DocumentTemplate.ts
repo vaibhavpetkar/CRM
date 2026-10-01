@@ -14,6 +14,9 @@ interface DocumentTemplateAttributes {
   name: string;
   docType: string; // 'quote' | 'invoice' | 'task' | 'meeting'
   purpose: string; // 'email' | 'print'
+  // Drag-and-drop builder design (JSON). htmlBody is always the rendered
+  // result, so printing never needs to understand the layout itself.
+  layout?: string | null;
   subject: string; // supports {{field}} placeholders too
   htmlBody: string;
   isDefault: boolean;
@@ -30,6 +33,7 @@ class DocumentTemplate
   public name!: string;
   public docType!: string;
   public purpose!: string;
+  public layout?: string | null;
   public subject!: string;
   public htmlBody!: string;
   public isDefault!: boolean;
@@ -45,6 +49,7 @@ DocumentTemplate.init(
     name: { type: DataTypes.STRING(255), allowNull: false },
     docType: { type: DataTypes.STRING(30), allowNull: false },
     purpose: { type: DataTypes.STRING(20), allowNull: false, defaultValue: 'email' },
+    layout: { type: DataTypes.TEXT, allowNull: true },
     subject: { type: DataTypes.STRING(500), allowNull: false, defaultValue: '' },
     htmlBody: { type: DataTypes.TEXT('long'), allowNull: false, defaultValue: '' },
     isDefault: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },

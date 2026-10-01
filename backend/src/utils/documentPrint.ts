@@ -185,8 +185,12 @@ export const buildQuoteData = async (quoteOrId: Quote | number | string): Promis
 };
 
 export const buildInvoiceData = async (id: number | string): Promise<Data> => {
+  // Invoices that carry their own line items (products/taxes associations)
+  // print those; otherwise they fall back to the quote they were raised from.
+  const ownLines = ['products', 'taxes'].filter((a) => a in Invoice.associations).map((association) => ({ association, required: false }));
   const invoice = await Invoice.findByPk(id, {
     include: [
+      ...ownLines,
       {
         model: Quote,
         as: 'quoteRef',
@@ -208,17 +212,18 @@ export const buildInvoiceData = async (id: number | string): Promise<Data> => {
   const total = Number(plain.amount) || 0;
   const paid = (plain.payments || []).reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0);
 
-  // Invoices carry their line items through the quote they were raised from.
-  // A stand-alone invoice prints as a single line for its full amount.
-  const child = quote
-    ? quoteChildData(quote.products || [], quote.taxes || [], currency)
+  // Where the commercials come from: the invoice itself, its quote, or (a
+  // stand-alone invoice with no lines) a single line for its full amount.
+  const source: any = plain.products?.length ? plain : quote?.products?.length ? quote : null;
+  const child = source
+    ? quoteChildData(source.products || [], source.taxes || [], currency)
     : {
         items: [{ item_name: `Invoice ${plain.invoiceNumber}`, quantity: '1', unit: '', rate: money(total, currency), amount: money(total, currency) }],
         taxes: [],
       };
-  const subtotal = quote ? Number(quote.subtotal) || 0 : total;
-  const discountValue = quote ? Number(quote.discountValue) || 0 : 0;
-  const discountAmount = !discountValue ? 0 : quote.discountType === 'percentage' ? (subtotal * discountValue) / 100 : discountValue;
+  const subtotal = source ? Number(source.subtotal) || 0 : total;
+  const discountValue = source ? Number(source.discountValue) || 0 : 0;
+  const discountAmount = !discountValue ? 0 : source.discountType === 'percentage' ? (subtotal * discountValue) / 100 : discountValue;
 
   return withReadyMadeTables({
     ...companyData(company),
@@ -228,17 +233,17 @@ export const buildInvoiceData = async (id: number | string): Promise<Data> => {
     due_date: formatLongDate(plain.dueDate),
     status: plain.status,
     quote_number: quote?.quoteNumber || '',
-    terms: quote?.terms || '',
-    payment_terms: quote?.paymentTerms || '',
+    terms: plain.terms || quote?.terms || '',
+    payment_terms: plain.paymentTerms || quote?.paymentTerms || '',
     client_name: plain.client,
     customer_email: plain.customerEmail || '',
     customer_phone: plain.customerPhone || '',
     customer_address: plain.customerAddress || '',
     subtotal: money(subtotal, currency),
     discount_amount: moneyOrBlank(discountAmount, currency),
-    discount_label: quote?.discountType === 'percentage' ? `Discount (${discountValue}%)` : 'Discount',
-    shipping_charges: moneyOrBlank(quote?.shippingCharges, currency),
-    tax_total: money(quote?.taxTotal, currency),
+    discount_label: source?.discountType === 'percentage' ? `Discount (${discountValue}%)` : 'Discount',
+    shipping_charges: moneyOrBlank(source?.shippingCharges, currency),
+    tax_total: money(source?.taxTotal, currency),
     total_amount: money(total, currency),
     amount_paid: money(paid, currency),
     amount_due: money(Math.max(total - paid, 0), currency),

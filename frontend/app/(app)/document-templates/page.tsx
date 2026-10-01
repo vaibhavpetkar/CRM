@@ -1,13 +1,14 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import PageHeader from '@/components/ui/page-header';
 import Button from '@/components/ui/button';
 import Card from '@/components/ui/card';
 import LoadingSpinner from '@/components/ui/loading-spinner';
 import { documentTemplatesApi, openPrintWindow, DocumentTemplate, DocTypeOption, MergeField, MergeList, TemplatePurpose } from '@/lib/api';
 import { renderTemplate, wrapPrintPreview } from '@/lib/template-render';
-import { PlusIcon, XMarkIcon, PencilSquareIcon, TrashIcon, DocumentTextIcon, PrinterIcon, EnvelopeIcon, DocumentDuplicateIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, XMarkIcon, PencilSquareIcon, TrashIcon, DocumentTextIcon, PrinterIcon, EnvelopeIcon, DocumentDuplicateIcon, Squares2X2Icon, CodeBracketIcon } from '@heroicons/react/24/outline';
 import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
 import { useToast } from '@/components/ui/toast';
 import { cn } from '@/lib/utils';
@@ -29,6 +30,7 @@ const PURPOSE_TABS: { value: TemplatePurpose; label: string; icon: typeof Printe
 
 export default function DocumentTemplatesPage() {
   const toast = useToast();
+  const router = useRouter();
   const [templates, setTemplates] = useState<DocumentTemplate[]>([]);
   const [docTypes, setDocTypes] = useState<DocTypeOption[]>([]);
   const [purpose, setPurpose] = useState<TemplatePurpose>('print');
@@ -87,7 +89,18 @@ export default function DocumentTemplatesPage() {
       <PageHeader
         title="Document Templates"
         description="HTML+CSS templates with {{field}} placeholders for printing and emailing your documents."
-        actions={<Button size="sm" onClick={() => setEditing({ template: null })}><PlusIcon className="h-4 w-4" /> New {purpose === 'print' ? 'Print Format' : 'Email Template'}</Button>}
+        actions={
+          purpose === 'print' ? (
+            <div className="flex gap-2">
+              <Button size="sm" variant="secondary" onClick={() => setEditing({ template: null })}><CodeBracketIcon className="h-4 w-4" /> New in HTML</Button>
+              <Button size="sm" onClick={() => router.push(`/document-templates/builder${filterDocType !== 'all' ? `?docType=${filterDocType}` : ''}`)}>
+                <Squares2X2Icon className="h-4 w-4" /> New Print Format
+              </Button>
+            </div>
+          ) : (
+            <Button size="sm" onClick={() => setEditing({ template: null })}><PlusIcon className="h-4 w-4" /> New Email Template</Button>
+          )
+        }
       />
 
       <div className="mb-3 flex gap-1 border-b border-slate-200">
@@ -128,7 +141,7 @@ export default function DocumentTemplatesPage() {
         <Card>
           <p className="py-6 text-center text-slate-400">
             {purpose === 'print'
-              ? 'No print formats yet, so documents print with the standard layout. Click "New Print Format" to customise it.'
+              ? 'No print formats yet, so documents print with the standard layout. Click "New Print Format" to design one with drag and drop.'
               : 'No email templates yet. Click "New Email Template" to create one.'}
           </p>
         </Card>
@@ -142,7 +155,12 @@ export default function DocumentTemplatesPage() {
                   <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">{docTypeLabel(template.docType)}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button onClick={() => setEditing({ template })} className="text-slate-400 hover:text-[var(--primary)]" aria-label="Edit" title="Edit">
+                  <button
+                    onClick={() => (template.layout ? router.push(`/document-templates/builder?id=${template.id}`) : setEditing({ template }))}
+                    className="text-slate-400 hover:text-[var(--primary)]"
+                    aria-label="Edit"
+                    title={template.layout ? 'Edit in the drag and drop builder' : 'Edit'}
+                  >
                     <PencilSquareIcon className="h-4 w-4" />
                   </button>
                   <button onClick={() => setEditing({ template: null, copyOf: template })} className="text-slate-400 hover:text-[var(--primary)]" aria-label="Duplicate" title="Duplicate">
@@ -158,6 +176,14 @@ export default function DocumentTemplatesPage() {
                 {template.isDefault && <StarIconSolid className="h-3.5 w-3.5 text-amber-400" title="Default template" />}
               </h3>
               {template.purpose !== 'print' && <p className="mt-1 truncate text-xs text-slate-500">{template.subject || 'No subject set'}</p>}
+              {template.purpose === 'print' && (
+                <p className="mt-1 flex items-center gap-2 text-xs text-slate-500">
+                  {template.layout ? 'Drag and drop design' : 'HTML template'}
+                  {template.layout && (
+                    <button onClick={() => setEditing({ template })} className="text-[11px] text-slate-400 hover:text-[#168eea]">Edit HTML</button>
+                  )}
+                </p>
+              )}
               {template.isDefault ? (
                 <p className="mt-2 text-[11px] font-medium text-amber-600">In use: the default for {docTypeLabel(template.docType)}</p>
               ) : (
@@ -311,7 +337,9 @@ function TemplateEditorModal({
 
     setSubmitting(true);
     try {
-      const payload = { name: name.trim(), docType, purpose, subject: purpose === 'print' ? '' : subject, htmlBody, isDefault };
+      // A duplicate of a builder design stays a builder design as long as its HTML wasn't hand-edited.
+      const keepLayout = !template && copyOf?.layout && htmlBody === copyOf.htmlBody ? copyOf.layout : undefined;
+      const payload = { name: name.trim(), docType, purpose, subject: purpose === 'print' ? '' : subject, htmlBody, isDefault, layout: keepLayout };
       if (template) {
         await documentTemplatesApi.updateTemplate(template.id, payload);
       } else {
@@ -389,6 +417,12 @@ function TemplateEditorModal({
                   ? `Use as the default print format for ${docLabel}`
                   : `Use as the default email for ${docLabel} (this is what actually gets sent)`}
               </label>
+
+              {template?.layout && (
+                <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-2 text-[11px] text-amber-700">
+                  This format was designed with drag and drop. Saving changes to its HTML here turns it into a plain HTML template, and it will no longer open in the builder.
+                </p>
+              )}
 
               {purpose === 'email' && (
                 <div className="mt-4">

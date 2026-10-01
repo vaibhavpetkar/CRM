@@ -19,6 +19,20 @@ const knownKeys = (docType: DocType) => {
   return keys;
 };
 
+/** Builder layouts arrive as objects or JSON strings; stored as JSON text, null when absent or invalid. */
+const normalizeLayout = (layout: unknown): string | null => {
+  if (layout === undefined || layout === null || layout === '') return null;
+  if (typeof layout === 'string') {
+    try {
+      JSON.parse(layout);
+      return layout;
+    } catch {
+      return null;
+    }
+  }
+  return JSON.stringify(layout);
+};
+
 const sendError = (res: Response, error: unknown, fallback: string) => {
   if (error instanceof AppError) return res.status(error.statusCode).json({ message: error.message });
   console.error(fallback, error);
@@ -103,6 +117,7 @@ export const createTemplate = async (req: Request & { user?: any }, res: Respons
       purpose,
       subject: subject || '',
       htmlBody: htmlBody || '',
+      layout: normalizeLayout(req.body.layout),
       isDefault: !!isDefault,
       createdById: req.user?.id || null,
     });
@@ -131,6 +146,9 @@ export const updateTemplate = async (req: Request, res: Response) => {
     if (name !== undefined) template.name = String(name).trim();
     if (subject !== undefined) template.subject = subject;
     if (htmlBody !== undefined) template.htmlBody = htmlBody;
+    // Editing the HTML by hand detaches it from a builder design, unless a new design is sent with it.
+    if (req.body.layout !== undefined) template.layout = normalizeLayout(req.body.layout);
+    else if (htmlBody !== undefined && htmlBody !== template.previous('htmlBody')) template.layout = null;
     if (isDefault !== undefined) template.isDefault = !!isDefault;
 
     await template.save();
@@ -195,6 +213,19 @@ export const printDocument = async (req: Request, res: Response) => {
     return res.send(html);
   } catch (error) {
     return sendError(res, error, 'Server error while rendering the print format');
+  }
+};
+
+/** A record's merge data as JSON, so the print builder canvas can show real values. */
+export const getRecordData = async (req: Request, res: Response) => {
+  try {
+    const docType = req.params.docType as DocType;
+    if (!VALID_DOC_TYPES.includes(docType)) return res.status(400).json({ message: `Unknown document type '${docType}'.` });
+    const data = await buildDocumentData(docType, req.params.id);
+    const plain = Object.fromEntries(Object.entries(data).map(([k, v]) => [k, v && typeof v === 'object' && !Array.isArray(v) ? String(v) : v]));
+    return res.json({ data: plain });
+  } catch (error) {
+    return sendError(res, error, 'Server error while loading the record');
   }
 };
 

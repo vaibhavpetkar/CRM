@@ -897,6 +897,8 @@ export interface DocumentTemplate {
   name: string;
   docType: string;
   purpose: TemplatePurpose;
+  /** Drag-and-drop builder design (JSON), when the print format was made in the builder. */
+  layout?: string | null;
   subject: string;
   htmlBody: string;
   isDefault: boolean;
@@ -926,6 +928,8 @@ export const documentTemplatesApi = {
   /** Full print-ready page for an unsaved template (sample data, or a real record when recordId is set). */
   previewPage: async (data: { docType: string; htmlBody: string; recordId?: string | number; autoPrint?: boolean }) =>
     request<string>('/document-templates/preview-page', { method: 'POST', body: JSON.stringify(data) }),
+  /** A record's merge data, for showing real values in the print builder. */
+  getRecordData: async (docType: string, id: string | number) => request<{ data: Record<string, unknown> }>(`/document-templates/data/${docType}/${id}`),
   /** Print view of a real record, using templateId, else the default print format, else the built-in layout. */
   getPrintHtml: async (docType: PrintDocType, id: string | number, templateId?: string | number | null) =>
     request<string>(`/document-templates/print/${docType}/${id}?autoPrint=1${templateId ? `&templateId=${templateId}` : ''}`),

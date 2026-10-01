@@ -25,6 +25,7 @@ router.post('/preview-page', protect, authorize('document_templates:read'), docu
 // Printing a record is gated by that record's own read permission, not by
 // access to the template editor — anyone who can open an invoice can print it.
 router.get('/print/:docType/:id', protect, authorizePrint, documentTemplateController.printDocument);
+router.get('/data/:docType/:id', protect, authorize('document_templates:read'), authorizePrint, documentTemplateController.getRecordData);
 
 router.get('/', protect, authorize('document_templates:read'), documentTemplateController.getTemplates);
 router.get('/:id', protect, authorize('document_templates:read'), documentTemplateController.getTemplate);
