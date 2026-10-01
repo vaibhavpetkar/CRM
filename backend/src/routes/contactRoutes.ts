@@ -16,11 +16,14 @@ router.get(
 
 // Item 8: relationship graph — same reason, must precede /:id.
 router.get('/relationships', protect, authorize('contacts:read'), contactController.getContactRelationships);
+// Company page (?name=) — also must precede /:id.
+router.get('/company-profile', protect, authorize('contacts:read'), contactController.getCompanyProfile);
 
 // Contact CRUD routes
 router.get('/', protect, authorize('contacts:read'), contactController.getContacts);
 router.post('/', protect, authorize('contacts:create'), contactController.createContact);
 router.get('/:id', protect, authorize('contacts:read'), contactController.getContactById);
+router.get('/:id/related', protect, authorize('contacts:read'), contactController.getRelatedForContact);
 router.put('/:id', protect, authorize('contacts:update'), contactController.updateContact);
 router.delete('/:id', protect, authorize('contacts:delete'), contactController.deleteContact);
 

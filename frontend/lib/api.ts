@@ -379,6 +379,18 @@ export const contactsApi = {
       edges: { source: string; target: string; type: 'company' | 'phone' | 'email' }[];
       totalContacts: number;
     }>('/contacts/relationships'),
+  // Colleagues at the same company, contacts sharing a phone/email, and the
+  // company's leads and deals — for the contact detail panel.
+  getRelated: async (id: string | number) =>
+    request<{ company: string | null; sameCompany: any[]; sharedPhone: any[]; sharedEmail: any[]; leads: any[]; deals: any[] }>(
+      `/contacts/${id}/related`
+    ),
+  getContact: async (id: string | number) => request<any>(`/contacts/${id}`),
+  // Company page: everything linked to one company name.
+  getCompanyProfile: async (name: string) =>
+    request<{ name: string; contacts: any[]; leads: any[]; deals: any[] }>(
+      `/contacts/company-profile?name=${encodeURIComponent(name)}`
+    ),
   getContacts: async (params: { page?: number; limit?: number; search?: string; source?: string; leadId?: number | string } = {}) => {
     const query = new URLSearchParams();
     if (params.page) query.append('page', String(params.page));

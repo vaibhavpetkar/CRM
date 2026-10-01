@@ -9,7 +9,9 @@ import { ANNUAL_TURNOVER_OPTIONS, INDUSTRY_OPTIONS, DESIGNATION_OPTIONS, TERRITO
 import Button from '@/components/ui/button';
 import Card from '@/components/ui/card';
 import DataTable from '@/components/ui/data-table';
+import Link from 'next/link';
 import CompanyAutocomplete from '@/components/ui/company-autocomplete';
+import { companyHref } from '@/components/contacts/related-records';
 import AISummaryPanel from '@/components/ui/ai-summary-panel';
 import SearchableSelect from '@/components/ui/searchable-select';
 import { ArrowLeftIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
@@ -372,7 +374,14 @@ export default function LeadDetailsPage() {
               <h4 className="mb-3 border-b border-slate-100 pb-2 text-sm font-semibold text-slate-900">Company Details</h4>
               <div className="grid grid-cols-3 gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700">Company Name</label>
+                  <label className="flex items-center justify-between text-sm font-medium text-slate-700">
+                    Company Name
+                    {formData.company && (
+                      <Link href={companyHref(formData.company)} className="text-xs font-medium text-[#168eea] hover:underline">
+                        View company →
+                      </Link>
+                    )}
+                  </label>
                   <CompanyAutocomplete
                     value={formData.company || ''}
                     onChange={(val) => setFormData({ ...formData, company: val })}
