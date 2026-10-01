@@ -13,6 +13,7 @@ import { getStoredUser } from '@/lib/api';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { PlusIcon, XMarkIcon, ClockIcon, ExclamationTriangleIcon, CheckCircleIcon, EllipsisVerticalIcon } from '@heroicons/react/24/outline';
 import { useToast } from '@/components/ui/toast';
+import PrintButton from '@/components/ui/print-button';
 
 // Task 4.8: Task Type dropdown, reordered — Call, Email, Online Meeting, In
 // Person Meeting, Field Visit.
@@ -298,6 +299,7 @@ export default function TasksPage() {
                 <div className="flex items-center gap-2">
                   <StatusBadge status={task.priority} />
                   <StatusBadge status={task.status} />
+                  <PrintButton docType="task" id={task.id} variant="icon" />
                   <div className="relative">
                     <button
                       onClick={(e) => {

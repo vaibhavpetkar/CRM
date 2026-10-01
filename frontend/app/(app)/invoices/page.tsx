@@ -15,6 +15,7 @@ import ImportExportButtons from '@/components/ui/import-export-buttons';
 import { INVOICE_FIELDS } from '@/lib/import-export/field-configs';
 import { PlusIcon, XMarkIcon, TrashIcon, PencilSquareIcon } from '@heroicons/react/24/outline';
 import { useToast } from '@/components/ui/toast';
+import PrintButton from '@/components/ui/print-button';
 
 const emptyForm = { 
   client: '', 
@@ -223,6 +224,7 @@ export default function InvoicesPage() {
               <button onClick={() => openEdit(invoice)} className="text-slate-400 hover:text-[#168eea]" aria-label="Edit">
                 <PencilSquareIcon className="h-4 w-4" />
               </button>
+              <PrintButton docType="invoice" id={invoice.id} variant="icon" />
               <button onClick={() => handleDelete(invoice)} className="text-slate-400 hover:text-red-600" aria-label="Delete">
                 <TrashIcon className="h-4 w-4" />
               </button>

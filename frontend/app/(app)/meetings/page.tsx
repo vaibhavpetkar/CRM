@@ -14,6 +14,7 @@ import ImportExportButtons from '@/components/ui/import-export-buttons';
 import { MEETING_FIELDS } from '@/lib/import-export/field-configs';
 import { PlusIcon, VideoCameraIcon, MapPinIcon, PhoneIcon, XMarkIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { useToast } from '@/components/ui/toast';
+import PrintButton from '@/components/ui/print-button';
 
 const emptyForm = {
   title: '',
@@ -174,6 +175,7 @@ export default function MeetingsPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <StatusBadge status={meeting.status} />
+                  <PrintButton docType="meeting" id={meeting.id} variant="icon" />
                   <button onClick={() => handleDelete(meeting)} className="text-slate-300 hover:text-red-600" aria-label="Delete meeting">
                     <TrashIcon className="h-4 w-4" />
                   </button>

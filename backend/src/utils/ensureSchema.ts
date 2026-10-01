@@ -103,6 +103,12 @@ const SCHEMA_PATCHES: { name: string; sql: string }[] = [
     sql: `CREATE INDEX IF NOT EXISTS "document_templates_doc_type" ON "document_templates" ("docType");`,
   },
   {
+    // Document templates can now be print formats as well as emails; every
+    // template that existed before this was an email template.
+    name: 'document_templates.purpose',
+    sql: `ALTER TABLE "document_templates" ADD COLUMN IF NOT EXISTS "purpose" VARCHAR(20) NOT NULL DEFAULT 'email';`,
+  },
+  {
     // The sales forecast reads this to place won deals in the month they
     // actually closed; the Deal model now stamps it on every stage change.
     name: 'deals.actualCloseDate',

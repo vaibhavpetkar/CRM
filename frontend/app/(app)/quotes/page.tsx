@@ -13,8 +13,9 @@ import { formatCurrency } from '@/lib/utils';
 import { getCachedCurrency } from '@/lib/currency';
 import { quotesApi, aiApi } from '@/lib/api';
 import Link from 'next/link';
-import { PlusIcon, XMarkIcon, TrashIcon, PaperAirplaneIcon, PrinterIcon, SparklesIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, XMarkIcon, TrashIcon, PaperAirplaneIcon, SparklesIcon } from '@heroicons/react/24/outline';
 import { useToast } from '@/components/ui/toast';
+import PrintButton from '@/components/ui/print-button';
 
 const emptyForm = { deal: '', client: '', customerEmail: '', customerPhone: '', customerAddress: '', amount: '', status: 'draft', validUntil: '' };
 
@@ -243,10 +244,8 @@ export default function QuotesPage() {
               <button onClick={() => openSendModal(quote)} className="text-slate-400 hover:text-[#168eea]" aria-label="Send">
                 <PaperAirplaneIcon className="h-4 w-4" />
               </button>
-              {/* Task 3.1: Print Format — opens the quote detail page's print view directly */}
-              <Link href={`/quotes/${quote.id}?print=1`} className="text-slate-400 hover:text-[#168eea]" aria-label="Print">
-                <PrinterIcon className="h-4 w-4" />
-              </Link>
+              {/* Prints with the quote's print format (Document Templates > Print Format) */}
+              <PrintButton docType="quote" id={quote.id} variant="icon" />
               <button onClick={() => handleDelete(quote)} className="text-slate-400 hover:text-red-600" aria-label="Delete">
                 <TrashIcon className="h-4 w-4" />
               </button>

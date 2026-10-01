@@ -91,8 +91,8 @@ export const downloadQuotePdf = asyncHandler(async (req: AuthRequest, res: Respo
 });
 
 export const printQuote = asyncHandler(async (req: AuthRequest, res: Response) => {
-  const html = await quoteService.getPrintHtml(req.params.id);
-  res.setHeader('Content-Type', 'text/html');
+  const html = await quoteService.getPrintHtml(req.params.id, (req.query.templateId as string) || null);
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
   return res.send(html);
 });
 

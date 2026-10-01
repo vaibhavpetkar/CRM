@@ -16,12 +16,11 @@ import { generateCode } from '../utils/codeGenerator';
 import { logActivity, getTimeline } from './activityLogger';
 import { notifyUser } from '../utils/notificationService';
 import { generateDocumentPdf, PrintableDocument } from '../utils/pdfGenerator';
-import { renderPrintHtml } from '../utils/printFormat';
+import { renderDocumentPrint, buildQuoteData, formatLongDate } from '../utils/documentPrint';
 import { sendMailWithAttachment } from '../utils/mailer';
 import { sanitizeDateFields } from '../utils/sanitize';
 import DocumentTemplate from '../models/DocumentTemplate';
 import { renderTemplate } from '../utils/templateRenderer';
-import { formatMoney } from '../utils/format';
 import path from 'path';
 import crypto from 'crypto';
 import { NotFoundError, ConflictError, ValidationError } from '../errors/AppError';
@@ -333,11 +332,9 @@ class QuoteService {
     return pdfPath;
   }
 
-  async getPrintHtml(id: number | string): Promise<string> {
-    const quote = await quoteRepository.getByIdWithDetails(id);
-    if (!quote) throw new NotFoundError('Quote', id);
-    const doc = await this.buildPrintableDocument(quote);
-    return renderPrintHtml(doc);
+  /** Honours the default "Print Format" template under Document Templates, else the built-in layout. */
+  async getPrintHtml(id: number | string, templateId?: number | string | null): Promise<string> {
+    return renderDocumentPrint('quote', id, { templateId });
   }
 
   /**
@@ -349,9 +346,7 @@ class QuoteService {
   async getPublicPrintHtml(token: string): Promise<string> {
     const quote = await Quote.findOne({ where: { publicToken: token } });
     if (!quote) throw new NotFoundError('Quote', token);
-    const full = await quoteRepository.getByIdWithDetails(quote.id);
-    const doc = await this.buildPrintableDocument(full!);
-    return renderPrintHtml(doc);
+    return renderDocumentPrint('quote', quote.id);
   }
 
   /**
@@ -710,7 +705,8 @@ class QuoteService {
     const company = await Company.findOne({ order: [['id', 'ASC']] });
     const companyName = company?.name || 'Our Company';
 
-    const template = await DocumentTemplate.findOne({ where: { docType: 'quote', isDefault: true } });
+    // Only email templates — a default print format must never be mailed as the body.
+    const template = await DocumentTemplate.findOne({ where: { docType: 'quote', purpose: 'email', isDefault: true } });
     if (!template) {
       return {
         subject: `Quotation ${quote.quoteNumber} from ${companyName}`,
@@ -718,20 +714,12 @@ class QuoteService {
       };
     }
 
-    const data = {
-      quote_number: quote.quoteNumber,
-      client_name: quote.client,
-      customer_email: quote.customerEmail || '',
-      company_name: companyName,
-      total_amount: formatMoney(Number(quote.amount), company?.currency || 'USD'),
-      valid_until: quote.validUntil ? new Date(quote.validUntil).toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' }) : '',
-      sent_date: new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' }),
-      status: quote.status,
-    };
+    const data = { ...(await buildQuoteData(quote)), sent_date: formatLongDate(new Date()) };
 
     return {
       subject: renderTemplate(template.subject, data) || `Quotation ${quote.quoteNumber} from ${companyName}`,
-      html: renderTemplate(template.htmlBody, data),
+      // Escaped: customer-entered values (client name, address) must not inject markup into the email.
+      html: renderTemplate(template.htmlBody, data, { escapeHtml: true }),
     };
   }
 

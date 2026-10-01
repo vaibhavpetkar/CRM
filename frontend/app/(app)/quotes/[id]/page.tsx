@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { quotesApi } from '@/lib/api';
+import { quotesApi, documentTemplatesApi, openPrintWindow } from '@/lib/api';
 import Button from '@/components/ui/button';
 import Card from '@/components/ui/card';
 import StatusBadge from '@/components/ui/status-badge';
@@ -13,6 +13,7 @@ import ItemAutocomplete, { ItemSuggestion } from '@/components/ui/item-autocompl
 import { formatCurrency } from '@/lib/utils';
 import { ArrowLeftIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { useToast } from '@/components/ui/toast';
+import PrintButton from '@/components/ui/print-button';
 import { useKeyboardShortcuts } from '@/lib/hooks/useKeyboardShortcuts';
 
 type LineItem = { itemId: number | ''; productName: string; quantity: number; unit: string; rate: number };
@@ -66,12 +67,14 @@ export default function QuoteDetailPage() {
     fetchQuote();
   }, [fetchQuote]);
 
-  // Task 3.1: "Print Format" action links here with ?print=1 — auto-open the
-  // browser print dialog once the quote data has actually loaded.
+  // Old "?print=1" links (the list's print icon used to come here): open the
+  // real print format once instead of printing this edit form. Runs without a
+  // click, so a blocked pop-up is expected; the Print button still works.
+  const printedFromLink = useRef(false);
   useEffect(() => {
-    if (!loading && quote && searchParams.get('print') === '1') {
-      const t = setTimeout(() => window.print(), 300);
-      return () => clearTimeout(t);
+    if (!loading && quote && searchParams.get('print') === '1' && !printedFromLink.current) {
+      printedFromLink.current = true;
+      openPrintWindow(documentTemplatesApi.getPrintHtml('quote', quote.id)).catch(() => {});
     }
   }, [loading, quote, searchParams]);
 
@@ -186,9 +189,7 @@ export default function QuoteDetailPage() {
           </Link>
         )}
         <div className="ml-auto flex flex-wrap gap-2">
-          <Button type="button" variant="secondary" size="sm" onClick={() => window.print()}>
-            Print
-          </Button>
+          <PrintButton docType="quote" id={quote.id} />
           <Button type="button" variant="secondary" size="sm" onClick={() => runAction('send')} disabled={!!busyAction}>
             {busyAction === 'send' ? 'Sending...' : 'Send'}
           </Button>
