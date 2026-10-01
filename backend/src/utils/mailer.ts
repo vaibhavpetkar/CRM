@@ -6,8 +6,10 @@ import logger from './logger';
 // (e.g. returning the raw link in the API response instead of emailing it).
 let transporter: nodemailer.Transporter | null = null;
 
+// Either a well-known provider (EMAIL_SERVICE=gmail) or any SMTP server
+// (EMAIL_HOST + EMAIL_PORT, e.g. the company's own Mailcow server).
 const isEmailConfigured = (): boolean => {
-  return Boolean(process.env.EMAIL_SERVICE && process.env.EMAIL_USER && process.env.EMAIL_PASS);
+  return Boolean((process.env.EMAIL_SERVICE || process.env.EMAIL_HOST) && process.env.EMAIL_USER && process.env.EMAIL_PASS);
 };
 
 const getTransporter = (): nodemailer.Transporter | null => {
@@ -15,7 +17,9 @@ const getTransporter = (): nodemailer.Transporter | null => {
   if (transporter) return transporter;
 
   transporter = nodemailer.createTransport({
-    service: process.env.EMAIL_SERVICE,
+    ...(process.env.EMAIL_HOST
+      ? { host: process.env.EMAIL_HOST, port: Number(process.env.EMAIL_PORT) || 587 }
+      : { service: process.env.EMAIL_SERVICE }),
     secure: process.env.EMAIL_SECURE === 'true',
     auth: {
       user: process.env.EMAIL_USER,
@@ -26,7 +30,13 @@ const getTransporter = (): nodemailer.Transporter | null => {
   return transporter;
 };
 
-const sendMail = async (to: string, subject: string, html: string, cc?: string[]): Promise<boolean> => {
+export const sendMail = async (
+  to: string,
+  subject: string,
+  html: string,
+  cc?: string[],
+  options: { replyTo?: string } = {}
+): Promise<boolean> => {
   const transport = getTransporter();
   if (!transport) {
     logger.warn(`Email not sent to ${to} ("${subject}") — SMTP is not configured.`);
@@ -38,6 +48,7 @@ const sendMail = async (to: string, subject: string, html: string, cc?: string[]
       from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
       to,
       ...(cc && cc.length ? { cc } : {}),
+      ...(options.replyTo ? { replyTo: options.replyTo } : {}),
       subject,
       html,
     });

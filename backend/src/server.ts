@@ -46,6 +46,7 @@ import googleBusinessRoutes from './routes/googleBusinessRoutes';
 import expenseRoutes from './routes/expenseRoutes';
 import reportRoutes from './routes/reportRoutes';
 import documentTemplateRoutes from './routes/documentTemplateRoutes';
+import publicRoutes from './routes/publicRoutes';
 
 // Import models in dependency order before sync
 import './models/Company';
@@ -96,6 +97,10 @@ const port = process.env.PORT || 5000;
 app.set('trust proxy', 1);
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
+
+// Public website endpoints (contact form): own CORS + body limit, so they
+// sit before the app-wide middleware below.
+app.use('/api/public', publicRoutes);
 
 const allowedOrigins = [
   process.env.CLIENT_URL || 'http://localhost:3000',

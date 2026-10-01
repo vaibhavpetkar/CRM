@@ -34,3 +34,13 @@ export const registrationRateLimiter = rateLimit({
   legacyHeaders: false,
   message: { message: 'Too many attempts. Please try again later.' },
 });
+
+// Public website "Contact us" form: a visitor writes once or twice; this
+// stops one IP flooding the CRM with fake leads and emails.
+export const websiteLeadRateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Too many messages from this connection. Please try again later or email us directly.' },
+});

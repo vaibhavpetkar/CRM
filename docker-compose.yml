@@ -95,6 +95,12 @@ services:
       - EMAIL_PASS=${EMAIL_PASS}
       - EMAIL_FROM=${EMAIL_FROM}
       - EMAIL_SECURE=${EMAIL_SECURE}
+      - EMAIL_HOST=${EMAIL_HOST:-}
+      - EMAIL_PORT=${EMAIL_PORT:-}
+      # Website "Contact us" form -> CRM lead + emails (routes/publicRoutes.ts)
+      - WEBSITE_ORIGINS=${WEBSITE_ORIGINS:-https://inveontechnologies.in,https://www.inveontechnologies.in}
+      - WEBSITE_LEAD_NOTIFY_EMAILS=${WEBSITE_LEAD_NOTIFY_EMAILS:-}
+      - COMPANY_NAME=${COMPANY_NAME:-Inveon Technologies}
       - CLIENT_URL=${CLIENT_URL:-https://crm.eleviq.buzz}
       - SUPER_ADMIN_EMAIL=${SUPER_ADMIN_EMAIL:-admin@crmpro.com}
       - SUPER_ADMIN_PASSWORD=${SUPER_ADMIN_PASSWORD:-et4t8HjfnhRYocM3Z22p!Aa1}
