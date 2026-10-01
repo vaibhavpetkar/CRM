@@ -6,6 +6,16 @@ import { Op } from 'sequelize';
 import sequelize from '../config/database';
 import { AuthRequest } from '../middleware/authMiddleware';
 import quoteService from '../services/QuoteService';
+import Contact from '../models/Contact';
+import Company from '../models/Company';
+import { findInvalidReference } from '../utils/referenceValidation';
+
+const REFERENCE_FIELDS = {
+  assignedToId: { label: 'Assigned To', model: User },
+  accountId: { label: 'Account', model: Company },
+  contactId: { label: 'Contact', model: Contact },
+  leadId: { label: 'Lead', model: Lead },
+};
 
 // Phase 7 automation: Prospecting Deal -> auto-generated Quote. Wrapped so a
 // failure here (e.g. quote numbering race) never blocks the Deal save that
@@ -164,6 +174,9 @@ export const createDeal = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ message: 'Probability must be between 0 and 100' });
     }
 
+    const badReference = await findInvalidReference(req.body, REFERENCE_FIELDS);
+    if (badReference) return res.status(422).json({ message: badReference });
+
     const deal = await Deal.create({
       title,
       client,
@@ -238,6 +251,9 @@ export const updateDeal = async (req: AuthRequest, res: Response) => {
     if (probability !== undefined && (!Number.isFinite(parsedProbability) || (parsedProbability as number) < 0 || (parsedProbability as number) > 100)) {
       return res.status(400).json({ message: 'Probability must be between 0 and 100' });
     }
+
+    const badReference = await findInvalidReference(req.body, REFERENCE_FIELDS);
+    if (badReference) return res.status(422).json({ message: badReference });
 
     // Use !== undefined so nullable fields can be cleared, and normalize '' -> null.
     const norm = (v: any) => (v === '' ? null : v);

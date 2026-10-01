@@ -10,6 +10,14 @@ import Role from '../models/Role';
 import Notification from '../models/Notification';
 import { notifyUser } from '../utils/notificationService';
 import { syncTaskToGoogle } from '../services/googleTasksService';
+import { findInvalidReference } from '../utils/referenceValidation';
+
+const REFERENCE_FIELDS = {
+  leadId: { label: 'Lead', model: Lead },
+  dealId: { label: 'Deal', model: Deal },
+  contactId: { label: 'Contact', model: Contact },
+  assignedToId: { label: 'Assigned To', model: User },
+};
 
 // Included whenever a Task is fetched so the API returns the linked
 // Lead/Deal/Contact record itself, not just a typed-in "relatedTo" string.
@@ -73,6 +81,9 @@ export const createTask = async (req: Request & { user?: any }, res: Response) =
   try {
     const { title, type, priority, dueDate, dueTime, status, relatedTo, leadId, dealId, contactId, description, assignedToId } = req.body;
     if (!title) return res.status(400).json({ message: 'Title is required' });
+
+    const badReference = await findInvalidReference(req.body, REFERENCE_FIELDS);
+    if (badReference) return res.status(422).json({ message: badReference });
 
     const task = await Task.create({
       title,
@@ -140,6 +151,9 @@ export const updateTask = async (req: Request & { user?: any }, res: Response) =
     if (!task) return res.status(404).json({ message: 'Task not found' });
 
     const { title, type, priority, dueDate, dueTime, status, relatedTo, leadId, dealId, contactId, description, assignedToId } = req.body;
+    const badReference = await findInvalidReference(req.body, REFERENCE_FIELDS);
+    if (badReference) return res.status(422).json({ message: badReference });
+
     // Normalize to string for comparison — body values arrive as strings while
     // the DB value is a number, so `"5" !== 5` previously fired a spurious
     // assignment notification on every save where the assignee didn't change.

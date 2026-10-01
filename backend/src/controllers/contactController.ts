@@ -3,6 +3,13 @@ import Contact from '../models/Contact';
 import User from '../models/User';
 import { Op } from 'sequelize';
 import sequelize from '../config/database';
+import Lead from '../models/Lead';
+import { findInvalidReference } from '../utils/referenceValidation';
+
+const REFERENCE_FIELDS = {
+  assignedToId: { label: 'Assigned To', model: User },
+  leadId: { label: 'Lead', model: Lead },
+};
 
 // Serialize contact to match frontend data shape
 const serializeContact = (contact: any) => {
@@ -143,6 +150,9 @@ export const createContact = async (req: Request, res: Response) => {
       }
     }
 
+    const badReference = await findInvalidReference(req.body, REFERENCE_FIELDS);
+    if (badReference) return res.status(422).json({ message: badReference });
+
     const contact = await Contact.create({
       firstName,
       lastName,
@@ -199,6 +209,9 @@ export const updateContact = async (req: Request, res: Response) => {
         return res.status(400).json({ message: 'Contact with this email already exists' });
       }
     }
+
+    const badReference = await findInvalidReference(req.body, REFERENCE_FIELDS);
+    if (badReference) return res.status(422).json({ message: badReference });
 
     // Use !== undefined so fields can actually be cleared to null/empty, and
     // normalize '' -> null so empty dates don't 500 on a DATE column.
