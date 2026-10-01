@@ -639,6 +639,7 @@ export const invoicesApi = {
     const qs = query.toString();
     return request<{ invoices: any[]; total: number }>(`/invoices${qs ? `?${qs}` : ''}`);
   },
+  getInvoice: async (id: string | number) => request<any>(`/invoices/${id}`),
   createInvoice: async (data: any) => request<{ message: string; invoice: any }>('/invoices', { method: 'POST', body: JSON.stringify(data) }),
   updateInvoice: async (id: string | number, data: any) => request<{ message: string; invoice: any }>(`/invoices/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteInvoice: async (id: string | number) => request<{ message: string }>(`/invoices/${id}`, { method: 'DELETE' }),

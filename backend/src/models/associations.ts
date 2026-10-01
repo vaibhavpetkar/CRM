@@ -31,6 +31,8 @@ import LeadProduct from './LeadProduct';
 import LeadTax from './LeadTax';
 import QuoteProduct from './QuoteProduct';
 import QuoteTax from './QuoteTax';
+import InvoiceProduct from './InvoiceProduct';
+import InvoiceTax from './InvoiceTax';
 
 // ─── Lead Associations ────────────────────────────────────────────────────────
 Lead.belongsTo(User, { foreignKey: 'assignedToId', as: 'assignedTo' });
@@ -118,6 +120,14 @@ Invoice.belongsTo(User, { foreignKey: 'assignedToId', as: 'assignedTo' });
 User.hasMany(Invoice, { foreignKey: 'assignedToId', as: 'assignedInvoices' });
 Invoice.belongsTo(Quote, { foreignKey: 'quoteId', as: 'quoteRef' });
 Quote.hasMany(Invoice, { foreignKey: 'quoteId', as: 'invoices' });
+
+Invoice.hasMany(InvoiceProduct, { foreignKey: 'invoiceId', as: 'products', onDelete: 'CASCADE' });
+InvoiceProduct.belongsTo(Invoice, { foreignKey: 'invoiceId', as: 'invoice' });
+InvoiceProduct.belongsTo(Item, { foreignKey: 'itemId', as: 'item' });
+
+Invoice.hasMany(InvoiceTax, { foreignKey: 'invoiceId', as: 'taxes', onDelete: 'CASCADE' });
+InvoiceTax.belongsTo(Invoice, { foreignKey: 'invoiceId', as: 'invoice' });
+InvoiceTax.belongsTo(TaxMaster, { foreignKey: 'taxId', as: 'tax' });
 
 // ─── Campaign Associations ────────────────────────────────────────────────────
 Campaign.belongsTo(User, { foreignKey: 'assignedToId', as: 'assignedTo' });

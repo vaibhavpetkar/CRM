@@ -74,6 +74,8 @@ import './models/LeadProduct';
 import './models/LeadTax';
 import './models/QuoteProduct';
 import './models/QuoteTax';
+import './models/InvoiceProduct';
+import './models/InvoiceTax';
 import './models/Attachment';
 import './models/Integration';
 import './models/UserGoogleTasksConnection';
