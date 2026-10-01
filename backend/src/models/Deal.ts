@@ -24,6 +24,8 @@ interface DealAttributes {
   deletedAt?: Date | null;
 }
 
+const CLOSED_STAGES = ['closed-won', 'closed-lost'];
+
 // Define the creation attributes (excluding auto-generated fields)
 interface DealCreationAttributes extends Optional<DealAttributes, 'id'> {}
 
@@ -161,6 +163,19 @@ Deal.init(
     tableName: 'deals',
     sequelize,
     paranoid: true,
+    hooks: {
+      // Record when a deal is closed (won or lost) so reports can place it in
+      // the month it actually closed, whichever code path moved the stage
+      // (deal form, pipeline drag, quote acceptance). Reopening clears it.
+      beforeSave: (deal: Deal) => {
+        if (!deal.isNewRecord && !deal.changed('stage')) return;
+        if (CLOSED_STAGES.includes(deal.stage)) {
+          if (!(deal.isNewRecord && deal.actualCloseDate)) deal.actualCloseDate = new Date();
+        } else {
+          deal.actualCloseDate = null;
+        }
+      },
+    },
   }
 );
 

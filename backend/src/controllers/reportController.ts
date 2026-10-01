@@ -2,6 +2,9 @@ import { Request, Response } from 'express';
 import { Op, fn, col, literal } from 'sequelize';
 import Payment from '../models/Payment';
 import Expense from '../models/Expense';
+import Deal from '../models/Deal';
+import User from '../models/User';
+import { buildSalesForecast, OPEN_STAGES, WON_STAGE } from '../utils/salesForecast';
 
 /**
  * Profit & Loss, computed on a cash basis:
@@ -90,5 +93,60 @@ export const getProfitLoss = async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Get profit & loss error:', error);
     return res.status(500).json({ message: 'Server error while generating the profit & loss report' });
+  }
+};
+
+const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Sales forecast: open pipeline and probability-weighted revenue by expected
+ * close month, alongside deals actually won in the same range. Defaults to
+ * the current month plus the next five. The math lives in
+ * utils/salesForecast so it can be tested without a database.
+ */
+export const getSalesForecast = async (req: Request, res: Response) => {
+  try {
+    const now = new Date();
+    const y = now.getUTCFullYear();
+    const m = now.getUTCMonth();
+    const defaultStart = new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 10);
+    const defaultEnd = new Date(Date.UTC(y, m + 6, 0)).toISOString().slice(0, 10);
+    const startDate = (req.query.startDate as string) || defaultStart;
+    const endDate = (req.query.endDate as string) || defaultEnd;
+
+    if (!DAY_RE.test(startDate) || !DAY_RE.test(endDate) || Number.isNaN(Date.parse(startDate)) || Number.isNaN(Date.parse(endDate))) {
+      return res.status(400).json({ message: 'startDate and endDate must be dates in YYYY-MM-DD format' });
+    }
+    if (startDate > endDate) {
+      return res.status(400).json({ message: 'startDate must be on or before endDate' });
+    }
+
+    // Every open deal is loaded (not just the ones in range) because slipped
+    // and undated deals are reported regardless of the selected range.
+    const deals = await Deal.findAll({
+      attributes: ['id', 'title', 'client', 'value', 'probability', 'stage', 'expectedCloseDate', 'actualCloseDate'],
+      where: { stage: [...OPEN_STAGES, WON_STAGE] },
+      include: [{ model: User, as: 'assignedTo', attributes: ['firstName', 'lastName'], required: false }],
+    });
+
+    const forecast = buildSalesForecast(
+      deals.map((d: any) => ({
+        id: d.id,
+        title: d.title,
+        client: d.client,
+        value: d.value,
+        probability: d.probability,
+        stage: d.stage,
+        expectedCloseDate: d.expectedCloseDate,
+        actualCloseDate: d.actualCloseDate,
+        owner: d.assignedTo ? `${d.assignedTo.firstName} ${d.assignedTo.lastName}` : null,
+      })),
+      { startDate, endDate, today: now.toISOString().slice(0, 10) }
+    );
+
+    return res.json(forecast);
+  } catch (error) {
+    console.error('Get sales forecast error:', error);
+    return res.status(500).json({ message: 'Server error while generating the sales forecast' });
   }
 };

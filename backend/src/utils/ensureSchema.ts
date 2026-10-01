@@ -102,6 +102,12 @@ const SCHEMA_PATCHES: { name: string; sql: string }[] = [
     name: 'document_templates index',
     sql: `CREATE INDEX IF NOT EXISTS "document_templates_doc_type" ON "document_templates" ("docType");`,
   },
+  {
+    // The sales forecast reads this to place won deals in the month they
+    // actually closed; the Deal model now stamps it on every stage change.
+    name: 'deals.actualCloseDate',
+    sql: `ALTER TABLE "deals" ADD COLUMN IF NOT EXISTS "actualCloseDate" TIMESTAMPTZ;`,
+  },
 ];
 
 export const runSchemaPatches = async (sequelize: Sequelize): Promise<void> => {
