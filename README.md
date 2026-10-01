@@ -45,6 +45,7 @@ Built with Next.js, Express, PostgreSQL, Redis, and Socket.IO — Dockerized wit
 | **AI Assistant** | Lead/deal summaries, next-action suggestions, quote follow-ups, and a chat widget — powered by a free local Ollama model by default (or Anthropic's API if configured) |
 | **Activity Logs** | Full audit trail of all user actions with revert support |
 | **Recycle Bin** | Soft-delete with restore support for leads, deals, and contacts |
+| **Sales Forecast** | Reports > Sales Forecast shows open pipeline and probability-weighted revenue by expected close month, deals won in the range, per-stage and per-owner breakdowns, and open deals that are past their expected close date |
 | **Expenses & Profit/Loss** | Record business costs by category; Reports > Profit & Loss shows real revenue (from collected payments) minus expenses, cash-basis, with a monthly trend chart |
 
 ### Marketing

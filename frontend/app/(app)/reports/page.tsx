@@ -6,18 +6,20 @@ import StatCard from '@/components/ui/stat-card';
 import Card from '@/components/ui/card';
 import Button from '@/components/ui/button';
 import LoadingSpinner from '@/components/ui/loading-spinner';
-import { dealsApi, leadsApi, reportsApi, ProfitLossReport } from '@/lib/api';
+import StatusBadge from '@/components/ui/status-badge';
+import { dealsApi, leadsApi, reportsApi, ProfitLossReport, SalesForecastReport } from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
 import { ArrowDownTrayIcon } from '@heroicons/react/24/outline';
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, CartesianGrid } from 'recharts';
+import { BarChart, Bar, ComposedChart, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, CartesianGrid } from 'recharts';
 
 const TABS = [
   { id: 'overview', label: 'Overview' },
+  { id: 'forecast', label: 'Sales Forecast' },
   { id: 'profit-loss', label: 'Profit & Loss' },
 ] as const;
 
 export default function ReportsPage() {
-  const [tab, setTab] = useState<'overview' | 'profit-loss'>('overview');
+  const [tab, setTab] = useState<(typeof TABS)[number]['id']>('overview');
   const [dateRange, setDateRange] = useState('this-month');
   const [dealStats, setDealStats] = useState<any>(null);
   const [leadStats, setLeadStats] = useState<any>(null);
@@ -178,7 +180,223 @@ export default function ReportsPage() {
         </>
       )}
 
+      {tab === 'forecast' && <ForecastTab />}
       {tab === 'profit-loss' && <ProfitLossTab />}
+    </>
+  );
+}
+
+const monthLabel = (m: string) => {
+  const [y, mo] = m.split('-');
+  return new Date(Number(y), Number(mo) - 1, 1).toLocaleDateString(undefined, { month: 'short', year: '2-digit' });
+};
+
+const formatDay = (d: string) => {
+  const [y, m, day] = d.split('-').map(Number);
+  return new Date(y, m - 1, day).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+};
+
+// Local-time YYYY-MM-DD (toISOString would shift the day for users ahead of UTC).
+const toDayString = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+const dateInputClass =
+  'rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea]';
+
+function ForecastTab() {
+  const now = new Date();
+  const [startDate, setStartDate] = useState(() => toDayString(new Date(now.getFullYear(), now.getMonth(), 1)));
+  const [endDate, setEndDate] = useState(() => toDayString(new Date(now.getFullYear(), now.getMonth() + 6, 0)));
+  const [report, setReport] = useState<SalesForecastReport | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchReport = useCallback(async () => {
+    if (!startDate || !endDate) return;
+    setLoading(true);
+    setError(null);
+    try {
+      setReport(await reportsApi.getForecast({ startDate, endDate }));
+    } catch (err) {
+      setError(err instanceof Error && err.message ? err.message : 'Failed to load the sales forecast.');
+    } finally {
+      setLoading(false);
+    }
+  }, [startDate, endDate]);
+
+  useEffect(() => {
+    fetchReport();
+  }, [fetchReport]);
+
+  const t = report?.totals;
+
+  return (
+    <>
+      <div className="mb-6 flex flex-wrap items-end gap-3">
+        <div>
+          <label className="mb-1 block text-xs font-medium text-slate-500">Expected close from</label>
+          <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className={dateInputClass} />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-slate-500">To</label>
+          <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className={dateInputClass} />
+        </div>
+      </div>
+
+      {error && <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
+
+      {loading ? (
+        <div className="flex h-48 items-center justify-center"><LoadingSpinner size="md" /></div>
+      ) : report && t ? (
+        <>
+          <p className="mb-4 text-xs text-slate-400">
+            Open deals are placed in the month of their expected close date. Weighted value is each deal&apos;s value
+            multiplied by its win probability. Won counts deals closed as won within the range.
+          </p>
+
+          <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <StatCard
+              label="Open Pipeline"
+              value={formatCurrency(t.pipeline)}
+              change={`${t.openDeals} deal${t.openDeals === 1 ? '' : 's'} expected to close`}
+            />
+            <StatCard label="Weighted Forecast" value={formatCurrency(t.weighted)} change="Value × probability" />
+            <StatCard label="Won" value={formatCurrency(t.won)} changeType="positive" change="Closed-won in range" />
+            <StatCard
+              label="Past Close Date"
+              value={formatCurrency(t.slippedValue)}
+              changeType={t.slippedCount > 0 ? 'negative' : 'neutral'}
+              change={`${t.slippedCount} open deal${t.slippedCount === 1 ? '' : 's'} slipped`}
+            />
+          </div>
+
+          {t.undatedCount > 0 && (
+            <div className="mb-6 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+              {t.undatedCount} open deal{t.undatedCount === 1 ? ' has' : 's have'} no expected close date (
+              {formatCurrency(t.undatedValue)}) and {t.undatedCount === 1 ? 'is' : 'are'} left out of this forecast. Add a
+              date on the Deals page to include {t.undatedCount === 1 ? 'it' : 'them'}.
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <Card title="Forecast by Month" className="lg:col-span-2">
+              {report.monthly.every((m) => m.pipeline === 0 && m.won === 0) ? (
+                <p className="py-8 text-center text-sm text-slate-400">
+                  No open deals are expected to close in this range, and none were won.
+                </p>
+              ) : (
+                <ResponsiveContainer width="100%" height={300}>
+                  <ComposedChart data={report.monthly.map((m) => ({ ...m, label: monthLabel(m.month) }))}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                    <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+                    <YAxis
+                      tick={{ fontSize: 12 }}
+                      width={56}
+                      tickFormatter={(v) => new Intl.NumberFormat('en', { notation: 'compact' }).format(Number(v))}
+                    />
+                    <Tooltip formatter={(v) => formatCurrency(Number(v))} />
+                    <Legend />
+                    <Bar dataKey="pipeline" name="Open pipeline" fill="#cbd5e1" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="weighted" name="Weighted" fill="var(--primary)" radius={[4, 4, 0, 0]} />
+                    <Line type="linear" dataKey="won" name="Won" stroke="#22c55e" strokeWidth={2} dot={{ r: 3 }} />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              )}
+            </Card>
+
+            <Card title="By Stage">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b-2 border-slate-200 text-left text-xs font-bold uppercase tracking-wider text-slate-500">
+                      <th className="pb-3 pr-4">Stage</th>
+                      <th className="pb-3 pr-4">Deals</th>
+                      <th className="pb-3 pr-4">Pipeline</th>
+                      <th className="pb-3">Weighted</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {report.byStage.map((s) => (
+                      <tr key={s.stage}>
+                        <td className="py-3 pr-4"><StatusBadge status={s.stage} /></td>
+                        <td className="py-3 pr-4 text-slate-600">{s.count}</td>
+                        <td className="py-3 pr-4 text-slate-600">{formatCurrency(s.pipeline)}</td>
+                        <td className="py-3 font-medium text-slate-900">{formatCurrency(s.weighted)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+
+            <Card title="By Owner">
+              {report.byOwner.length === 0 ? (
+                <p className="py-4 text-center text-sm text-slate-400">No deals in this range.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b-2 border-slate-200 text-left text-xs font-bold uppercase tracking-wider text-slate-500">
+                        <th className="pb-3 pr-4">Owner</th>
+                        <th className="pb-3 pr-4">Deals</th>
+                        <th className="pb-3 pr-4">Weighted</th>
+                        <th className="pb-3">Won</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {report.byOwner.map((o) => (
+                        <tr key={o.owner}>
+                          <td className="py-3 pr-4 font-medium text-slate-900">{o.owner}</td>
+                          <td className="py-3 pr-4 text-slate-600">{o.count}</td>
+                          <td className="py-3 pr-4 text-slate-600">{formatCurrency(o.weighted)}</td>
+                          <td className="py-3 text-emerald-600">{formatCurrency(o.won)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Card>
+
+            {report.slipped.length > 0 && (
+              <Card title="Past Expected Close Date" className="lg:col-span-2">
+                <p className="mb-3 text-xs text-slate-400">
+                  Open deals whose expected close date has passed, oldest first
+                  {t.slippedCount > report.slipped.length ? ` (showing ${report.slipped.length} of ${t.slippedCount})` : ''}.
+                  Update their dates or stages on the Deals page so they count again.
+                </p>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b-2 border-slate-200 text-left text-xs font-bold uppercase tracking-wider text-slate-500">
+                        <th className="pb-3 pr-4">Deal</th>
+                        <th className="pb-3 pr-4">Stage</th>
+                        <th className="pb-3 pr-4">Owner</th>
+                        <th className="pb-3 pr-4">Expected close</th>
+                        <th className="pb-3">Value</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {report.slipped.map((d) => (
+                        <tr key={d.id}>
+                          <td className="py-3 pr-4">
+                            <p className="font-medium text-slate-900">{d.title}</p>
+                            <p className="text-xs text-slate-500">{d.client}</p>
+                          </td>
+                          <td className="py-3 pr-4"><StatusBadge status={d.stage} /></td>
+                          <td className="py-3 pr-4 text-slate-600">{d.owner}</td>
+                          <td className="py-3 pr-4 text-red-500">{formatDay(d.expectedCloseDate)}</td>
+                          <td className="py-3 text-slate-900">{formatCurrency(d.value)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+            )}
+          </div>
+        </>
+      ) : null}
     </>
   );
 }
@@ -210,11 +428,6 @@ function ProfitLossTab() {
   useEffect(() => {
     fetchReport();
   }, [fetchReport]);
-
-  const monthLabel = (m: string) => {
-    const [y, mo] = m.split('-');
-    return new Date(Number(y), Number(mo) - 1, 1).toLocaleDateString(undefined, { month: 'short', year: '2-digit' });
-  };
 
   return (
     <>

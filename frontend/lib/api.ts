@@ -811,6 +811,40 @@ export interface ProfitLossReport {
   basis: string;
 }
 
+export interface ForecastTotals {
+  count: number;
+  pipeline: number;
+  weighted: number;
+}
+
+export interface SalesForecastReport {
+  startDate: string;
+  endDate: string;
+  totals: {
+    openDeals: number;
+    pipeline: number;
+    weighted: number;
+    won: number;
+    slippedCount: number;
+    slippedValue: number;
+    undatedCount: number;
+    undatedValue: number;
+  };
+  monthly: { month: string; pipeline: number; weighted: number; won: number }[];
+  byStage: ({ stage: string } & ForecastTotals)[];
+  byOwner: ({ owner: string; won: number } & ForecastTotals)[];
+  slipped: {
+    id: number;
+    title: string;
+    client: string;
+    stage: string;
+    value: number;
+    probability: number;
+    expectedCloseDate: string;
+    owner: string;
+  }[];
+}
+
 export const reportsApi = {
   getProfitLoss: async (params: { startDate?: string; endDate?: string } = {}) => {
     const query = new URLSearchParams();
@@ -818,6 +852,13 @@ export const reportsApi = {
     if (params.endDate) query.append('endDate', params.endDate);
     const qs = query.toString();
     return request<ProfitLossReport>(`/reports/profit-loss${qs ? `?${qs}` : ''}`);
+  },
+  getForecast: async (params: { startDate?: string; endDate?: string } = {}) => {
+    const query = new URLSearchParams();
+    if (params.startDate) query.append('startDate', params.startDate);
+    if (params.endDate) query.append('endDate', params.endDate);
+    const qs = query.toString();
+    return request<SalesForecastReport>(`/reports/forecast${qs ? `?${qs}` : ''}`);
   },
 };
 
