@@ -218,12 +218,12 @@ export default function LeadsPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await leadsApi.getLeads({
+      const rows = await leadsApi.getAllLeads({
         search,
         status: filter,
         territory: territoryFilter,
       });
-      setLeads(res.leads || []);
+      setLeads(rows);
     } catch (err: any) {
       setError(err.message || 'Failed to load leads. Is the backend running?');
       setLeads([]);
