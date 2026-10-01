@@ -233,6 +233,12 @@ export default function ContactsPage() {
           data={contacts}
           rowKey={(c) => c.id}
           loading={loading}
+          bulkDelete={{
+            deleteRow: (c) => contactsApi.deleteContact(c.id),
+            onComplete: fetchContacts,
+            entityName: 'contacts',
+            restorable: true,
+          }}
           showToolbar
           onRowClick={openPanel}
           totalEntries={contacts.length}

@@ -225,6 +225,11 @@ export default function ItemsPage() {
           data={items}
           rowKey={(i) => i.id}
           loading={loading}
+          bulkDelete={{
+            deleteRow: (i) => itemsApi.deleteItem(i.id),
+            onComplete: fetchAll,
+            entityName: 'items',
+          }}
           showToolbar
           totalEntries={items.length}
           emptyMessage='No items found. Click "Add Item" to create one.'

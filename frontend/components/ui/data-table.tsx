@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/components/ui/toast';
 import {
   ChevronDownIcon,
   ChevronUpIcon,
@@ -15,6 +16,7 @@ import {
   XMarkIcon,
   ArrowPathIcon,
   MapPinIcon,
+  TrashIcon,
 } from '@heroicons/react/24/outline';
 import { MapPinIcon as MapPinIconSolid } from '@heroicons/react/24/solid';
 
@@ -72,6 +74,21 @@ type DataTableProps<T> = {
   tableId?: string;
   /** User permission flag: controls if right-click inline edit is unlocked */
   canEdit?: boolean;
+  /**
+   * Enables "Delete selected / Delete all" in the right-click menu once one
+   * or more rows are checked. Each row goes through `deleteRow`, which should
+   * call the same API as the row's own delete button, so soft-delete /
+   * Recycle Bin behaviour and server-side permission checks still apply.
+   */
+  bulkDelete?: {
+    deleteRow: (row: T) => Promise<unknown>;
+    /** Called once after the batch finishes (typically a refetch) */
+    onComplete: () => void;
+    /** Plural noun for prompts, e.g. "leads". Defaults to "records". */
+    entityName?: string;
+    /** True when deleted records land in the Recycle Bin and can be restored */
+    restorable?: boolean;
+  };
 };
 
 const ALL_SENTINEL = 'all';
@@ -253,7 +270,9 @@ export default function DataTable<T>({
   totalEntries,
   tableId           = 'default_datatable',
   canEdit           = true,
+  bulkDelete,
 }: DataTableProps<T>) {
+  const toast = useToast();
   const [selected,    setSelected]    = useState<Set<string | number>>(new Set());
   const [expandedId,  setExpandedId]  = useState<string | number | null>(null);
   const [pageSizeStr, setPageSizeStr] = useState<string>('10');
@@ -523,6 +542,49 @@ export default function DataTable<T>({
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
+
+  // ── Bulk delete (right-click → Delete selected / Delete all) ──
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+
+  const handleBulkDelete = async () => {
+    setContextMenu(null);
+    if (!bulkDelete || bulkDeleting) return;
+    const rows = data.filter((row) => selected.has(rowKey(row)));
+    if (rows.length === 0) return;
+    const noun = bulkDelete.entityName || 'records';
+    const scope = allSelected ? `ALL ${rows.length}` : String(rows.length);
+    const tail = bulkDelete.restorable
+      ? 'They can be restored from the Recycle Bin.'
+      : 'This cannot be undone.';
+    if (!window.confirm(`Delete ${scope} selected ${noun}? ${tail}`)) return;
+
+    setBulkDeleting(true);
+    let failed = 0;
+    let firstError = '';
+    // Small batches so a large selection doesn't flood the API.
+    const BATCH = 5;
+    for (let i = 0; i < rows.length; i += BATCH) {
+      const results = await Promise.allSettled(rows.slice(i, i + BATCH).map((row) => bulkDelete.deleteRow(row)));
+      for (const r of results) {
+        if (r.status === 'rejected') {
+          failed += 1;
+          if (!firstError) firstError = (r.reason as Error)?.message || '';
+        }
+      }
+    }
+    setBulkDeleting(false);
+
+    const deleted = rows.length - failed;
+    if (failed === 0) {
+      toast.success(`Deleted ${deleted} ${noun}.`);
+    } else if (deleted === 0) {
+      toast.error(`Could not delete the selected ${noun}${firstError ? `: ${firstError}` : '.'}`);
+    } else {
+      toast.warning(`Deleted ${deleted} ${noun}; ${failed} failed${firstError ? ` (${firstError})` : ''}.`);
+    }
+    setSelected(new Set());
+    bulkDelete.onComplete();
+  };
 
   const toggleExpand = (id: string | number) =>
     setExpandedId((prev) => (prev === id ? null : id));
@@ -1013,6 +1075,25 @@ export default function DataTable<T>({
             </svg>
             <span>Copy Cell Value</span>
           </button>
+
+          {/* Bulk delete for checked rows (shown only when the page opts in) */}
+          {bulkDelete && selectable && selected.size > 0 && (
+            <>
+              <div className="my-1 border-t border-slate-100" />
+              <button
+                onClick={handleBulkDelete}
+                disabled={bulkDeleting}
+                className="flex w-full items-center gap-2.5 px-3 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-50"
+              >
+                <TrashIcon className="h-4 w-4" />
+                <span>
+                  {allSelected
+                    ? `Delete All (${selected.size})`
+                    : `Delete Selected (${selected.size})`}
+                </span>
+              </button>
+            </>
+          )}
         </div>
       )}
     </div>

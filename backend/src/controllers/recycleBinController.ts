@@ -4,6 +4,7 @@ import Task from '../models/Task';
 import Deal from '../models/Deal';
 import Contact from '../models/Contact';
 import { Op } from 'sequelize';
+import { invalidateCache } from '../utils/cache';
 
 export const getDeletedRecords = async (req: Request, res: Response) => {
   try {
@@ -61,6 +62,7 @@ export const restoreRecord = async (req: Request, res: Response) => {
 
     // Restore the record by setting deletedAt to null
     await record.restore();
+    if (type === 'Lead') await invalidateCache('leads:list:');
 
     return res.json({ message: `${type} restored successfully` });
   } catch (error) {
