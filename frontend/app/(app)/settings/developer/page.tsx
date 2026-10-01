@@ -68,14 +68,10 @@ export default function DeveloperSettingsPage() {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [showValues, setShowValues] = useState<Record<string, boolean>>({});
 
-  // Check if user is super admin
-  const user = getStoredUser();
-  if (!user?.isSuperAdmin) {
-    useEffect(() => {
-      router.push('/dashboard');
-    }, [router]);
-    return null;
-  }
+  // null until we've read the stored user on the client. localStorage isn't
+  // available during the server render, so reading it inline (and returning
+  // early before the other hooks) made the hook order differ between renders.
+  const [isSuperAdmin, setIsSuperAdmin] = useState<boolean | null>(null);
 
   const fetchEnvVars = async () => {
     setLoading(true);
@@ -95,8 +91,16 @@ export default function DeveloperSettingsPage() {
   };
 
   useEffect(() => {
+    const allowed = !!getStoredUser()?.isSuperAdmin;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage is client-only, so this must run after mount
+    setIsSuperAdmin(allowed);
+    if (!allowed) {
+      router.push('/dashboard');
+      return;
+    }
     fetchEnvVars();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount
+  }, [router]);
 
   const handleChange = (key: string, value: string) => {
     setEdits((prev) => ({ ...prev, [key]: value }));
@@ -164,6 +168,8 @@ export default function DeveloperSettingsPage() {
     if (def.type !== 'password') return def.type; // text/url fields are never masked — nothing sensitive to hide
     return showValues[key] ? 'text' : 'password'; // native browser masking — never touches the underlying value
   };
+
+  if (!isSuperAdmin) return null;
 
   return (
     <>
