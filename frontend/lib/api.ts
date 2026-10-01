@@ -596,10 +596,12 @@ export const itemsApi = {
 // ─── Quotes API ────────────────────────────────────────────────────────────────
 
 export const quotesApi = {
-  getQuotes: async (params: { search?: string; status?: string } = {}) => {
+  getQuotes: async (params: { search?: string; status?: string; includeItems?: boolean; limit?: number } = {}) => {
     const query = new URLSearchParams();
     if (params.search) query.append('search', params.search);
     if (params.status && params.status !== 'all') query.append('status', params.status);
+    if (params.includeItems) query.append('includeItems', 'true');
+    if (params.limit) query.append('limit', String(params.limit));
     const qs = query.toString();
     return request<{ quotes: any[]; total: number }>(`/quotes${qs ? `?${qs}` : ''}`);
   },

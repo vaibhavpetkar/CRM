@@ -1,4 +1,4 @@
-import type { ImportExportField } from './types';
+import type { ImportExportChildTable, ImportExportField } from './types';
 
 // Each list defines exactly the columns that matter for that module.
 // To add import/export to another form (Deals, Quotes, Meetings, Tasks, ...),
@@ -49,13 +49,38 @@ export const DEAL_FIELDS: ImportExportField[] = [
   { key: 'expectedClose', label: 'Expected Close', type: 'date' },
 ];
 
+// Quote No ties a quote's item lines together on import. It is not reused:
+// every imported quote gets a fresh number from the server. Totals and status
+// are computed server-side (imports always start as drafts), so they are
+// export-only.
 export const QUOTE_FIELDS: ImportExportField[] = [
-  { key: 'deal', label: 'Deal', type: 'text' },
+  { key: 'quoteNumber', label: 'Quote No', type: 'text' },
+  { key: 'quotationDate', label: 'Quotation Date', type: 'date' },
   { key: 'client', label: 'Client', required: true, type: 'text' },
-  { key: 'amount', label: 'Amount', type: 'number' },
-  { key: 'status', label: 'Status', type: 'select', options: ['draft', 'sent', 'accepted'] },
+  { key: 'customerEmail', label: 'Customer Email', type: 'email' },
+  { key: 'customerPhone', label: 'Customer Phone', type: 'text', defaultExport: false },
+  { key: 'customerAddress', label: 'Customer Address', type: 'text', defaultExport: false },
   { key: 'validUntil', label: 'Valid Until', type: 'date' },
+  { key: 'discountType', label: 'Discount Type', type: 'select', options: ['percentage', 'flat'], defaultExport: false },
+  { key: 'discountValue', label: 'Discount Value', type: 'number', defaultExport: false },
+  { key: 'shippingCharges', label: 'Shipping Charges', type: 'number', defaultExport: false },
+  { key: 'terms', label: 'Terms', type: 'text', defaultExport: false },
+  { key: 'paymentTerms', label: 'Payment Terms', type: 'text', defaultExport: false },
+  { key: 'amount', label: 'Amount', type: 'number', exportOnly: true },
+  { key: 'status', label: 'Status', type: 'select', options: ['draft', 'sent', 'accepted', 'rejected', 'expired', 'superseded'], exportOnly: true },
 ];
+
+export const QUOTE_ITEMS_TABLE: ImportExportChildTable = {
+  key: 'products',
+  label: 'Items',
+  fields: [
+    { key: 'productName', label: 'Item Name', required: true, type: 'text' },
+    { key: 'quantity', label: 'Item Quantity', type: 'number' },
+    { key: 'unit', label: 'Item Unit', type: 'text' },
+    { key: 'rate', label: 'Item Rate', type: 'number' },
+    { key: 'amount', label: 'Item Amount', type: 'number', exportOnly: true },
+  ],
+};
 
 export const MEETING_FIELDS: ImportExportField[] = [
   { key: 'title', label: 'Title', required: true, type: 'text' },
