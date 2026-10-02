@@ -36,10 +36,11 @@ export class BaseRepository<TModel extends Model> {
   protected buildWhere(params: ListQueryParams): WhereOptions {
     const where: Record<string, unknown> = {};
 
-    // Exact-match filters on whitelisted fields, e.g. ?status=new&territory=west
+    // Exact-match filters on whitelisted fields, e.g. ?status=new&territory=west.
+    // 'all' is the UI's "All Statuses" / "All Territories" choice, meaning no filter.
     for (const field of this.filterableFields) {
       const value = params[field];
-      if (value !== undefined && value !== '') {
+      if (value !== undefined && value !== '' && value !== 'all') {
         where[field] = value;
       }
     }

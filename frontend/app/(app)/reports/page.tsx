@@ -34,11 +34,11 @@ export default function ReportsPage() {
       const [dStats, lStats, dealsRes] = await Promise.all([
         dealsApi.getStats(),
         leadsApi.getStats(),
-        dealsApi.getDeals({ limit: 500 }),
+        dealsApi.getAllDeals(),
       ]);
       setDealStats(dStats);
       setLeadStats(lStats);
-      setDeals(dealsRes.deals || []);
+      setDeals(dealsRes);
     } catch (err: any) {
       setError(err.message || 'Failed to load reports. Is the backend running?');
     } finally {

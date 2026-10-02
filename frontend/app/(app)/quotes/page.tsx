@@ -49,8 +49,8 @@ export default function QuotesPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await quotesApi.getQuotes();
-      setQuotes(res.quotes || []);
+      const rows = await quotesApi.getAllQuotes();
+      setQuotes(rows);
     } catch (err: any) {
       setError(err.message || 'Failed to load quotes. Is the backend running?');
       setQuotes([]);
