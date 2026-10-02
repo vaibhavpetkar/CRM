@@ -3,9 +3,13 @@ import * as leadController from '../controllers/leadController';
 import { protect, authorize } from '../middleware/authMiddleware';
 import { validate } from '../validations/validate';
 import { createLeadValidation, updateLeadValidation, convertLeadValidation } from '../validations/leadValidation';
-import { cacheRoute } from '../utils/cache';
+import { cacheRoute, invalidateOnWrite } from '../utils/cache';
 
 const router = Router();
+
+// Any write (create/update/delete/convert/revert) clears the cached list below,
+// otherwise a deleted lead keeps showing for up to 15s after the table refetches.
+router.use(invalidateOnWrite('leads:list:'));
 
 // IMPORTANT: Stats route must come BEFORE /:id to avoid being matched as id='stats'
 router.get('/stats', protect, authorize('leads:read'), leadController.getLeadStats);

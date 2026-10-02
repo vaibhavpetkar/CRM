@@ -73,8 +73,8 @@ export default function DealsPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await dealsApi.getDeals({ search, stage: filter });
-      setDeals(res.deals || []);
+      const rows = await dealsApi.getAllDeals({ search, stage: filter });
+      setDeals(rows);
     } catch (err: any) {
       setError(err.message || 'Failed to load deals. Is the backend running?');
       setDeals([]);
@@ -299,6 +299,12 @@ export default function DealsPage() {
           data={deals}
           rowKey={(d) => d.id}
           loading={loading}
+          bulkDelete={{
+            deleteRow: (d) => dealsApi.deleteDeal(d.id),
+            onComplete: fetchDeals,
+            entityName: 'deals',
+            restorable: true,
+          }}
           showToolbar
           onSelectionChange={setSelectedDealIds}
           totalEntries={deals.length}

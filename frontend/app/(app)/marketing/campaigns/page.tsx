@@ -140,6 +140,11 @@ export default function CampaignsPage() {
           data={campaigns}
           rowKey={(c) => c.id}
           loading={loading}
+          bulkDelete={{
+            deleteRow: (c) => campaignsApi.deleteCampaign(c.id),
+            onComplete: fetchAll,
+            entityName: 'campaigns',
+          }}
           emptyMessage='No campaigns yet. Click "New Campaign" to create one.'
           actions={(campaign) => (
             <button onClick={() => handleDelete(campaign)} className="text-slate-400 hover:text-red-600" aria-label="Delete">

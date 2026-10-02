@@ -1,4 +1,6 @@
 import multer from 'multer';
+import { AsyncResource } from 'async_hooks';
+import type { RequestHandler } from 'express';
 import path from 'path';
 import crypto from 'crypto';
 import fs from 'fs';
@@ -38,10 +40,26 @@ const fileFilter: multer.Options['fileFilter'] = (_req, file, cb) => {
 
 // 15 MB per file — generous enough for typical attachments (docs, images, small PDFs)
 // without letting a single upload exhaust disk/memory.
-export const upload = multer({
+const multerUpload = multer({
   storage,
   limits: { fileSize: 15 * 1024 * 1024 },
   fileFilter,
 });
+
+// multer finishes from the request stream's own events, which would drop the
+// logged-in user's company context (tenancy/context.ts) before the route
+// handler runs. Binding `next` to the caller's context keeps it.
+const keepContext =
+  (middleware: RequestHandler): RequestHandler =>
+  (req, res, next) =>
+    middleware(req, res, AsyncResource.bind(next));
+
+export const upload = {
+  single: (field: string) => keepContext(multerUpload.single(field)),
+  array: (field: string, maxCount?: number) => keepContext(multerUpload.array(field, maxCount)),
+  fields: (fields: multer.Field[]) => keepContext(multerUpload.fields(fields)),
+  any: () => keepContext(multerUpload.any()),
+  none: () => keepContext(multerUpload.none()),
+};
 
 export { UPLOAD_DIR };

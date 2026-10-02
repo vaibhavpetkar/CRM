@@ -132,6 +132,11 @@ export default function ItemCategoriesPage() {
           data={categories}
           rowKey={(c) => c.id}
           loading={loading}
+          bulkDelete={{
+            deleteRow: (c) => itemCategoriesApi.deleteCategory(c.id),
+            onComplete: fetchCategories,
+            entityName: 'categories',
+          }}
           showToolbar
           totalEntries={categories.length}
           emptyMessage='No categories found. Click "Add Category" to create one.'

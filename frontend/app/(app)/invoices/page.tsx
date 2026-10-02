@@ -216,6 +216,11 @@ export default function InvoicesPage() {
           data={invoices}
           rowKey={(i) => i.id}
           loading={loading}
+          bulkDelete={{
+            deleteRow: (i) => invoicesApi.deleteInvoice(i.id),
+            onComplete: fetchInvoices,
+            entityName: 'invoices',
+          }}
           showToolbar
           totalEntries={invoices.length}
           emptyMessage='No invoices yet. Click "New Invoice" to create one.'

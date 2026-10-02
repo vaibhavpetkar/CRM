@@ -74,7 +74,7 @@ export const getDeals = async (req: AuthRequest, res: Response) => {
       ];
     }
 
-    if (stage) {
+    if (stage && stage !== 'all') {
       whereClause.stage = stage;
     }
 
