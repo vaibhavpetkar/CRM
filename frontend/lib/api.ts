@@ -65,7 +65,13 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   }
 
   if (!response.ok) {
+    // Validation errors carry per-field details; include them so callers (e.g.
+    // the import preview) can say which field was rejected.
+    const details: string[] = Array.isArray(data?.details)
+      ? data.details.map((d: any) => d?.message || d?.field).filter(Boolean)
+      : [];
     const message =
+      (data && data.message && details.length ? `${data.message}: ${details.join('; ')}` : null) ||
       (data && data.message) ||
       (typeof data === 'string' && data) ||
       (contentType.includes('application/json')

@@ -2,6 +2,8 @@ import { body } from 'express-validator';
 
 export const createQuoteValidation = [
   body('client').trim().notEmpty().withMessage('client is required'),
+  body('quotationDate').optional({ values: 'falsy' }).isISO8601({ strict: true }).withMessage('quotationDate must be a valid date (YYYY-MM-DD)'),
+  body('validUntil').optional({ values: 'falsy' }).isISO8601({ strict: true }).withMessage('validUntil must be a valid date (YYYY-MM-DD)'),
   body('discountType').optional().isIn(['percentage', 'flat']).withMessage('discountType must be percentage or flat'),
   body('discountValue').optional().isFloat({ min: 0 }).withMessage('discountValue must be a positive number'),
   body('shippingCharges').optional().isFloat({ min: 0 }).withMessage('shippingCharges must be a positive number'),
@@ -12,6 +14,8 @@ export const createQuoteValidation = [
 ];
 
 export const updateQuoteValidation = [
+  body('quotationDate').optional({ values: 'falsy' }).isISO8601({ strict: true }).withMessage('quotationDate must be a valid date (YYYY-MM-DD)'),
+  body('validUntil').optional({ values: 'falsy' }).isISO8601({ strict: true }).withMessage('validUntil must be a valid date (YYYY-MM-DD)'),
   body('discountType').optional().isIn(['percentage', 'flat']),
   body('discountValue').optional().isFloat({ min: 0 }),
   body('shippingCharges').optional().isFloat({ min: 0 }),

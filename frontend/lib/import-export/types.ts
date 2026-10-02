@@ -16,6 +16,8 @@ export type ImportExportField = {
   options?: string[];
   /** included in export by default */
   defaultExport?: boolean;
+  /** reject select values outside `options` before sending (the server enforces them too) */
+  strict?: boolean;
   /** computed/system values: exported, but left out of the import template and preview */
   exportOnly?: boolean;
 };

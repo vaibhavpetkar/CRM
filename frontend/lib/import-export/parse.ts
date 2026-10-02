@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
 import type { ImportExportChildTable, ImportExportField, ImportRow } from './types';
+import { normalizeCell } from './validate';
 
 function normalize(str: string) {
   return str.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -25,7 +26,15 @@ function nextRowId() {
   return `row-${Date.now()}-${rowCounter}`;
 }
 
-const cellText = (cell: any) => (cell === undefined || cell === null ? '' : String(cell).trim());
+const pad = (n: number) => String(n).padStart(2, '0');
+
+/** Excel stores dates as serial numbers; with cellDates they arrive as Date
+ * objects, which we turn back into the YYYY-MM-DD the API expects. */
+const cellText = (cell: any) => {
+  if (cell === undefined || cell === null) return '';
+  if (cell instanceof Date) return `${cell.getFullYear()}-${pad(cell.getMonth() + 1)}-${pad(cell.getDate())}`;
+  return String(cell).trim();
+};
 
 export async function parseImportFile(
   file: File,
@@ -37,7 +46,7 @@ export async function parseImportFile(
   const childFields = (childTable?.fields ?? []).filter((f) => !f.exportOnly);
 
   const buffer = await file.arrayBuffer();
-  const workbook = XLSX.read(buffer, { type: 'array' });
+  const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
   const raw: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', blankrows: false });
 
@@ -61,7 +70,7 @@ export async function parseImportFile(
     const child: Record<string, string> = {};
     columnMap.forEach((col, idx) => {
       if (!col) return;
-      (col.child ? child : parent)[col.field.key] = cellText(row[idx]);
+      (col.child ? child : parent)[col.field.key] = normalizeCell(col.field, cellText(row[idx]));
     });
 
     const hasParentValues = Object.values(parent).some((v) => v !== '');

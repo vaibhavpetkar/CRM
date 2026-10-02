@@ -164,8 +164,9 @@ export async function runExport(
   }
 }
 
-/** Download a blank template (Excel or CSV) containing just the header row,
- * plus one example row of hints, so users know exactly what to fill in. */
+/** Download a blank template (Excel or CSV) containing just the header row.
+ * Format hints go on a separate "Instructions" sheet (Excel only) rather than
+ * in a data row, so a hint can never be imported as a value by mistake. */
 export function downloadTemplate(
   allFields: ImportExportField[],
   entityNamePlural: string,
@@ -190,7 +191,7 @@ export function downloadTemplate(
     }
   });
 
-  const worksheet = XLSX.utils.aoa_to_sheet([headers, hintRow]);
+  const worksheet = XLSX.utils.aoa_to_sheet([headers]);
   worksheet['!cols'] = fields.map((f) => ({ wch: Math.max(f.label.length + 2, 16) }));
 
   if (format === 'csv') {
@@ -202,6 +203,15 @@ export function downloadTemplate(
 
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, 'Template');
+  const instructions = XLSX.utils.aoa_to_sheet([
+    ['Column', 'Required', 'What to enter'],
+    ...fields.map((f, i) => [f.label, f.required ? 'Yes' : '', hintRow[i]]),
+    ...(childTable
+      ? [[], [`Put each ${childTable.label.toLowerCase().replace(/s$/, '')} on its own line. Extra lines for the same record leave the other columns blank.`]]
+      : []),
+  ]);
+  instructions['!cols'] = [{ wch: 24 }, { wch: 10 }, { wch: 40 }];
+  XLSX.utils.book_append_sheet(workbook, instructions, 'Instructions');
   const buffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
   const blob = new Blob([buffer], { type: 'application/octet-stream' });
   saveAs(blob, `${entityNamePlural}-import-template.xlsx`);
