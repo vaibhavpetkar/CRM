@@ -2,9 +2,11 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import PageHeader from '@/components/ui/page-header';
 import Button from '@/components/ui/button';
 import { contactsApi } from '@/lib/api';
+import { companyHref } from '@/components/contacts/related-records';
 import { ArrowLeftIcon, Squares2X2Icon, ListBulletIcon } from '@heroicons/react/24/outline';
 
 type Node = { id: string; type: 'contact' | 'company'; label: string; company?: string | null; email?: string | null; phone?: string | null; jobTitle?: string | null };
@@ -66,6 +68,7 @@ function layout(nodes: Node[], edges: Edge[]): Positioned[] {
 }
 
 export default function ContactRelationshipsPage() {
+  const router = useRouter();
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
   const [loading, setLoading] = useState(true);
@@ -185,7 +188,13 @@ export default function ContactRelationshipsPage() {
             {positioned
               .filter((n) => n.type === 'company')
               .map((n) => (
-                <g key={n.id} onMouseEnter={() => setHoveredId(n.id)} onMouseLeave={() => setHoveredId(null)} className="cursor-default">
+                <g
+                  key={n.id}
+                  onMouseEnter={() => setHoveredId(n.id)}
+                  onMouseLeave={() => setHoveredId(null)}
+                  onClick={() => router.push(companyHref(n.label))}
+                  className="cursor-pointer"
+                >
                   <circle cx={n.x} cy={n.y} r={22} fill="#168eea" opacity={hoveredId && !highlightedIds.has(n.id) ? 0.25 : 1} />
                   <text x={n.x} y={n.y - 28} textAnchor="middle" className="fill-slate-700 text-[11px] font-semibold">
                     {n.label}
@@ -220,7 +229,9 @@ export default function ContactRelationshipsPage() {
         <div className="space-y-4">
           {Array.from(tree.groups.entries()).map(([company, contacts]) => (
             <div key={company} className="rounded-lg border border-slate-200 bg-white p-4">
-              <p className="mb-2 text-sm font-semibold text-slate-800">{company}</p>
+              <Link href={companyHref(company)} className="mb-2 block text-sm font-semibold text-slate-800 hover:text-[#168eea] hover:underline">
+                {company} <span className="font-normal text-slate-400">({contacts.length})</span>
+              </Link>
               <ul className="space-y-1.5 pl-3">
                 {contacts.map((c) => {
                   const links = tree.crossLinksFor(c.id);

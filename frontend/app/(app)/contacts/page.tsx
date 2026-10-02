@@ -14,6 +14,8 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { PlusIcon, XMarkIcon, PencilSquareIcon, TrashIcon, ShareIcon } from '@heroicons/react/24/outline';
 import { useToast } from '@/components/ui/toast';
+import CompanyAutocomplete from '@/components/ui/company-autocomplete';
+import { ContactRows, LeadRows, DealRows, RelatedSection, companyHref } from '@/components/contacts/related-records';
 
 const emptyForm = {
   firstName: '',
@@ -45,6 +47,9 @@ export default function ContactsPage() {
   const [panelForm, setPanelForm] = useState<any>({});
   const [panelSaving, setPanelSaving] = useState(false);
   const canEditContacts = hasPermission(getStoredUser(), 'contacts:update');
+  // Everything the open contact is linked to, loaded from the server so it
+  // covers all contacts rather than just the rows currently listed.
+  const [related, setRelated] = useState<{ company: string | null; sameCompany: any[]; sharedPhone: any[]; sharedEmail: any[]; leads: any[]; deals: any[] } | null>(null);
 
   // Support deep-linking from the topbar's Quick Create menu (/contacts?quickCreate=1)
   useEffect(() => {
@@ -136,7 +141,27 @@ export default function ContactsPage() {
       title: contact.title || contact.jobTitle || '',
     });
     setPanelEditing(false);
+    loadRelated(contact.id);
   };
+
+  const loadRelated = (id: string | number) => {
+    setRelated(null);
+    contactsApi
+      .getRelated(id)
+      .then(setRelated)
+      .catch(() => setRelated({ company: null, sameCompany: [], sharedPhone: [], sharedEmail: [], leads: [], deals: [] }));
+  };
+
+  // /contacts?open=<id> opens that contact's panel (links from the company page).
+  useEffect(() => {
+    const openId = searchParams.get('open');
+    if (!openId) return;
+    contactsApi
+      .getContact(openId)
+      .then((c) => openPanel(c))
+      .catch((err) => toast.error(err.message || 'Contact not found'));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   const handlePanelSave = async () => {
     if (!panelContact) return;
@@ -146,6 +171,7 @@ export default function ContactsPage() {
       toast.success('Contact updated.');
       setPanelEditing(false);
       setPanelContact({ ...panelContact, ...panelForm });
+      loadRelated(panelContact.id);
       fetchContacts();
     } catch (err: any) {
       toast.error(err.message || 'Failed to update contact');
@@ -153,12 +179,6 @@ export default function ContactsPage() {
       setPanelSaving(false);
     }
   };
-
-  // Other contacts sharing the same company — shown below the selected
-  // contact's details in the side panel.
-  const relatedContacts = panelContact?.company
-    ? contacts.filter((c) => c.id !== panelContact.id && c.company && c.company.toLowerCase() === panelContact.company.toLowerCase())
-    : [];
 
   const columns: DataTableColumn<any>[] = [
     {
@@ -177,7 +197,17 @@ export default function ContactsPage() {
     },
     { header: 'Email', accessor: (c) => <span className="text-slate-600">{c.email || '—'}</span> },
     { header: 'Phone', accessor: (c) => <span className="text-slate-600">{c.phone || '—'}</span> },
-    { header: 'Company', accessor: (c) => <span className="text-slate-600">{c.company || '—'}</span> },
+    {
+      header: 'Company',
+      accessor: (c) =>
+        c.company ? (
+          <Link href={companyHref(c.company)} onClick={(e) => e.stopPropagation()} className="text-slate-600 hover:text-[#168eea] hover:underline">
+            {c.company}
+          </Link>
+        ) : (
+          <span className="text-slate-600">—</span>
+        ),
+    },
     { header: 'Title', accessor: (c) => <span className="text-slate-600">{c.title || c.jobTitle || '—'}</span> },
     {
       header: 'Source',
@@ -327,11 +357,11 @@ export default function ContactsPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-slate-700">Company</label>
-                  <input
-                    type="text"
+                  {/* Picking an existing name keeps the spelling consistent, which is what links colleagues together. */}
+                  <CompanyAutocomplete
                     value={formData.company}
-                    onChange={(e) => setFormData({ ...formData, company: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                    onChange={(val) => setFormData({ ...formData, company: val })}
+                    placeholder="Type to find an existing company..."
                   />
                 </div>
                 <div>
@@ -448,10 +478,10 @@ export default function ContactsPage() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-700">Company</label>
-                  <input
+                  <CompanyAutocomplete
                     value={panelForm.company}
-                    onChange={(e) => setPanelForm({ ...panelForm, company: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                    onChange={(val) => setPanelForm({ ...panelForm, company: val })}
+                    placeholder="Type to find an existing company..."
                   />
                 </div>
                 <div className="flex justify-end gap-2 pt-2">
@@ -479,7 +509,15 @@ export default function ContactsPage() {
                 </div>
                 <div>
                   <dt className="text-xs font-medium uppercase text-slate-400">Company</dt>
-                  <dd className="text-slate-700">{panelContact.company || '—'}</dd>
+                  <dd className="text-slate-700">
+                    {panelContact.company ? (
+                      <Link href={companyHref(panelContact.company)} className="text-[#168eea] hover:underline">
+                        {panelContact.company}
+                      </Link>
+                    ) : (
+                      '—'
+                    )}
+                  </dd>
                 </div>
                 <div>
                   <dt className="text-xs font-medium uppercase text-slate-400">Source</dt>
@@ -488,32 +526,51 @@ export default function ContactsPage() {
               </dl>
             )}
 
-            {panelContact.company && (
-              <div className="mt-6 border-t border-slate-100 pt-4">
-                <h4 className="text-sm font-semibold text-slate-900">Other contacts at {panelContact.company}</h4>
-                {relatedContacts.length === 0 ? (
-                  <p className="mt-2 text-xs text-slate-400">No other contacts found for this company.</p>
-                ) : (
-                  <div className="mt-2 space-y-2">
-                    {relatedContacts.map((c) => (
-                      <button
-                        key={c.id}
-                        onClick={() => openPanel(c)}
-                        className="flex w-full items-center gap-2 rounded-md border border-slate-100 p-2 text-left text-sm hover:bg-slate-50"
-                      >
-                        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-[10px] font-semibold text-slate-600">
-                          {`${(c.firstName || 'C').charAt(0)}${(c.lastName || '').charAt(0)}`.toUpperCase()}
-                        </div>
-                        <div>
-                          <p className="font-medium text-slate-900">{c.firstName} {c.lastName}</p>
-                          <p className="text-xs text-slate-500">{c.title || c.jobTitle || '—'}</p>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
+            <div className="mt-6 border-t border-slate-100 pt-4">
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-semibold text-slate-900">Relationships</h4>
+                {panelContact.company && (
+                  <Link href={companyHref(panelContact.company)} className="text-xs font-medium text-[#168eea] hover:underline">
+                    Open company page →
+                  </Link>
                 )}
               </div>
-            )}
+              {!related ? (
+                <p className="mt-2 text-xs text-slate-400">Loading...</p>
+              ) : related.sameCompany.length + related.sharedPhone.length + related.sharedEmail.length + related.leads.length + related.deals.length === 0 ? (
+                <p className="mt-2 text-xs text-slate-400">
+                  {panelContact.company ? 'No other contacts, leads or deals are linked to this company yet.' : 'Add a company to link this contact with colleagues, leads and deals.'}
+                </p>
+              ) : (
+                <>
+                  {related.sameCompany.length > 0 && (
+                    <RelatedSection title={`Colleagues at ${related.company}`} count={related.sameCompany.length}>
+                      <ContactRows contacts={related.sameCompany} onSelect={openPanel} />
+                    </RelatedSection>
+                  )}
+                  {related.sharedPhone.length > 0 && (
+                    <RelatedSection title="Same phone number" count={related.sharedPhone.length}>
+                      <ContactRows contacts={related.sharedPhone} onSelect={openPanel} showCompany />
+                    </RelatedSection>
+                  )}
+                  {related.sharedEmail.length > 0 && (
+                    <RelatedSection title="Same email" count={related.sharedEmail.length}>
+                      <ContactRows contacts={related.sharedEmail} onSelect={openPanel} showCompany />
+                    </RelatedSection>
+                  )}
+                  {related.leads.length > 0 && (
+                    <RelatedSection title="Leads at this company" count={related.leads.length}>
+                      <LeadRows leads={related.leads} />
+                    </RelatedSection>
+                  )}
+                  {related.deals.length > 0 && (
+                    <RelatedSection title="Deals" count={related.deals.length}>
+                      <DealRows deals={related.deals} />
+                    </RelatedSection>
+                  )}
+                </>
+              )}
+            </div>
           </div>
         </div>
       )}
