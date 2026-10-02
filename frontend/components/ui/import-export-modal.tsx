@@ -22,6 +22,7 @@ import { cn } from '@/lib/utils';
 import type { ImportExportConfig, ImportRow } from '@/lib/import-export/types';
 import { runExport, downloadTemplate, type ExportFormat } from '@/lib/import-export/exporters';
 import { parseImportFile } from '@/lib/import-export/parse';
+import { validateCell } from '@/lib/import-export/validate';
 import { useToast } from '@/components/ui/toast';
 
 type Tab = 'export' | 'import';
@@ -191,17 +192,15 @@ export default function ImportExportModal({ open, onClose, config, initialTab = 
 
   const validateRow = (row: ImportRow): string | null => {
     for (const field of importFields) {
-      if (field.required && !String(row[field.key] ?? '').trim()) {
-        return `${field.label} is required`;
-      }
+      const error = validateCell(field, row[field.key]);
+      if (error) return error;
     }
     if (childTable) {
       const children: any[] = row[childTable.key] || [];
       for (let i = 0; i < children.length; i += 1) {
         for (const field of importChildFields) {
-          if (field.required && !String(children[i][field.key] ?? '').trim()) {
-            return `${childTable.label} line ${i + 1}: ${field.label} is required`;
-          }
+          const error = validateCell(field, children[i][field.key]);
+          if (error) return `${childTable.label} line ${i + 1}: ${error}`;
         }
       }
     }

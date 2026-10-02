@@ -61,7 +61,7 @@ export const QUOTE_FIELDS: ImportExportField[] = [
   { key: 'customerPhone', label: 'Customer Phone', type: 'text', defaultExport: false },
   { key: 'customerAddress', label: 'Customer Address', type: 'text', defaultExport: false },
   { key: 'validUntil', label: 'Valid Until', type: 'date' },
-  { key: 'discountType', label: 'Discount Type', type: 'select', options: ['percentage', 'flat'], defaultExport: false },
+  { key: 'discountType', label: 'Discount Type', type: 'select', options: ['percentage', 'flat'], strict: true, defaultExport: false },
   { key: 'discountValue', label: 'Discount Value', type: 'number', defaultExport: false },
   { key: 'shippingCharges', label: 'Shipping Charges', type: 'number', defaultExport: false },
   { key: 'terms', label: 'Terms', type: 'text', defaultExport: false },
