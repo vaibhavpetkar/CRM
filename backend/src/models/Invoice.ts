@@ -59,7 +59,7 @@ class Invoice extends Model<InvoiceAttributes, InvoiceCreationAttributes> implem
 Invoice.init(
   {
     id: { type: DataTypes.INTEGER.UNSIGNED, autoIncrement: true, primaryKey: true },
-    invoiceNumber: { type: DataTypes.STRING(30), allowNull: false, unique: true },
+    invoiceNumber: { type: DataTypes.STRING(30), allowNull: false }, // unique per company (see tenancy/migration.ts)
     client: { type: DataTypes.STRING(255), allowNull: false },
     customerEmail: { type: DataTypes.STRING(255), allowNull: true },
     customerPhone: { type: DataTypes.STRING(20), allowNull: true },

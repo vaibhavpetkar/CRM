@@ -42,12 +42,12 @@ ItemCategory.init(
     code: {
       type: DataTypes.STRING(30),
       allowNull: false,
-      unique: true,
+      // Unique per company (see tenancy/migration.ts), not globally.
     },
     name: {
       type: DataTypes.STRING(150),
       allowNull: false,
-      unique: true,
+      // Unique per company (see tenancy/migration.ts), not globally.
     },
     description: {
       type: DataTypes.TEXT,

@@ -174,7 +174,7 @@ Lead.init(
     leadNumber: {
       type: DataTypes.STRING(30),
       allowNull: false,
-      unique: true,
+      // Unique per company (see tenancy/migration.ts), not globally.
     },
     date: {
       type: DataTypes.DATEONLY,

@@ -110,6 +110,18 @@ export const authApi = {
     return data;
   },
 
+  signupCompany: async (payload: { companyName: string; firstName: string; lastName: string; email: string; password: string; phone?: string }) => {
+    const data = await request<{ message: string; token: string; user: any }>('/auth/signup-company', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    if (data.token) {
+      setAuthToken(data.token);
+      setStoredUser(data.user);
+    }
+    return data;
+  },
+
   googleLogin: async (token: string) => {
     const data = await request<{ message: string; token: string; user: any }>('/auth/google', {
       method: 'POST',
@@ -541,6 +553,31 @@ export const meetingsApi = {
 export const companyApi = {
   getCompany: async () => request<any>('/company'),
   updateCompany: async (data: any) => request<{ message: string; company: any }>('/company', { method: 'PUT', body: JSON.stringify(data) }),
+};
+
+// ─── Subscription API ───────────────────────────────────────────────────────────
+
+export type SubscriptionPlan = { key: string; name: string; maxUsers: number | null; priceMonthly: number | null };
+
+export type Subscription = {
+  company: { id: number; name: string };
+  plan: string;
+  planName: string;
+  status: 'trial' | 'active' | 'past_due' | 'expired' | 'blocked';
+  endsAt: string | null;
+  daysLeft: number | null;
+  lockedOn: string | null;
+  locked: boolean;
+  maxUsers: number | null;
+  activeUsers: number;
+  alert: { level: 'info' | 'warning' | 'danger'; message: string } | null;
+  plans: SubscriptionPlan[];
+};
+
+export const subscriptionApi = {
+  get: async () => request<Subscription>('/subscription'),
+  requestPlan: async (plan: string) =>
+    request<{ message: string }>('/subscription/request', { method: 'POST', body: JSON.stringify({ plan }) }),
 };
 
 export type IntegrationRow = {

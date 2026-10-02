@@ -1,6 +1,7 @@
 import { OAuth2Client } from 'google-auth-library';
 import jwt from 'jsonwebtoken';
 import UserGoogleTasksConnection from '../models/UserGoogleTasksConnection';
+import { runAsUser } from '../tenancy/provisioning';
 
 // Item 2 — per-user Google Tasks sync. Reuses the same GOOGLE_CLIENT_ID /
 // GOOGLE_CLIENT_SECRET already configured for Google Sign-In (see
@@ -51,29 +52,31 @@ export const handleOAuthCallback = async (code: string, state: string): Promise<
   if (decoded?.purpose !== 'google-tasks-connect' || !decoded?.userId) {
     throw new Error('Invalid connection request.');
   }
+  // OAuth redirects arrive without a login: act as the connecting user's company.
+  return runAsUser(decoded.userId, async () => {
+    const { tokens } = await client.getToken(code);
+    if (!tokens.access_token) {
+      throw new Error('Google did not return a usable access token.');
+    }
 
-  const { tokens } = await client.getToken(code);
-  if (!tokens.access_token) {
-    throw new Error('Google did not return a usable access token.');
-  }
+    const [connection] = await UserGoogleTasksConnection.findOrCreate({
+      where: { userId: decoded.userId },
+      defaults: { userId: decoded.userId },
+    });
 
-  const [connection] = await UserGoogleTasksConnection.findOrCreate({
-    where: { userId: decoded.userId },
-    defaults: { userId: decoded.userId },
+    await connection.update({
+      accessToken: tokens.access_token,
+      // Google only sends a refresh_token on first consent (or when we force
+      // prompt=consent, as above) — don't overwrite a working one with
+      // nothing if this particular response happened not to include one.
+      ...(tokens.refresh_token ? { refreshToken: tokens.refresh_token } : {}),
+      tokenExpiresAt: tokens.expiry_date ? new Date(tokens.expiry_date) : null,
+      isEnabled: true,
+      lastError: connection.refreshToken || tokens.refresh_token ? null : 'No refresh token received from Google — you may need to reconnect periodically.',
+    });
+
+    return decoded.userId;
   });
-
-  await connection.update({
-    accessToken: tokens.access_token,
-    // Google only sends a refresh_token on first consent (or when we force
-    // prompt=consent, as above) — don't overwrite a working one with
-    // nothing if this particular response happened not to include one.
-    ...(tokens.refresh_token ? { refreshToken: tokens.refresh_token } : {}),
-    tokenExpiresAt: tokens.expiry_date ? new Date(tokens.expiry_date) : null,
-    isEnabled: true,
-    lastError: connection.refreshToken || tokens.refresh_token ? null : 'No refresh token received from Google — you may need to reconnect periodically.',
-  });
-
-  return decoded.userId;
 };
 
 export const disconnect = async (userId: number): Promise<void> => {

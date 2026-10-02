@@ -7,7 +7,9 @@ import crypto from 'crypto';
 import { Op } from 'sequelize';
 import { OAuth2Client } from 'google-auth-library';
 import { AuthRequest } from '../middleware/authMiddleware';
-import { runUnscoped } from '../tenancy/context';
+import { runUnscoped, runWithTenant } from '../tenancy/context';
+import { createTrialCompany } from '../tenancy/provisioning';
+import { seatLimitMessage } from '../utils/subscription';
 import { getDefaultCompanyId } from '../tenancy/migration';
 import { sendInviteEmail, sendResetPasswordEmail } from '../utils/mailer';
 
@@ -110,6 +112,56 @@ export const register = async (req: Request, res: Response) => {
   }
 };
 
+// ─── Company signup (15-day free trial) ───────────────────────────────────────
+
+export const signupCompany = async (req: Request, res: Response) => {
+  try {
+    const { companyName, firstName, lastName, email, password, phone } = req.body || {};
+
+    if (!companyName?.trim() || !firstName?.trim() || !lastName?.trim() || !email?.trim() || !password) {
+      return res.status(400).json({ message: 'Company name, first name, last name, email and password are required' });
+    }
+    if (password.length < 8) {
+      return res.status(400).json({ message: 'Password must be at least 8 characters' });
+    }
+    const normalizedEmail = String(email).trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      return res.status(400).json({ message: 'Enter a valid email address' });
+    }
+    // Emails are unique across every company.
+    if (await User.findOne({ where: { email: normalizedEmail } })) {
+      return res.status(400).json({ message: 'An account with this email already exists. Sign in instead.' });
+    }
+
+    const { company, roles } = await createTrialCompany(String(companyName).trim().slice(0, 100));
+    const user = await runWithTenant(company.id, async () => {
+      const created = await User.create({
+        firstName: String(firstName).trim(),
+        lastName: String(lastName).trim(),
+        email: normalizedEmail,
+        password: await hashPassword(password),
+        phone: phone || null,
+        roleId: roles['Administrator']?.id ?? null,
+        isSuperAdmin: false,
+        isActive: true,
+        emailVerified: false,
+        phoneVerified: false,
+        lastLogin: new Date(),
+      });
+      return User.findByPk(created.id, { include: [roleInclude] });
+    });
+
+    return res.status(201).json({
+      message: 'Your company is ready. Your 15-day free trial has started.',
+      token: generateToken(user!.id),
+      user: userPublicFields(user!),
+    });
+  } catch (error) {
+    console.error('Company signup error:', error);
+    return res.status(500).json({ message: 'Server error during signup' });
+  }
+};
+
 // ─── Login ────────────────────────────────────────────────────────────────────
 
 export const login = async (req: Request, res: Response) => {
@@ -172,19 +224,12 @@ export const googleLogin = async (req: Request, res: Response) => {
     const { email, given_name, family_name } = payload;
     let user = await User.findOne({ where: { email }, include: [roleInclude] });
 
+    // Google sign-in only signs in existing accounts. New people join by
+    // signing up their company or through an invitation, never by landing
+    // in someone else's company.
     if (!user) {
-      const randomPassword = crypto.randomBytes(16).toString('hex');
-      const hashedPassword = await hashPassword(randomPassword);
-      user = await User.create({
-        firstName: given_name || 'Google',
-        lastName: family_name || 'User',
-        email,
-        password: hashedPassword,
-        isSuperAdmin: false,
-        emailVerified: true,
-        phoneVerified: false,
-        isActive: true,
-        companyId: await getDefaultCompanyId(),
+      return res.status(403).json({
+        message: 'No account found for this Google email. Sign up your company or ask your administrator for an invitation.',
       });
     }
 
@@ -237,6 +282,8 @@ export const sendInvitation = async (req: Request, res: Response) => {
         roleId: roleId || user.roleId,
       });
     } else {
+      const seatMessage = await seatLimitMessage((req as any).company);
+      if (seatMessage) return res.status(403).json({ message: seatMessage });
       const dummyPassword = await hashPassword(crypto.randomBytes(16).toString('hex'));
       user = await User.create({
         firstName,

@@ -27,6 +27,14 @@ import Expense from '../models/Expense';
 import Item from '../models/Item';
 import ItemCategory from '../models/ItemCategory';
 import TaxMaster from '../models/TaxMaster';
+import InvoiceProduct from '../models/InvoiceProduct';
+import InvoiceTax from '../models/InvoiceTax';
+import Role from '../models/Role';
+import Sequence from '../models/Sequence';
+import Integration from '../models/Integration';
+import GoogleMeetConnection from '../models/GoogleMeetConnection';
+import GoogleBusinessConnection from '../models/GoogleBusinessConnection';
+import UserGoogleTasksConnection from '../models/UserGoogleTasksConnection';
 
 /**
  * Multi-company data isolation.
@@ -39,10 +47,13 @@ import TaxMaster from '../models/TaxMaster';
  * A request can never move a record to another company: a companyId sent in
  * a request body is overwritten with the caller's own.
  *
- * Still global for now (single shared copy across companies): roles and
- * permissions, number sequences, integrations and Google connections.
+ * `companies` is scoped the same way: a tenant's own row has companyId = id,
+ * and customer "account" rows (made by lead conversion) carry the companyId
+ * of the tenant that owns them. Only permissions and users' Google Tasks
+ * links by userId stay global.
  */
 export const TENANT_MODELS: ModelStatic<Model>[] = [
+  Company,
   User,
   Employee,
   Lead,
@@ -67,6 +78,14 @@ export const TENANT_MODELS: ModelStatic<Model>[] = [
   Item,
   ItemCategory,
   TaxMaster,
+  InvoiceProduct,
+  InvoiceTax,
+  Role,
+  Sequence,
+  Integration,
+  GoogleMeetConnection,
+  GoogleBusinessConnection,
+  UserGoogleTasksConnection,
 ];
 
 export const TENANT_FIELD = 'companyId';
@@ -126,7 +145,8 @@ export const applyTenantScoping = () => {
 
     model.addHook('beforeCreate', 'tenantScope', (instance: any, options: any) => {
       stampInstance(instance, options);
-      if (instance.get(TENANT_FIELD) == null) {
+      // A new tenant company is created unscoped and points at itself after.
+      if (instance.get(TENANT_FIELD) == null && model !== Company) {
         logger.warn(`[tenancy] ${model.name} created without a company (no request context).`);
       }
     });
@@ -138,7 +158,4 @@ export const applyTenantScoping = () => {
       if (companyId != null && instance.changed(TENANT_FIELD)) instance.set(TENANT_FIELD, companyId);
     });
   }
-
-  // The company record itself: a user can only read or change their own.
-  scopeReadsAndBulkWrites(Company, 'id');
 };

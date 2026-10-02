@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 // Routes that do NOT require authentication.
-const PUBLIC_PATHS = ['/login', '/forgot-password', '/reset-password', '/accept-invite'];
+const PUBLIC_PATHS = ['/login', '/signup', '/forgot-password', '/reset-password', '/accept-invite'];
 
 function isPublicPath(pathname: string) {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/'));
@@ -32,7 +32,7 @@ export function proxy(request: NextRequest) {
   // Already logged in + visiting an auth page → send to the dashboard instead.
   // (accept-invite is intentionally excluded: an invited user may already be signed
   // in under a different session and still needs to be able to open their invite link.)
-  if (token && (pathname === '/login' || pathname === '/register' || pathname === '/forgot-password')) {
+  if (token && (pathname === '/login' || pathname === '/signup' || pathname === '/register' || pathname === '/forgot-password')) {
     return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 

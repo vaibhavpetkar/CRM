@@ -29,6 +29,18 @@ interface CompanyAttributes {
   // {{companyName}}, {{companySocialLinks}} placeholders. Null -> a sensible
   // built-in default is used instead (see QuoteService.DEFAULT_SHARE_TEMPLATE).
   quoteMessageTemplate?: string | null;
+
+  // Subscription (only meaningful on a tenant row, i.e. companyId === id; see
+  // utils/subscription.ts). Rows created as customer "accounts" by lead
+  // conversion leave these unset.
+  plan?: string | null; // key into config/plans.ts
+  subscriptionStatus?: string | null; // 'trial' | 'active' | 'cancelled'
+  trialEndsAt?: Date | null;
+  paidUntil?: Date | null; // null on an active plan = no expiry
+  maxUsers?: number | null; // null = unlimited
+  blockedAt?: Date | null;
+  blockedReason?: string | null;
+  lastAlertKey?: string | null; // last subscription alert sent to admins, so each is sent once
 }
 
 // Define the creation attributes (excluding auto-generated fields)
@@ -54,6 +66,14 @@ class Company extends Model<CompanyAttributes, CompanyCreationAttributes> implem
   public youtube?: string | null;
   public twitter?: string | null;
   public quoteMessageTemplate?: string | null;
+  public plan?: string | null;
+  public subscriptionStatus?: string | null;
+  public trialEndsAt?: Date | null;
+  public paidUntil?: Date | null;
+  public maxUsers?: number | null;
+  public blockedAt?: Date | null;
+  public blockedReason?: string | null;
+  public lastAlertKey?: string | null;
 
   // Timestamps
   public readonly createdAt!: Date;
@@ -125,6 +145,14 @@ Company.init(
     youtube: { type: DataTypes.STRING(255), allowNull: true },
     twitter: { type: DataTypes.STRING(255), allowNull: true },
     quoteMessageTemplate: { type: DataTypes.TEXT, allowNull: true },
+    plan: { type: DataTypes.STRING(30), allowNull: true },
+    subscriptionStatus: { type: DataTypes.STRING(20), allowNull: true },
+    trialEndsAt: { type: DataTypes.DATE, allowNull: true },
+    paidUntil: { type: DataTypes.DATE, allowNull: true },
+    maxUsers: { type: DataTypes.INTEGER, allowNull: true },
+    blockedAt: { type: DataTypes.DATE, allowNull: true },
+    blockedReason: { type: DataTypes.STRING(500), allowNull: true },
+    lastAlertKey: { type: DataTypes.STRING(100), allowNull: true },
   },
   {
     tableName: 'companies',

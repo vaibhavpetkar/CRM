@@ -4,10 +4,23 @@ import User from '../models/User';
 import Role from '../models/Role';
 import { runWithTenant } from '../tenancy/context';
 import { getDefaultCompanyId } from '../tenancy/migration';
+import Company from '../models/Company';
+import { getSubscriptionState, SubscriptionState } from '../utils/subscription';
 
 export interface AuthRequest extends Request {
   user?: any;
+  company?: Company;
+  subscription?: SubscriptionState;
 }
+
+// What a locked company (trial over, unpaid, blocked) can still reach: enough
+// to see why and ask for a renewal. Everything else answers 402.
+const allowedWhileLocked = (req: Request) => {
+  const path = req.originalUrl.split('?')[0];
+  if (path.startsWith('/api/subscription')) return true;
+  if (req.method !== 'GET') return false;
+  return ['/api/profile', '/api/auth/me', '/api/company'].includes(path) || path.startsWith('/api/notifications');
+};
 
 export const authMiddleware = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
@@ -38,7 +51,24 @@ export const authMiddleware = async (req: AuthRequest, res: Response, next: Next
       await user.update({ companyId: await getDefaultCompanyId() });
     }
 
+    // Outside any tenant context yet, so this reads the user's company directly.
+    const company = await Company.findByPk(user.companyId as number);
+    if (!company) {
+      return res.status(403).json({ message: 'Your company account no longer exists. Please contact support.' });
+    }
+    const subscription = getSubscriptionState(company);
+    // The platform owner (super admin) is never locked out.
+    if (subscription.locked && !user.isSuperAdmin && !allowedWhileLocked(req)) {
+      return res.status(402).json({
+        code: 'SUBSCRIPTION_LOCKED',
+        status: subscription.status,
+        message: subscription.alert?.message || 'Your subscription is not active.',
+      });
+    }
+
     req.user = user;
+    req.company = company;
+    req.subscription = subscription;
     return runWithTenant(user.companyId as number, () => next());
   } catch (error) {
     res.status(401).json({ message: 'Invalid or expired token.' });

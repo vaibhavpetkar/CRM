@@ -51,7 +51,7 @@ Item.init(
     itemCode: {
       type: DataTypes.STRING(30),
       allowNull: false,
-      unique: true,
+      // Unique per company (see tenancy/migration.ts), not globally.
     },
     itemName: {
       type: DataTypes.STRING(200),
