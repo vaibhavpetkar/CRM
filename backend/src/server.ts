@@ -41,6 +41,8 @@ import aiRoutes from './routes/aiRoutes';
 import googleTasksRoutes from './routes/googleTasksRoutes';
 import googleMeetRoutes from './routes/googleMeetRoutes';
 import googleBusinessRoutes from './routes/googleBusinessRoutes';
+import metaLeadsRoutes from './routes/metaLeadsRoutes';
+import metaWebhookRoutes from './routes/metaWebhookRoutes';
 import expenseRoutes from './routes/expenseRoutes';
 import reportRoutes from './routes/reportRoutes';
 import documentTemplateRoutes from './routes/documentTemplateRoutes';
@@ -109,6 +111,8 @@ app.set('trust proxy', 1);
 // Public website endpoints (contact form): own CORS + body limit, so they
 // sit before the app-wide middleware below.
 app.use('/api/public', publicRoutes);
+// Facebook Lead Ads webhook: needs the raw body to check Meta's signature.
+app.use('/api/webhooks/meta', metaWebhookRoutes);
 
 const allowedOrigins = [
   process.env.CLIENT_URL || 'http://localhost:3000',
@@ -183,6 +187,7 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/integrations/google-tasks', googleTasksRoutes);
 app.use('/api/integrations/google-meet', googleMeetRoutes);
 app.use('/api/integrations/google-business', googleBusinessRoutes);
+app.use('/api/integrations/meta', metaLeadsRoutes);
 app.use('/api/integrations', integrationRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/expenses', expenseRoutes);

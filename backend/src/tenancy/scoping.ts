@@ -35,6 +35,8 @@ import Integration from '../models/Integration';
 import GoogleMeetConnection from '../models/GoogleMeetConnection';
 import GoogleBusinessConnection from '../models/GoogleBusinessConnection';
 import UserGoogleTasksConnection from '../models/UserGoogleTasksConnection';
+import MetaPage from '../models/MetaPage';
+import MetaLeadEvent from '../models/MetaLeadEvent';
 
 /**
  * Multi-company data isolation.
@@ -86,6 +88,8 @@ export const TENANT_MODELS: ModelStatic<Model>[] = [
   GoogleMeetConnection,
   GoogleBusinessConnection,
   UserGoogleTasksConnection,
+  MetaPage,
+  MetaLeadEvent,
 ];
 
 export const TENANT_FIELD = 'companyId';

@@ -23,14 +23,6 @@ interface ProviderDef {
 
 export const PROVIDER_CATALOG: ProviderDef[] = [
   {
-    key: 'meta',
-    label: 'Meta (Facebook, Instagram & WhatsApp Business)',
-    category: 'social',
-    description: 'Sync leads from Facebook/Instagram ads and send messages via WhatsApp Business API.',
-    requiredEnvVars: ['META_APP_ID', 'META_APP_SECRET'],
-    docsUrl: 'https://developers.facebook.com/docs',
-  },
-  {
     key: 'linkedin',
     label: 'LinkedIn',
     category: 'professional',
@@ -54,9 +46,9 @@ export const PROVIDER_CATALOG: ProviderDef[] = [
     requiredEnvVars: ['MAILCHIMP_API_KEY', 'MAILCHIMP_SERVER_PREFIX'],
     docsUrl: 'https://mailchimp.com/developer/',
   },
-  // Google Meet and Google Business Profile are NOT in this catalog — they
-  // have real, dedicated OAuth flows (googleMeetController/Routes and
-  // googleBusinessController/Routes) instead of the generic
+  // Google Meet, Google Business Profile and Facebook Lead Ads (meta) are NOT in this catalog — they
+  // have real, dedicated OAuth flows (googleMeetController/Routes,
+  // googleBusinessController/Routes and metaLeadsController/Routes) instead of the generic
   // credentials-configured-but-not-implemented stub below. See the
   // Integrations page, which renders them as separate real cards.
 ];

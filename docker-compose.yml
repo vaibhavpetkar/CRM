@@ -102,6 +102,12 @@ services:
       - WEBSITE_LEAD_NOTIFY_EMAILS=${WEBSITE_LEAD_NOTIFY_EMAILS:-}
       - COMPANY_NAME=${COMPANY_NAME:-Inveon Technologies}
       - CLIENT_URL=${CLIENT_URL:-https://crm.eleviq.buzz}
+      # Facebook / Instagram Lead Ads (Settings > Integrations). Webhook URL:
+      # ${CLIENT_URL}/api/webhooks/meta, OAuth redirect: ${CLIENT_URL}/api/integrations/meta/callback
+      - META_APP_ID=${META_APP_ID:-}
+      - META_APP_SECRET=${META_APP_SECRET:-}
+      - META_VERIFY_TOKEN=${META_VERIFY_TOKEN:-}
+      - META_LOGIN_CONFIG_ID=${META_LOGIN_CONFIG_ID:-}
       - SUPER_ADMIN_EMAIL=${SUPER_ADMIN_EMAIL:-admin@crmpro.com}
       - SUPER_ADMIN_PASSWORD=${SUPER_ADMIN_PASSWORD:-et4t8HjfnhRYocM3Z22p!Aa1}
       # AI Assistant — free, local Ollama provider (see the `ollama` service

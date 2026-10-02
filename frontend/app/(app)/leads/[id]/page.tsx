@@ -420,6 +420,8 @@ export default function LeadDetailsPage() {
                   >
                     <option value="website">Website</option>
                     <option value="linkedin">LinkedIn</option>
+                    <option value="facebook">Facebook</option>
+                    <option value="instagram">Instagram</option>
                     <option value="referral">Referral</option>
                     <option value="event">Event</option>
                     <option value="social-media">Social Media</option>

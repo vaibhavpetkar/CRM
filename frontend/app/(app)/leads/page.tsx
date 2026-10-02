@@ -688,6 +688,8 @@ export default function LeadsPage() {
                     >
                       <option value="Website">Website</option>
                       <option value="LinkedIn">LinkedIn</option>
+                      <option value="Facebook">Facebook</option>
+                      <option value="Instagram">Instagram</option>
                       <option value="Referral">Referral</option>
                       <option value="Event">Event</option>
                       <option value="Social Media">Social Media</option>
