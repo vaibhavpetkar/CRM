@@ -8,13 +8,39 @@ import Card from '@/components/ui/card';
 import DataTable, { DataTableColumn } from '@/components/ui/data-table';
 import ImportExportButtons from '@/components/ui/import-export-buttons';
 import CompanyAutocomplete from '@/components/ui/company-autocomplete';
-import { QUOTE_FIELDS } from '@/lib/import-export/field-configs';
+import { QUOTE_FIELDS, QUOTE_ITEMS_TABLE } from '@/lib/import-export/field-configs';
 import { formatCurrency } from '@/lib/utils';
 import { getCachedCurrency } from '@/lib/currency';
 import { quotesApi, aiApi } from '@/lib/api';
 import Link from 'next/link';
 import { PlusIcon, XMarkIcon, TrashIcon, PaperAirplaneIcon, PrinterIcon, SparklesIcon } from '@heroicons/react/24/outline';
 import { useToast } from '@/components/ui/toast';
+
+const withoutBlanks = (record: Record<string, any>) =>
+  Object.fromEntries(Object.entries(record).filter(([, v]) => v !== undefined && v !== null && String(v).trim() !== ''));
+
+/** Spreadsheet row (all strings) -> createQuote body. Quote No, totals and
+ * status are dropped: the server numbers the quote, computes totals from the
+ * items and always starts imports as drafts. */
+const toQuotePayload = (row: Record<string, any>) => {
+  const { products = [], quoteNumber, amount, status, ...rest } = row;
+  const quote = withoutBlanks(rest);
+  for (const key of ['discountValue', 'shippingCharges']) {
+    if (quote[key] !== undefined) quote[key] = Number(quote[key]);
+  }
+  return {
+    ...quote,
+    products: (products as Record<string, any>[])
+      .map(withoutBlanks)
+      .filter((p) => p.productName)
+      .map((p) => ({
+        productName: p.productName,
+        quantity: p.quantity !== undefined ? Number(p.quantity) : undefined,
+        unit: p.unit,
+        rate: p.rate !== undefined ? Number(p.rate) : undefined,
+      })),
+  };
+};
 
 const emptyForm = { deal: '', client: '', customerEmail: '', customerPhone: '', customerAddress: '', amount: '', status: 'draft', validUntil: '' };
 
@@ -49,8 +75,8 @@ export default function QuotesPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await quotesApi.getQuotes();
-      setQuotes(res.quotes || []);
+      const rows = await quotesApi.getAllQuotes();
+      setQuotes(rows);
     } catch (err: any) {
       setError(err.message || 'Failed to load quotes. Is the backend running?');
       setQuotes([]);
@@ -213,12 +239,10 @@ export default function QuotesPage() {
                 entityName: 'Quote',
                 entityNamePlural: 'quotes',
                 fields: QUOTE_FIELDS,
-                getExportData: () => quotes,
-                onImportRow: (row) =>
-                  quotesApi.createQuote({
-                    ...row,
-                    amount: row.amount !== undefined && row.amount !== '' ? Number(row.amount) : undefined,
-                  }),
+                childTable: QUOTE_ITEMS_TABLE,
+                groupKey: 'quoteNumber',
+                getExportData: () => quotesApi.getAllQuotes({ includeItems: true }),
+                onImportRow: (row) => quotesApi.createQuote(toQuotePayload(row)),
                 onImportComplete: fetchQuotes,
               }}
             />
@@ -237,6 +261,11 @@ export default function QuotesPage() {
           data={quotes}
           rowKey={(q) => q.id}
           loading={loading}
+          bulkDelete={{
+            deleteRow: (q) => quotesApi.deleteQuote(q.id),
+            onComplete: fetchQuotes,
+            entityName: 'quotes',
+          }}
           emptyMessage='No quotes yet. Click "New Quote" to create one.'
           actions={(quote) => (
             <div className="flex justify-end gap-3">

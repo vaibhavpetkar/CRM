@@ -16,6 +16,19 @@ export type ImportExportField = {
   options?: string[];
   /** included in export by default */
   defaultExport?: boolean;
+  /** computed/system values: exported, but left out of the import template and preview */
+  exportOnly?: boolean;
+};
+
+/** A child table (e.g. a Quote's line items). In a spreadsheet each child row
+ * is its own line: the first line of a record carries the parent columns, and
+ * the following lines either leave them blank or repeat the same `groupKey`. */
+export type ImportExportChildTable = {
+  /** key of the array on the parent record (e.g. "products") */
+  key: string;
+  /** human friendly name (e.g. "Items") */
+  label: string;
+  fields: ImportExportField[];
 };
 
 export type ImportRowStatus = 'pending' | 'success' | 'error';
@@ -34,6 +47,10 @@ export type ImportExportConfig = {
   /** e.g. "leads", used for filenames */
   entityNamePlural: string;
   fields: ImportExportField[];
+  /** optional child table exported/imported as extra lines per record */
+  childTable?: ImportExportChildTable;
+  /** parent field that ties a record's lines together (e.g. "quoteNumber") */
+  groupKey?: string;
   /** rows currently visible in the table, used for Export */
   getExportData: () => any[] | Promise<any[]>;
   /** called once per row when the user clicks Import — should create the record */

@@ -66,8 +66,8 @@ export default function ContactsPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await contactsApi.getContacts({ search, limit: 200 });
-      setContacts(res.contacts || []);
+      const rows = await contactsApi.getAllContacts({ search });
+      setContacts(rows);
     } catch (err: any) {
       setError(err.message || 'Failed to load contacts. Is the backend running?');
       setContacts([]);
@@ -263,6 +263,12 @@ export default function ContactsPage() {
           data={contacts}
           rowKey={(c) => c.id}
           loading={loading}
+          bulkDelete={{
+            deleteRow: (c) => contactsApi.deleteContact(c.id),
+            onComplete: fetchContacts,
+            entityName: 'contacts',
+            restorable: true,
+          }}
           showToolbar
           onRowClick={openPanel}
           totalEntries={contacts.length}

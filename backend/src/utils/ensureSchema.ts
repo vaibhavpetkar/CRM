@@ -108,6 +108,21 @@ const SCHEMA_PATCHES: { name: string; sql: string }[] = [
     name: 'deals.actualCloseDate',
     sql: `ALTER TABLE "deals" ADD COLUMN IF NOT EXISTS "actualCloseDate" TIMESTAMPTZ;`,
   },
+  {
+    // Invoices now carry quotation-style commercials (line items live in the
+    // invoice_products / invoice_taxes tables, which sync creates).
+    name: 'invoices commercials',
+    sql: `
+      ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "subtotal" DECIMAL(15,2) NOT NULL DEFAULT 0;
+      ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "discountType" VARCHAR(20) NOT NULL DEFAULT 'percentage';
+      ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "discountValue" DECIMAL(15,2) NOT NULL DEFAULT 0;
+      ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "shippingCharges" DECIMAL(15,2) NOT NULL DEFAULT 0;
+      ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "taxTotal" DECIMAL(15,2) NOT NULL DEFAULT 0;
+      ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "terms" TEXT;
+      ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "paymentTerms" TEXT;
+      ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "notes" TEXT;
+    `,
+  },
 ];
 
 export const runSchemaPatches = async (sequelize: Sequelize): Promise<void> => {

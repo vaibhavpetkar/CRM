@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { Fragment, useMemo, useRef, useState } from 'react';
 import {
   XMarkIcon,
   ArrowDownTrayIcon,
@@ -13,6 +13,9 @@ import {
   XCircleIcon,
   ArrowPathIcon,
   TrashIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
+  PlusIcon,
 } from '@heroicons/react/24/outline';
 import Button from './button';
 import { cn } from '@/lib/utils';
@@ -43,8 +46,18 @@ export default function ImportExportModal({ open, onClose, config, initialTab = 
 
   // ── Export state ──────────────────────────────────────────────────────────
   const [format, setFormat] = useState<ExportFormat>('excel');
+  const childTable = config.childTable;
+  const childKey = (key: string) => `${childTable?.key}.${key}`;
+  const allFieldKeys = useMemo(
+    () => [...config.fields.map((f) => f.key), ...(childTable?.fields ?? []).map((f) => `${childTable!.key}.${f.key}`)],
+    [config.fields, childTable]
+  );
   const [selectedFields, setSelectedFields] = useState<Set<string>>(
-    () => new Set(config.fields.filter((f) => f.defaultExport !== false).map((f) => f.key))
+    () =>
+      new Set([
+        ...config.fields.filter((f) => f.defaultExport !== false).map((f) => f.key),
+        ...(childTable?.fields ?? []).filter((f) => f.defaultExport !== false).map((f) => `${childTable!.key}.${f.key}`),
+      ])
   );
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
@@ -54,9 +67,17 @@ export default function ImportExportModal({ open, onClose, config, initialTab = 
   const [dragOver, setDragOver] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importSummary, setImportSummary] = useState<{ done: number; total: number } | null>(null);
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const exportFields = useMemo(() => config.fields.filter((f) => selectedFields.has(f.key)), [config.fields, selectedFields]);
+  const exportChildFields = useMemo(
+    () => (childTable?.fields ?? []).filter((f) => selectedFields.has(`${childTable!.key}.${f.key}`)),
+    [childTable, selectedFields]
+  );
+  const importFields = useMemo(() => config.fields.filter((f) => !f.exportOnly), [config.fields]);
+  const importChildFields = useMemo(() => (childTable?.fields ?? []).filter((f) => !f.exportOnly), [childTable]);
+  const exportColumnCount = exportFields.length + exportChildFields.length;
 
   const selectedCount = rows.filter((r) => r.__selected).length;
   const successCount = rows.filter((r) => r.__status === 'success').length;
@@ -78,7 +99,14 @@ export default function ImportExportModal({ open, onClose, config, initialTab = 
     setExporting(true);
     try {
       const data = await config.getExportData();
-      await runExport(format, data, exportFields, config.entityNamePlural);
+      await runExport(
+        format,
+        data,
+        exportFields,
+        config.entityNamePlural,
+        childTable && exportChildFields.length ? { table: childTable, fields: exportChildFields } : undefined,
+        config.groupKey
+      );
     } catch (err: any) {
       setExportError(err.message || 'Export failed. Please try again.');
     } finally {
@@ -89,8 +117,9 @@ export default function ImportExportModal({ open, onClose, config, initialTab = 
   const handleFile = async (file: File) => {
     setImportSummary(null);
     try {
-      const parsed = await parseImportFile(file, config.fields);
+      const parsed = await parseImportFile(file, config.fields, childTable, config.groupKey);
       setRows(parsed);
+      setExpandedRows(new Set());
     } catch (err: any) {
       toast.error(err.message || 'Could not read that file. Please upload an Excel or CSV file.');
     }
@@ -107,6 +136,40 @@ export default function ImportExportModal({ open, onClose, config, initialTab = 
     setRows((prev) => prev.map((r) => (r.__rowId === rowId ? { ...r, [key]: value } : r)));
   };
 
+  const updateChildCell = (rowId: string, childIdx: number, key: string, value: string) => {
+    if (!childTable) return;
+    setRows((prev) =>
+      prev.map((r) =>
+        r.__rowId === rowId
+          ? { ...r, [childTable.key]: r[childTable.key].map((c: any, i: number) => (i === childIdx ? { ...c, [key]: value } : c)) }
+          : r
+      )
+    );
+  };
+
+  const addChildRow = (rowId: string) => {
+    if (!childTable) return;
+    setRows((prev) => prev.map((r) => (r.__rowId === rowId ? { ...r, [childTable.key]: [...r[childTable.key], {}] } : r)));
+  };
+
+  const removeChildRow = (rowId: string, childIdx: number) => {
+    if (!childTable) return;
+    setRows((prev) =>
+      prev.map((r) =>
+        r.__rowId === rowId ? { ...r, [childTable.key]: r[childTable.key].filter((_: any, i: number) => i !== childIdx) } : r
+      )
+    );
+  };
+
+  const toggleExpanded = (rowId: string) => {
+    setExpandedRows((prev) => {
+      const next = new Set(prev);
+      if (next.has(rowId)) next.delete(rowId);
+      else next.add(rowId);
+      return next;
+    });
+  };
+
   const toggleRow = (rowId: string) => {
     setRows((prev) => prev.map((r) => (r.__rowId === rowId ? { ...r, __selected: !r.__selected } : r)));
   };
@@ -121,14 +184,25 @@ export default function ImportExportModal({ open, onClose, config, initialTab = 
 
   const resetImport = () => {
     setRows([]);
+    setExpandedRows(new Set());
     setImportSummary(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const validateRow = (row: ImportRow): string | null => {
-    for (const field of config.fields) {
+    for (const field of importFields) {
       if (field.required && !String(row[field.key] ?? '').trim()) {
         return `${field.label} is required`;
+      }
+    }
+    if (childTable) {
+      const children: any[] = row[childTable.key] || [];
+      for (let i = 0; i < children.length; i += 1) {
+        for (const field of importChildFields) {
+          if (field.required && !String(children[i][field.key] ?? '').trim()) {
+            return `${childTable.label} line ${i + 1}: ${field.label} is required`;
+          }
+        }
       }
     }
     return null;
@@ -170,7 +244,9 @@ export default function ImportExportModal({ open, onClose, config, initialTab = 
     config.onImportComplete?.();
   };
 
-  const previewColumns = config.fields.slice(0, 6);
+  const previewColumns = importFields.slice(0, 6);
+  // checkbox + preview columns + (items) + status + remove
+  const previewColSpan = previewColumns.length + (childTable ? 4 : 3);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -239,7 +315,7 @@ export default function ImportExportModal({ open, onClose, config, initialTab = 
                   <div className="flex gap-3 text-xs">
                     <button
                       className="text-[#168eea] hover:underline"
-                      onClick={() => setSelectedFields(new Set(config.fields.map((f) => f.key)))}
+                      onClick={() => setSelectedFields(new Set(allFieldKeys))}
                     >
                       Select all
                     </button>
@@ -261,6 +337,26 @@ export default function ImportExportModal({ open, onClose, config, initialTab = 
                     </label>
                   ))}
                 </div>
+                {childTable && (
+                  <>
+                    <p className="mb-2 mt-4 text-sm font-medium text-slate-700">
+                      {childTable.label} <span className="font-normal text-slate-400">(one line per {childTable.label.toLowerCase().replace(/s$/, '')})</span>
+                    </p>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-2 rounded-lg border border-slate-100 p-3 sm:grid-cols-3">
+                      {childTable.fields.map((field) => (
+                        <label key={field.key} className="flex items-center gap-2 text-sm text-slate-600">
+                          <input
+                            type="checkbox"
+                            checked={selectedFields.has(childKey(field.key))}
+                            onChange={() => toggleField(childKey(field.key))}
+                            className="h-3.5 w-3.5 rounded border-slate-300 text-[#168eea] focus:ring-[#168eea]"
+                          />
+                          {field.label}
+                        </label>
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
 
               {exportError && (
@@ -277,12 +373,19 @@ export default function ImportExportModal({ open, onClose, config, initialTab = 
                     <div>
                       <p className="text-sm font-medium text-slate-700">1. Don&apos;t have a file yet?</p>
                       <p className="text-xs text-slate-500">Download a ready-made template with the correct columns.</p>
+                      {childTable && (
+                        <p className="mt-1 text-xs text-slate-500">
+                          Put each {childTable.label.toLowerCase().replace(/s$/, '')} on its own line. Extra lines for the same{' '}
+                          {config.entityName.toLowerCase()} leave the other columns blank
+                          {config.groupKey ? ` or repeat its ${config.fields.find((f) => f.key === config.groupKey)?.label}` : ''}.
+                        </p>
+                      )}
                     </div>
                     <div className="flex gap-2">
-                      <Button variant="secondary" size="sm" onClick={() => downloadTemplate(config.fields, config.entityNamePlural, 'excel')}>
+                      <Button variant="secondary" size="sm" onClick={() => downloadTemplate(config.fields, config.entityNamePlural, 'excel', childTable)}>
                         <TableCellsIcon className="h-4 w-4" /> Excel template
                       </Button>
-                      <Button variant="secondary" size="sm" onClick={() => downloadTemplate(config.fields, config.entityNamePlural, 'csv')}>
+                      <Button variant="secondary" size="sm" onClick={() => downloadTemplate(config.fields, config.entityNamePlural, 'csv', childTable)}>
                         <DocumentTextIcon className="h-4 w-4" /> CSV template
                       </Button>
                     </div>
@@ -360,66 +463,138 @@ export default function ImportExportModal({ open, onClose, config, initialTab = 
                               {field.required && <span className="text-red-400"> *</span>}
                             </th>
                           ))}
+                          {childTable && (
+                            <th className="whitespace-nowrap px-3 py-2 text-left text-xs font-semibold text-slate-500">{childTable.label}</th>
+                          )}
                           <th className="px-3 py-2 text-left text-xs font-semibold text-slate-500">Status</th>
                           <th className="w-8 px-3 py-2" />
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-50">
                         {rows.map((row) => (
-                          <tr
-                            key={row.__rowId}
-                            className={cn(
-                              row.__status === 'success' && 'bg-emerald-50',
-                              row.__status === 'error' && 'bg-red-50'
-                            )}
-                          >
-                            <td className="px-3 py-1.5">
-                              <input
-                                type="checkbox"
-                                checked={row.__selected}
-                                disabled={row.__status === 'success'}
-                                onChange={() => toggleRow(row.__rowId)}
-                                className="h-3.5 w-3.5 rounded border-slate-300 text-[#168eea] focus:ring-[#168eea]"
-                              />
-                            </td>
-                            {previewColumns.map((field) => (
-                              <td key={field.key} className="px-3 py-1.5">
+                          <Fragment key={row.__rowId}>
+                            <tr
+                              className={cn(
+                                row.__status === 'success' && 'bg-emerald-50',
+                                row.__status === 'error' && 'bg-red-50'
+                              )}
+                            >
+                              <td className="px-3 py-1.5">
                                 <input
-                                  value={row[field.key] ?? ''}
+                                  type="checkbox"
+                                  checked={row.__selected}
                                   disabled={row.__status === 'success'}
-                                  onChange={(e) => updateCell(row.__rowId, field.key, e.target.value)}
-                                  className="w-full min-w-[90px] rounded border border-transparent bg-transparent px-1.5 py-1 text-xs focus:border-[#168eea] focus:bg-white focus:outline-none disabled:text-slate-400"
+                                  onChange={() => toggleRow(row.__rowId)}
+                                  className="h-3.5 w-3.5 rounded border-slate-300 text-[#168eea] focus:ring-[#168eea]"
                                 />
                               </td>
-                            ))}
-                            <td className="px-3 py-1.5 text-xs">
-                              {row.__status === 'success' && (
-                                <span className="flex items-center gap-1 text-emerald-600">
-                                  <CheckCircleIcon className="h-4 w-4" /> Imported
-                                </span>
+                              {previewColumns.map((field) => (
+                                <td key={field.key} className="px-3 py-1.5">
+                                  <input
+                                    value={row[field.key] ?? ''}
+                                    disabled={row.__status === 'success'}
+                                    onChange={(e) => updateCell(row.__rowId, field.key, e.target.value)}
+                                    className="w-full min-w-[90px] rounded border border-transparent bg-transparent px-1.5 py-1 text-xs focus:border-[#168eea] focus:bg-white focus:outline-none disabled:text-slate-400"
+                                  />
+                                </td>
+                              ))}
+                              {childTable && (
+                                <td className="px-3 py-1.5 text-xs">
+                                  <button
+                                    onClick={() => toggleExpanded(row.__rowId)}
+                                    className="flex items-center gap-1 whitespace-nowrap font-medium text-[#168eea] hover:underline"
+                                  >
+                                    {expandedRows.has(row.__rowId) ? (
+                                      <ChevronDownIcon className="h-3.5 w-3.5" />
+                                    ) : (
+                                      <ChevronRightIcon className="h-3.5 w-3.5" />
+                                    )}
+                                    {(row[childTable.key] || []).length} {childTable.label.toLowerCase()}
+                                  </button>
+                                </td>
                               )}
-                              {row.__status === 'error' && (
-                                <span className="flex items-center gap-1 text-red-600" title={row.__error}>
-                                  <XCircleIcon className="h-4 w-4" /> {row.__error || 'Failed'}
-                                </span>
-                              )}
-                              {row.__status === 'pending' && <span className="text-slate-400">Pending</span>}
-                            </td>
-                            <td className="px-3 py-1.5">
-                              {row.__status !== 'success' && (
-                                <button onClick={() => removeRow(row.__rowId)} className="text-slate-300 hover:text-red-500">
-                                  <TrashIcon className="h-3.5 w-3.5" />
-                                </button>
-                              )}
-                            </td>
-                          </tr>
+                              <td className="px-3 py-1.5 text-xs">
+                                {row.__status === 'success' && (
+                                  <span className="flex items-center gap-1 text-emerald-600">
+                                    <CheckCircleIcon className="h-4 w-4" /> Imported
+                                  </span>
+                                )}
+                                {row.__status === 'error' && (
+                                  <span className="flex items-center gap-1 text-red-600" title={row.__error}>
+                                    <XCircleIcon className="h-4 w-4" /> {row.__error || 'Failed'}
+                                  </span>
+                                )}
+                                {row.__status === 'pending' && <span className="text-slate-400">Pending</span>}
+                              </td>
+                              <td className="px-3 py-1.5">
+                                {row.__status !== 'success' && (
+                                  <button onClick={() => removeRow(row.__rowId)} className="text-slate-300 hover:text-red-500">
+                                    <TrashIcon className="h-3.5 w-3.5" />
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                            {childTable && expandedRows.has(row.__rowId) && (
+                              <tr className="bg-slate-50/60">
+                                <td />
+                                <td colSpan={previewColSpan - 1} className="px-3 py-2">
+                                  <table className="min-w-full text-xs">
+                                    <thead>
+                                      <tr>
+                                        <th className="w-6 px-1.5 py-1 text-left font-semibold text-slate-400">#</th>
+                                        {importChildFields.map((field) => (
+                                          <th key={field.key} className="whitespace-nowrap px-1.5 py-1 text-left font-semibold text-slate-500">
+                                            {field.label}
+                                            {field.required && <span className="text-red-400"> *</span>}
+                                          </th>
+                                        ))}
+                                        <th className="w-6" />
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {(row[childTable.key] || []).map((childRow: any, idx: number) => (
+                                        <tr key={idx}>
+                                          <td className="px-1.5 py-1 text-slate-400">{idx + 1}</td>
+                                          {importChildFields.map((field) => (
+                                            <td key={field.key} className="px-1.5 py-1">
+                                              <input
+                                                value={childRow[field.key] ?? ''}
+                                                disabled={row.__status === 'success'}
+                                                onChange={(e) => updateChildCell(row.__rowId, idx, field.key, e.target.value)}
+                                                className="w-full min-w-[80px] rounded border border-slate-200 bg-white px-1.5 py-1 text-xs focus:border-[#168eea] focus:outline-none disabled:text-slate-400"
+                                              />
+                                            </td>
+                                          ))}
+                                          <td className="px-1.5 py-1">
+                                            {row.__status !== 'success' && (
+                                              <button onClick={() => removeChildRow(row.__rowId, idx)} className="text-slate-300 hover:text-red-500">
+                                                <TrashIcon className="h-3.5 w-3.5" />
+                                              </button>
+                                            )}
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                  {row.__status !== 'success' && (
+                                    <button
+                                      onClick={() => addChildRow(row.__rowId)}
+                                      className="mt-1.5 flex items-center gap-1 text-xs font-medium text-[#168eea] hover:underline"
+                                    >
+                                      <PlusIcon className="h-3.5 w-3.5" /> Add {childTable.label.toLowerCase().replace(/s$/, '')}
+                                    </button>
+                                  )}
+                                </td>
+                              </tr>
+                            )}
+                          </Fragment>
                         ))}
                       </tbody>
                     </table>
                   </div>
-                  {config.fields.length > previewColumns.length && (
+                  {importFields.length > previewColumns.length && (
                     <p className="text-xs text-slate-400">
-                      Showing the first {previewColumns.length} of {config.fields.length} columns in the preview — every
+                      Showing the first {previewColumns.length} of {importFields.length} columns in the preview — every
                       column is still imported.
                     </p>
                   )}
@@ -433,12 +608,12 @@ export default function ImportExportModal({ open, onClose, config, initialTab = 
         <div className="flex items-center justify-between border-t border-slate-100 px-6 py-4">
           {tab === 'export' ? (
             <>
-              <span className="text-xs text-slate-400">{exportFields.length} field{exportFields.length === 1 ? '' : 's'} selected</span>
+              <span className="text-xs text-slate-400">{exportColumnCount} field{exportColumnCount === 1 ? '' : 's'} selected</span>
               <div className="flex gap-2">
                 <Button variant="secondary" size="sm" onClick={onClose}>
                   Cancel
                 </Button>
-                <Button size="sm" onClick={handleExport} disabled={exporting || exportFields.length === 0}>
+                <Button size="sm" onClick={handleExport} disabled={exporting || exportColumnCount === 0}>
                   {exporting ? 'Exporting…' : `Export ${format.toUpperCase()}`}
                 </Button>
               </div>

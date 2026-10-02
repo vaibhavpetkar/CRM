@@ -23,7 +23,9 @@ class QuoteRepository extends BaseRepository<Quote> {
   }
 
   async list(params: ListQueryParams): Promise<PaginatedResult<Quote>> {
-    return this.findAll(params, { include: [assignedToInclude] });
+    // ?includeItems=true adds the line items, used by the Quotes export.
+    const include = params.includeItems === 'true' ? [assignedToInclude, childTableIncludes[0]] : [assignedToInclude];
+    return this.findAll(params, { include });
   }
 
   async getByIdWithDetails(id: number | string, transaction?: Transaction): Promise<Quote | null> {

@@ -1,33 +1,21 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import PageHeader from '@/components/ui/page-header';
 import StatusBadge from '@/components/ui/status-badge';
 import StatCard from '@/components/ui/stat-card';
 import Button from '@/components/ui/button';
 import Card from '@/components/ui/card';
 import DataTable, { DataTableColumn } from '@/components/ui/data-table';
-import CompanyAutocomplete from '@/components/ui/company-autocomplete';
 import SearchInput from '@/components/ui/search-input';
 import { formatCurrency } from '@/lib/utils';
 import { invoicesApi } from '@/lib/api';
 import ImportExportButtons from '@/components/ui/import-export-buttons';
 import { INVOICE_FIELDS } from '@/lib/import-export/field-configs';
-import { PlusIcon, XMarkIcon, TrashIcon, PencilSquareIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, TrashIcon, PencilSquareIcon, PrinterIcon } from '@heroicons/react/24/outline';
 import { useToast } from '@/components/ui/toast';
-
-const emptyForm = { 
-  client: '', 
-  customerEmail: '', 
-  customerPhone: '', 
-  customerAddress: '',
-  companyAddress: '',
-  amount: '', 
-  status: 'draft', 
-  issuedDate: '', 
-  dueDate: '',
-  quoteId: '',
-};
 
 const INVOICE_STATUSES = [
   { value: 'all', label: 'All' },
@@ -41,26 +29,12 @@ const INVOICE_STATUSES = [
 
 export default function InvoicesPage() {
   const toast = useToast();
+  const router = useRouter();
   const [invoices, setInvoices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingId, setEditingId] = useState<string | number | null>(null);
-  const [formData, setFormData] = useState(emptyForm);
-  const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-
-  // Handle company selection from autocomplete
-  const handleCompanySelect = (company: any) => {
-    setFormData((prev: any) => ({
-      ...prev,
-      client: company.name,
-      customerEmail: company.email || '',
-      customerPhone: company.phone || '',
-      customerAddress: company.address || '',
-    }));
-  };
 
   const fetchInvoices = useCallback(async () => {
     setLoading(true);
@@ -84,36 +58,6 @@ export default function InvoicesPage() {
   const totalPending = useMemo(() => invoices.filter((i) => i.status === 'pending' || i.status === 'partial').reduce((s, i) => s + Number(i.amount || 0), 0), [invoices]);
   const totalOverdue = useMemo(() => invoices.filter((i) => i.status === 'overdue').reduce((s, i) => s + Number(i.amount || 0), 0), [invoices]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSubmitting(true);
-    try {
-      if (editingId) {
-        await invoicesApi.updateInvoice(editingId, { 
-          ...formData, 
-          amount: Number(formData.amount),
-          quoteId: formData.quoteId || undefined,
-        });
-        toast.success('Invoice updated successfully');
-      } else {
-        await invoicesApi.createInvoice({ 
-          ...formData, 
-          amount: Number(formData.amount),
-          quoteId: formData.quoteId || undefined,
-        });
-        toast.success('Invoice created successfully');
-      }
-      setIsModalOpen(false);
-      setFormData(emptyForm);
-      setEditingId(null);
-      fetchInvoices();
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to save invoice');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
   const handleDelete = async (invoice: any) => {
     if (!confirm(`Delete invoice ${invoice.invoiceNumber}?`)) return;
     try {
@@ -125,25 +69,8 @@ export default function InvoicesPage() {
     }
   };
 
-  const openEdit = (invoice: any) => {
-    setEditingId(invoice.id);
-    setFormData({
-      client: invoice.client,
-      customerEmail: invoice.customerEmail || '',
-      customerPhone: invoice.customerPhone || '',
-      customerAddress: invoice.customerAddress || '',
-      companyAddress: invoice.companyAddress || '',
-      amount: invoice.amount,
-      status: invoice.status,
-      issuedDate: invoice.issuedDate ? String(invoice.issuedDate).split('T')[0] : '',
-      dueDate: invoice.dueDate ? String(invoice.dueDate).split('T')[0] : '',
-      quoteId: invoice.quoteId || '',
-    });
-    setIsModalOpen(true);
-  };
-
   const columns: DataTableColumn<any>[] = [
-    { header: 'Invoice #', accessor: (i) => <span className="font-medium text-[#168eea]">{i.invoiceNumber}</span> },
+    { header: 'Invoice #', accessor: (i) => <Link href={`/invoices/${i.id}`} className="font-medium text-[#168eea] hover:underline">{i.invoiceNumber}</Link> },
     { header: 'Client', accessor: (i) => <span className="text-slate-900">{i.client}</span> },
     { header: 'Amount', accessor: (i) => <span className="font-medium text-slate-900">{formatCurrency(i.amount)}</span> },
     { header: 'Status', accessor: (i) => <StatusBadge status={i.status} /> },
@@ -173,7 +100,7 @@ export default function InvoicesPage() {
                 onImportComplete: fetchInvoices,
               }}
             />
-            <Button size="sm" onClick={() => { setFormData(emptyForm); setEditingId(null); setIsModalOpen(true); }}><PlusIcon className="h-4 w-4" /> New Invoice</Button>
+            <Button size="sm" onClick={() => router.push('/invoices/new')}><PlusIcon className="h-4 w-4" /> New Invoice</Button>
           </>
         }
       />
@@ -215,14 +142,22 @@ export default function InvoicesPage() {
           data={invoices}
           rowKey={(i) => i.id}
           loading={loading}
+          bulkDelete={{
+            deleteRow: (i) => invoicesApi.deleteInvoice(i.id),
+            onComplete: fetchInvoices,
+            entityName: 'invoices',
+          }}
           showToolbar
           totalEntries={invoices.length}
           emptyMessage='No invoices yet. Click "New Invoice" to create one.'
           actions={(invoice) => (
             <div className="flex justify-end gap-3">
-              <button onClick={() => openEdit(invoice)} className="text-slate-400 hover:text-[#168eea]" aria-label="Edit">
+              <Link href={`/invoices/${invoice.id}?print=1`} className="text-slate-400 hover:text-[#168eea]" aria-label="Print">
+                <PrinterIcon className="h-4 w-4" />
+              </Link>
+              <Link href={`/invoices/${invoice.id}`} className="text-slate-400 hover:text-[#168eea]" aria-label="Edit">
                 <PencilSquareIcon className="h-4 w-4" />
-              </button>
+              </Link>
               <button onClick={() => handleDelete(invoice)} className="text-slate-400 hover:text-red-600" aria-label="Delete">
                 <TrashIcon className="h-4 w-4" />
               </button>
@@ -231,134 +166,6 @@ export default function InvoicesPage() {
         />
       </Card>
 
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-lg font-semibold text-slate-900">{editingId ? 'Edit Invoice' : 'New Invoice'}</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600">
-                <XMarkIcon className="h-5 w-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="mt-4 space-y-3">
-              {/* Client Selection with Autocomplete */}
-              <div>
-                <label className="block text-xs font-medium text-slate-700">Client *</label>
-                <CompanyAutocomplete
-                  value={formData.client}
-                  onChange={(val) => setFormData({ ...formData, client: val })}
-                  onSelect={handleCompanySelect}
-                  placeholder="Type client name to search..."
-                />
-              </div>
-
-              {/* Customer Details (auto-filled from selection) */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-slate-700">Customer Email</label>
-                  <input
-                    type="email"
-                    value={formData.customerEmail}
-                    onChange={(e) => setFormData({ ...formData, customerEmail: e.target.value })}
-                    placeholder="client@example.com"
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-700">Customer Phone</label>
-                  <input
-                    type="tel"
-                    maxLength={10}
-                    value={formData.customerPhone}
-                    onChange={(e) => setFormData({ ...formData, customerPhone: e.target.value.replace(/\D/g, '') })}
-                    placeholder="10-digit number"
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              {/* Addresses */}
-              <div>
-                <label className="block text-xs font-medium text-slate-700">Customer Address</label>
-                <textarea
-                  value={formData.customerAddress}
-                  onChange={(e) => setFormData({ ...formData, customerAddress: e.target.value })}
-                  placeholder="Client billing address..."
-                  rows={2}
-                  className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-700">Company Address</label>
-                <textarea
-                  value={formData.companyAddress}
-                  onChange={(e) => setFormData({ ...formData, companyAddress: e.target.value })}
-                  placeholder="Your company address..."
-                  rows={2}
-                  className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
-                />
-              </div>
-
-              {/* Amount and Status */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-slate-700">Amount *</label>
-<input
-                      type="number"
-                      required
-                      value={formData.amount}
-                      onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                      className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
-                    />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-700">Status</label>
-                  <select
-                    value={formData.status}
-                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
-                  >
-                    <option value="draft">Draft</option>
-                    <option value="pending">Pending</option>
-                    <option value="partial">Partial</option>
-                    <option value="paid">Paid</option>
-                    <option value="overdue">Overdue</option>
-                    <option value="cancelled">Cancelled</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Dates */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-slate-700">Issued Date</label>
-                  <input
-                    type="date"
-                    value={formData.issuedDate}
-                    onChange={(e) => setFormData({ ...formData, issuedDate: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-700">Due Date</label>
-                  <input
-                    type="date"
-                    value={formData.dueDate}
-                    onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="mt-4 flex justify-end gap-2 pt-2">
-                <Button type="button" variant="secondary" size="sm" onClick={() => setIsModalOpen(false)}>Cancel</Button>
-                <Button type="submit" size="sm" disabled={submitting}>{submitting ? 'Saving...' : 'Create Invoice'}</Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </>
   );
 }

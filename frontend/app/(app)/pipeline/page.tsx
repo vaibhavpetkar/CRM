@@ -23,8 +23,8 @@ export default function PipelinePage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await dealsApi.getDeals({ limit: 500 });
-      setDeals(res.deals || []);
+      const rows = await dealsApi.getAllDeals();
+      setDeals(rows);
     } catch (err: any) {
       setError(err.message || 'Failed to load pipeline. Is the backend running?');
       setDeals([]);

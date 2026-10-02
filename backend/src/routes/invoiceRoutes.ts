@@ -5,6 +5,7 @@ import { protect, authorize } from '../middleware/authMiddleware';
 const router = Router();
 
 router.get('/', protect, authorize('invoices:view'), invoiceController.getInvoices);
+router.get('/:id', protect, authorize('invoices:view'), invoiceController.getInvoiceById);
 router.post('/', protect, authorize('invoices:view'), invoiceController.createInvoice);
 router.put('/:id', protect, authorize('invoices:view'), invoiceController.updateInvoice);
 router.delete('/:id', protect, authorize('invoices:view'), invoiceController.deleteInvoice);

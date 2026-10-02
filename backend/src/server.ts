@@ -74,12 +74,20 @@ import './models/LeadProduct';
 import './models/LeadTax';
 import './models/QuoteProduct';
 import './models/QuoteTax';
+import './models/InvoiceProduct';
+import './models/InvoiceTax';
 import './models/Attachment';
 import './models/Integration';
 import './models/UserGoogleTasksConnection';
 
 // Import associations AFTER all models — defines belongsTo/hasMany relationships
 import './models/associations';
+
+// Multi-company isolation: adds companyId to every company-owned model and
+// filters queries to the logged-in user's company. Must run before sync.
+import { applyTenantScoping } from './tenancy/scoping';
+import { getDefaultCompanyId, runTenancyMigration } from './tenancy/migration';
+applyTenantScoping();
 
 // Import middleware
 import { protect } from './middleware/authMiddleware';
@@ -251,6 +259,7 @@ const createSuperAdmin = async (adminRoleId?: number) => {
     return;
   }
 
+  const companyId = await getDefaultCompanyId();
   const existing = await User.findOne({ where: { email: superEmail } });
   if (existing) {
     // Make sure the account stays a super admin & keeps a role even if it already existed.
@@ -258,6 +267,7 @@ const createSuperAdmin = async (adminRoleId?: number) => {
       isSuperAdmin: true,
       isActive: true,
       roleId: existing.roleId ?? adminRoleId ?? null,
+      companyId: existing.companyId ?? companyId,
     });
     return;
   }
@@ -273,6 +283,7 @@ const createSuperAdmin = async (adminRoleId?: number) => {
     emailVerified: true,
     phoneVerified: true,
     roleId: adminRoleId || null,
+    companyId,
   });
 };
 
@@ -308,6 +319,8 @@ const startServer = async () => {
     // Sync models — use alter:true in dev to apply schema changes
     await sequelize.sync({ alter: process.env.NODE_ENV === 'development' });
     console.log('✅ Database synchronized.');
+
+    await runTenancyMigration(sequelize);
 
     // Seed default roles and the super admin account on every boot.
     // Both are idempotent (skip/update anything that already exists), so this is
