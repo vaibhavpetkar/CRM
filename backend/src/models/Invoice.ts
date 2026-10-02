@@ -9,7 +9,17 @@ interface InvoiceAttributes {
   customerPhone?: string | null;
   customerAddress?: string | null;
   companyAddress?: string | null;
-  amount: number;
+  amount: number; // grand total
+  // Commercials — mirror Quote. Invoices without line items (legacy or
+  // manually keyed) keep a hand-entered amount and zeroed breakdown.
+  subtotal: number;
+  discountType: string; // 'percentage' | 'fixed'
+  discountValue: number;
+  shippingCharges: number;
+  taxTotal: number;
+  terms?: string | null;
+  paymentTerms?: string | null;
+  notes?: string | null;
   status: string; // 'paid' | 'pending' | 'overdue' | 'draft' | 'cancelled'
   issuedDate?: Date | null;
   dueDate?: Date | null;
@@ -17,7 +27,7 @@ interface InvoiceAttributes {
   assignedToId?: number | null;
 }
 
-interface InvoiceCreationAttributes extends Optional<InvoiceAttributes, 'id' | 'invoiceNumber'> {}
+interface InvoiceCreationAttributes extends Optional<InvoiceAttributes, 'id' | 'invoiceNumber' | 'subtotal' | 'discountType' | 'discountValue' | 'shippingCharges' | 'taxTotal'> {}
 
 class Invoice extends Model<InvoiceAttributes, InvoiceCreationAttributes> implements InvoiceAttributes {
   public id!: number;
@@ -28,6 +38,14 @@ class Invoice extends Model<InvoiceAttributes, InvoiceCreationAttributes> implem
   public customerAddress?: string | null;
   public companyAddress?: string | null;
   public amount!: number;
+  public subtotal!: number;
+  public discountType!: string;
+  public discountValue!: number;
+  public shippingCharges!: number;
+  public taxTotal!: number;
+  public terms?: string | null;
+  public paymentTerms?: string | null;
+  public notes?: string | null;
   public status!: string;
   public issuedDate?: Date | null;
   public dueDate?: Date | null;
@@ -48,6 +66,14 @@ Invoice.init(
     customerAddress: { type: DataTypes.TEXT, allowNull: true },
     companyAddress: { type: DataTypes.TEXT, allowNull: true },
     amount: { type: DataTypes.DECIMAL(15, 2), allowNull: false, defaultValue: 0 },
+    subtotal: { type: DataTypes.DECIMAL(15, 2), allowNull: false, defaultValue: 0 },
+    discountType: { type: DataTypes.STRING(20), allowNull: false, defaultValue: 'percentage' },
+    discountValue: { type: DataTypes.DECIMAL(15, 2), allowNull: false, defaultValue: 0 },
+    shippingCharges: { type: DataTypes.DECIMAL(15, 2), allowNull: false, defaultValue: 0 },
+    taxTotal: { type: DataTypes.DECIMAL(15, 2), allowNull: false, defaultValue: 0 },
+    terms: { type: DataTypes.TEXT, allowNull: true },
+    paymentTerms: { type: DataTypes.TEXT, allowNull: true },
+    notes: { type: DataTypes.TEXT, allowNull: true },
     status: { type: DataTypes.STRING(20), allowNull: false, defaultValue: 'draft' },
     issuedDate: { type: DataTypes.DATEONLY, allowNull: true },
     dueDate: { type: DataTypes.DATEONLY, allowNull: true },

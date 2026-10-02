@@ -3,8 +3,43 @@ import { Op } from 'sequelize';
 import Invoice from '../models/Invoice';
 import Payment from '../models/Payment';
 import User from '../models/User';
+import Quote from '../models/Quote';
+import InvoiceProduct from '../models/InvoiceProduct';
+import InvoiceTax from '../models/InvoiceTax';
+import sequelize from '../config/database';
 import { generateCode } from '../utils/codeGenerator';
 import { markOverdueInvoices, recalculateInvoiceStatus, toFiniteNonNegative } from '../utils/invoiceStatus';
+import { recalculateInvoiceTotals, replaceInvoiceProducts, replaceInvoiceTaxes } from '../utils/invoiceLines';
+
+const DETAIL_INCLUDE = [
+  { model: User, attributes: ['id', 'firstName', 'lastName'], as: 'assignedTo', required: false },
+  { model: InvoiceProduct, as: 'products', required: false },
+  { model: InvoiceTax, as: 'taxes', required: false },
+  { model: Quote, attributes: ['id', 'quoteNumber'], as: 'quoteRef', required: false },
+  { model: Payment, attributes: ['id', 'amount'], as: 'payments', required: false },
+];
+
+const serializeDetail = (invoice: any) => {
+  const plain = serialize(invoice);
+  const totalPaid = (plain.payments || []).reduce((sum: number, p: any) => sum + parseFloat(String(p.amount)), 0);
+  delete plain.payments;
+  return {
+    ...plain,
+    products: [...(plain.products || [])].sort((a: any, b: any) => a.id - b.id),
+    taxes: [...(plain.taxes || [])].sort((a: any, b: any) => a.id - b.id),
+    totalPaid,
+    balanceDue: parseFloat(String(plain.amount)) - totalPaid,
+  };
+};
+
+// Quotes use 'percentage' | 'fixed' (older rows say 'flat'); anything that
+// isn't a percentage is a flat amount.
+const normalizeDiscountType = (value: unknown) => (value && value !== 'percentage' ? 'fixed' : 'percentage');
+
+const toNumberOr = (value: unknown, fallback: number) => {
+  const num = toFiniteNonNegative(value);
+  return num === null ? fallback : num;
+};
 
 const serialize = (invoice: any) => {
   const plain = invoice.toJSON ? invoice.toJSON() : invoice;
@@ -99,6 +134,23 @@ export const getInvoices = async (req: Request, res: Response) => {
   }
 };
 
+export const getInvoiceById = async (req: Request, res: Response) => {
+  try {
+    const invoice = await Invoice.findByPk(req.params.id as string, { include: DETAIL_INCLUDE });
+    if (!invoice) return res.status(404).json({ message: 'Invoice not found' });
+    return res.json(serializeDetail(invoice));
+  } catch (error) {
+    console.error('Get invoice error:', error);
+    return res.status(500).json({ message: 'Server error while fetching invoice' });
+  }
+};
+
+/**
+ * Creates an invoice. Like a quotation it can carry line items (`products`),
+ * `taxes`, discount and shipping — the grand total is then computed
+ * server-side. Without line items, the hand-entered `amount` is used as-is
+ * (the original lump-sum behaviour, kept for imports and simple invoices).
+ */
 export const createInvoice = async (req: Request, res: Response) => {
   try {
     const { client, customerEmail, customerPhone, customerAddress, companyAddress, amount, status, issuedDate, dueDate, quoteId, assignedToId } = req.body;
@@ -109,22 +161,38 @@ export const createInvoice = async (req: Request, res: Response) => {
       return res.status(400).json({ message: 'Amount must be a valid non-negative number' });
     }
 
-    const invoice = await Invoice.create({
-      invoiceNumber: await generateInvoiceNumber(),
-      client,
-      customerEmail: customerEmail || null,
-      customerPhone: customerPhone || null,
-      customerAddress: customerAddress || null,
-      companyAddress: companyAddress || null,
-      amount: parsedAmount,
-      status: status || 'draft',
-      issuedDate: issuedDate || null,
-      dueDate: dueDate || null,
-      quoteId: quoteId || null,
-      assignedToId: assignedToId || null,
+    const id = await sequelize.transaction(async (t) => {
+      const invoice = await Invoice.create(
+        {
+          invoiceNumber: await generateInvoiceNumber(),
+          client,
+          customerEmail: customerEmail || null,
+          customerPhone: customerPhone || null,
+          customerAddress: customerAddress || null,
+          companyAddress: companyAddress || null,
+          amount: parsedAmount,
+          discountType: normalizeDiscountType(req.body.discountType),
+          discountValue: toNumberOr(req.body.discountValue, 0),
+          shippingCharges: toNumberOr(req.body.shippingCharges, 0),
+          terms: req.body.terms || null,
+          paymentTerms: req.body.paymentTerms || null,
+          notes: req.body.notes || null,
+          status: status || 'draft',
+          issuedDate: issuedDate || null,
+          dueDate: dueDate || null,
+          quoteId: quoteId || null,
+          assignedToId: assignedToId || null,
+        },
+        { transaction: t }
+      );
+      if (Array.isArray(req.body.products)) await replaceInvoiceProducts(invoice.id, req.body.products, t);
+      if (Array.isArray(req.body.taxes)) await replaceInvoiceTaxes(invoice.id, req.body.taxes, t);
+      await recalculateInvoiceTotals(invoice.id, t);
+      return invoice.id;
     });
 
-    return res.status(201).json({ message: 'Invoice created successfully', invoice: serialize(invoice) });
+    const invoice = await Invoice.findByPk(id, { include: DETAIL_INCLUDE });
+    return res.status(201).json({ message: 'Invoice created successfully', invoice: serializeDetail(invoice) });
   } catch (error) {
     console.error('Create invoice error:', error);
     return res.status(500).json({ message: 'Server error while creating invoice' });
@@ -133,7 +201,7 @@ export const createInvoice = async (req: Request, res: Response) => {
 
 export const updateInvoice = async (req: Request, res: Response) => {
   try {
-    const invoice = await Invoice.findByPk(req.params.id);
+    const invoice = await Invoice.findByPk(req.params.id as string);
     if (!invoice) return res.status(404).json({ message: 'Invoice not found' });
 
     const { client, customerEmail, customerPhone, customerAddress, companyAddress, amount, status, issuedDate, dueDate, quoteId, assignedToId } = req.body;
@@ -143,18 +211,33 @@ export const updateInvoice = async (req: Request, res: Response) => {
       return res.status(400).json({ message: 'Amount must be a valid non-negative number' });
     }
 
-    await invoice.update({
-      client: client ?? invoice.client,
-      customerEmail: customerEmail !== undefined ? customerEmail : invoice.customerEmail,
-      customerPhone: customerPhone !== undefined ? customerPhone : invoice.customerPhone,
-      customerAddress: customerAddress !== undefined ? customerAddress : invoice.customerAddress,
-      companyAddress: companyAddress !== undefined ? companyAddress : invoice.companyAddress,
-      amount: parsedAmount !== null ? parsedAmount : invoice.amount,
-      status: status ?? invoice.status,
-      issuedDate: issuedDate !== undefined ? issuedDate : invoice.issuedDate,
-      dueDate: dueDate !== undefined ? dueDate : invoice.dueDate,
-      quoteId: quoteId !== undefined ? quoteId : invoice.quoteId,
-      assignedToId: assignedToId !== undefined ? assignedToId : invoice.assignedToId,
+    await sequelize.transaction(async (t) => {
+      await invoice.update(
+        {
+          client: client ?? invoice.client,
+          customerEmail: customerEmail !== undefined ? customerEmail : invoice.customerEmail,
+          customerPhone: customerPhone !== undefined ? customerPhone : invoice.customerPhone,
+          customerAddress: customerAddress !== undefined ? customerAddress : invoice.customerAddress,
+          companyAddress: companyAddress !== undefined ? companyAddress : invoice.companyAddress,
+          amount: parsedAmount !== null ? parsedAmount : invoice.amount,
+          discountType: req.body.discountType !== undefined ? normalizeDiscountType(req.body.discountType) : invoice.discountType,
+          discountValue: req.body.discountValue !== undefined ? toNumberOr(req.body.discountValue, 0) : invoice.discountValue,
+          shippingCharges: req.body.shippingCharges !== undefined ? toNumberOr(req.body.shippingCharges, 0) : invoice.shippingCharges,
+          terms: req.body.terms !== undefined ? req.body.terms : invoice.terms,
+          paymentTerms: req.body.paymentTerms !== undefined ? req.body.paymentTerms : invoice.paymentTerms,
+          notes: req.body.notes !== undefined ? req.body.notes : invoice.notes,
+          status: status ?? invoice.status,
+          // '' from a cleared date input would be an invalid DATEONLY
+          issuedDate: issuedDate !== undefined ? issuedDate || null : invoice.issuedDate,
+          dueDate: dueDate !== undefined ? dueDate || null : invoice.dueDate,
+          quoteId: quoteId !== undefined ? quoteId || null : invoice.quoteId,
+          assignedToId: assignedToId !== undefined ? assignedToId : invoice.assignedToId,
+        },
+        { transaction: t }
+      );
+      if (Array.isArray(req.body.products)) await replaceInvoiceProducts(invoice.id, req.body.products, t);
+      if (Array.isArray(req.body.taxes)) await replaceInvoiceTaxes(invoice.id, req.body.taxes, t);
+      await recalculateInvoiceTotals(invoice.id, t);
     });
 
     // Amount/dueDate edits can make the stored status stale (e.g. raising the
@@ -162,8 +245,8 @@ export const updateInvoice = async (req: Request, res: Response) => {
     // date). Recompute it — draft/cancelled are preserved by the helper.
     await recalculateInvoiceStatus(invoice.id);
 
-    await invoice.reload({ include: [{ model: User, attributes: ['id', 'firstName', 'lastName'], as: 'assignedTo', required: false }] });
-    return res.json({ message: 'Invoice updated successfully', invoice: serialize(invoice) });
+    const updated = await Invoice.findByPk(invoice.id, { include: DETAIL_INCLUDE });
+    return res.json({ message: 'Invoice updated successfully', invoice: serializeDetail(updated) });
   } catch (error) {
     console.error('Update invoice error:', error);
     return res.status(500).json({ message: 'Server error while updating invoice' });

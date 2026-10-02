@@ -14,6 +14,7 @@ import Contact from '../models/Contact';
 import quoteRepository from '../repositories/QuoteRepository';
 import { ListQueryParams } from '../repositories/BaseRepository';
 import { generateCode } from '../utils/codeGenerator';
+import { copyQuoteLinesToInvoice } from '../utils/invoiceLines';
 import { logActivity, getTimeline } from './activityLogger';
 import { notifyUser } from '../utils/notificationService';
 import { generateDocumentPdf, PrintableDocument } from '../utils/pdfGenerator';
@@ -622,6 +623,8 @@ class QuoteService {
         },
         { transaction: t }
       );
+      // Carry the quotation's line items, taxes and terms onto the invoice.
+      await copyQuoteLinesToInvoice(quote, invoice.id, t);
 
       await logActivity(
         { action: 'invoice_created', entityType: 'Quote', entityId: quote.id, performedById: userId, details: `Quotation ${quote.quoteNumber} was approved; Invoice ${invoiceNumber} was auto-created.` },
