@@ -1,6 +1,11 @@
 import Redis from 'ioredis';
 import logger from './logger';
 import type { Request, Response, NextFunction } from 'express';
+import { currentCompanyId } from '../tenancy/context';
+
+// Cached results are per company, so the same key never serves one
+// company's data to another.
+const tenantKey = (key: string) => `c${currentCompanyId() ?? 'all'}:${key}`;
 
 const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
 
@@ -47,7 +52,8 @@ const getClient = (): Redis | null => {
  *   response, and any given write is reflected everywhere within one TTL
  *   window without needing per-write invalidation wiring.
  */
-export async function getOrSetCache<T>(key: string, ttlSeconds: number, fn: () => Promise<T>): Promise<T> {
+export async function getOrSetCache<T>(rawKey: string, ttlSeconds: number, fn: () => Promise<T>): Promise<T> {
+  const key = tenantKey(rawKey);
   const redis = getClient();
   if (!redis) return fn();
 
@@ -78,7 +84,7 @@ export async function invalidateCache(prefix: string): Promise<void> {
   if (!redis) return;
 
   try {
-    const stream = redis.scanStream({ match: `${prefix}*`, count: 100 });
+    const stream = redis.scanStream({ match: `${tenantKey(prefix)}*`, count: 100 });
     const keysToDelete: string[] = [];
     for await (const keys of stream) {
       keysToDelete.push(...(keys as string[]));
@@ -101,7 +107,7 @@ export function cacheRoute(keyFn: (req: Request) => string, ttlSeconds: number) 
     const redis = getClient();
     if (!redis) return next();
 
-    const key = keyFn(req);
+    const key = tenantKey(keyFn(req));
 
     try {
       const cached = await redis.get(key);

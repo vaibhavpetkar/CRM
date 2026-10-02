@@ -7,6 +7,8 @@ import crypto from 'crypto';
 import { Op } from 'sequelize';
 import { OAuth2Client } from 'google-auth-library';
 import { AuthRequest } from '../middleware/authMiddleware';
+import { runUnscoped } from '../tenancy/context';
+import { getDefaultCompanyId } from '../tenancy/migration';
 import { sendInviteEmail, sendResetPasswordEmail } from '../utils/mailer';
 
 const roleInclude = { model: Role, as: 'role' };
@@ -94,6 +96,8 @@ export const register = async (req: Request, res: Response) => {
       isActive: false,
       emailVerified: false,
       phoneVerified: false,
+      // Lands in the original company until self-serve company signup exists.
+      companyId: await getDefaultCompanyId(),
     });
 
     return res.status(201).json({
@@ -180,6 +184,7 @@ export const googleLogin = async (req: Request, res: Response) => {
         emailVerified: true,
         phoneVerified: false,
         isActive: true,
+        companyId: await getDefaultCompanyId(),
       });
     }
 
@@ -215,7 +220,12 @@ export const sendInvitation = async (req: Request, res: Response) => {
     const inviteToken = crypto.randomBytes(32).toString('hex');
     const inviteExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
 
-    let user = await User.findOne({ where: { email } });
+    // Emails are unique across all companies, so look outside this one too.
+    let user = await runUnscoped(() => User.findOne({ where: { email } }));
+
+    if (user && user.companyId !== (req as any).user?.companyId) {
+      return res.status(400).json({ message: 'This email is already registered with another company.' });
+    }
 
     if (user) {
       if (user.emailVerified) {

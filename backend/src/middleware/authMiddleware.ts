@@ -2,6 +2,8 @@ import { Request, Response, NextFunction } from 'express';
 import jwt, { JwtPayload } from 'jsonwebtoken';
 import User from '../models/User';
 import Role from '../models/Role';
+import { runWithTenant } from '../tenancy/context';
+import { getDefaultCompanyId } from '../tenancy/migration';
 
 export interface AuthRequest extends Request {
   user?: any;
@@ -27,8 +29,17 @@ export const authMiddleware = async (req: AuthRequest, res: Response, next: Next
       return res.status(401).json({ message: 'Account is inactive.' });
     }
 
+    // Every user works inside one company; everything after this point only
+    // sees that company's records (see tenancy/scoping.ts).
+    if (!user.companyId) {
+      if (!user.isSuperAdmin) {
+        return res.status(403).json({ message: 'Your account is not linked to a company. Please contact your administrator.' });
+      }
+      await user.update({ companyId: await getDefaultCompanyId() });
+    }
+
     req.user = user;
-    next();
+    return runWithTenant(user.companyId as number, () => next());
   } catch (error) {
     res.status(401).json({ message: 'Invalid or expired token.' });
   }

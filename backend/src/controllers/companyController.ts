@@ -1,9 +1,9 @@
 import { Request, Response } from 'express';
 import Company from '../models/Company';
 
-// This app manages a single organization's settings (name, currency, etc.) under
-// Settings > Company. We treat the first Company row as that singleton record,
-// creating it on first access if it doesn't exist yet.
+// Settings > Company: the logged-in user's own company (name, currency, etc.).
+// Company reads are filtered to the user's company (tenancy/scoping.ts), so
+// "the first row" here is always the caller's company.
 const getOrCreateCompany = async () => {
   let company = await Company.findOne({ order: [['id', 'ASC']] });
   if (!company) {

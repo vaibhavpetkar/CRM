@@ -9,6 +9,7 @@ import LeadTax from '../models/LeadTax';
 import Deal from '../models/Deal';
 import Invoice from '../models/Invoice';
 import Company from '../models/Company';
+import { runWithTenant } from '../tenancy/context';
 import Contact from '../models/Contact';
 import quoteRepository from '../repositories/QuoteRepository';
 import { ListQueryParams } from '../repositories/BaseRepository';
@@ -349,9 +350,15 @@ class QuoteService {
   async getPublicPrintHtml(token: string): Promise<string> {
     const quote = await Quote.findOne({ where: { publicToken: token } });
     if (!quote) throw new NotFoundError('Quote', token);
-    const full = await quoteRepository.getByIdWithDetails(quote.id);
-    const doc = await this.buildPrintableDocument(full!);
-    return renderPrintHtml(doc);
+    // No login on this link, so render as the quote's own company (its
+    // name, logo, currency) rather than with no company at all.
+    const companyId = (quote as any).companyId as number | null;
+    const render = async () => {
+      const full = await quoteRepository.getByIdWithDetails(quote.id);
+      const doc = await this.buildPrintableDocument(full!);
+      return renderPrintHtml(doc);
+    };
+    return companyId ? runWithTenant(companyId, render) : render();
   }
 
   /**
