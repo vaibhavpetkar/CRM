@@ -186,6 +186,11 @@ export default function ExpensesPage() {
           data={expenses}
           rowKey={(e) => e.id}
           loading={loading}
+          bulkDelete={{
+            deleteRow: (e) => expensesApi.deleteExpense(e.id),
+            onComplete: fetchAll,
+            entityName: 'expenses',
+          }}
           showToolbar
           totalEntries={expenses.length}
           emptyMessage='No expenses found. Click "Add Expense" to record one.'

@@ -299,6 +299,12 @@ export default function DealsPage() {
           data={deals}
           rowKey={(d) => d.id}
           loading={loading}
+          bulkDelete={{
+            deleteRow: (d) => dealsApi.deleteDeal(d.id),
+            onComplete: fetchDeals,
+            entityName: 'deals',
+            restorable: true,
+          }}
           showToolbar
           onSelectionChange={setSelectedDealIds}
           totalEntries={deals.length}

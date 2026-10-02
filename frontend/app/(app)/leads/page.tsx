@@ -590,6 +590,12 @@ export default function LeadsPage() {
           data={leads}
           rowKey={(l) => l.id}
           loading={loading}
+          bulkDelete={{
+            deleteRow: (l) => leadsApi.deleteLead(l.id),
+            onComplete: fetchLeads,
+            entityName: 'leads',
+            restorable: true,
+          }}
           showToolbar
           canEdit={canEditLeads}
           onSelectionChange={setSelectedLeadIds}

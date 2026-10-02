@@ -237,6 +237,11 @@ export default function QuotesPage() {
           data={quotes}
           rowKey={(q) => q.id}
           loading={loading}
+          bulkDelete={{
+            deleteRow: (q) => quotesApi.deleteQuote(q.id),
+            onComplete: fetchQuotes,
+            entityName: 'quotes',
+          }}
           emptyMessage='No quotes yet. Click "New Quote" to create one.'
           actions={(quote) => (
             <div className="flex justify-end gap-3">

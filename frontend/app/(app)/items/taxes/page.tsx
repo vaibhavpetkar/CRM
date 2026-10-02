@@ -134,6 +134,11 @@ export default function TaxMasterPage() {
           data={taxes}
           rowKey={(t) => t.id}
           loading={loading}
+          bulkDelete={{
+            deleteRow: (t) => taxesApi.deleteTax(t.id),
+            onComplete: fetchTaxes,
+            entityName: 'taxes',
+          }}
           showToolbar
           totalEntries={taxes.length}
           emptyMessage='No taxes found. Click "Add Tax" to create one.'
