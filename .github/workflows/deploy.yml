@@ -8,6 +8,15 @@ on:
       - 'v*'
   workflow_dispatch:
 
+# Only one deploy may touch the VPS at a time. Two overlapping runs (e.g.
+# merging two PRs back to back) race each other's `compose down` / `up` and
+# fail with "container name ... is already in use". A run that's already
+# deploying is never cancelled mid-way; newer pushes wait their turn, and
+# GitHub keeps only the latest waiting run, which deploys latest master.
+concurrency:
+  group: deploy-vps
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -62,9 +71,21 @@ jobs:
             git fetch --all
             git reset --hard origin/master
             
-            # Rebuild and restart the Docker containers
-            sudo docker compose down
-            sudo docker compose up -d --build
+            # Rebuild and restart the Docker containers.
+            # A recreate that gets interrupted (failed build, dropped SSH,
+            # cancelled run) leaves a half-made container behind under
+            # Compose's temporary name, e.g. "491c802bc577_crm_frontend".
+            # Compose doesn't clean those up itself, and every later deploy
+            # then dies with "container name ... is already in use". Remove
+            # any such leftovers first; the pattern only matches that
+            # temporary <12-hex-id>_crm_<service> form, never the real
+            # crm_* containers or anything from other projects on the box.
+            sudo docker ps -a --format '{{.ID}} {{.Names}}' \
+              | grep -E ' [0-9a-f]{12}_crm_[a-z]+$' \
+              | awk '{print $1}' \
+              | xargs -r sudo docker rm -f
+            sudo docker compose down --remove-orphans
+            sudo docker compose up -d --build --remove-orphans
             
             # Run any pending DB migrations against the now-running backend
             # container. Without this, new columns/tables added by a
