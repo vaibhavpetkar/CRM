@@ -14,8 +14,9 @@ import { formatCurrency } from '@/lib/utils';
 import { invoicesApi } from '@/lib/api';
 import ImportExportButtons from '@/components/ui/import-export-buttons';
 import { INVOICE_FIELDS } from '@/lib/import-export/field-configs';
-import { PlusIcon, TrashIcon, PencilSquareIcon, PrinterIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, TrashIcon, PencilSquareIcon } from '@heroicons/react/24/outline';
 import { useToast } from '@/components/ui/toast';
+import PrintButton from '@/components/ui/print-button';
 
 const INVOICE_STATUSES = [
   { value: 'all', label: 'All' },
@@ -152,9 +153,8 @@ export default function InvoicesPage() {
           emptyMessage='No invoices yet. Click "New Invoice" to create one.'
           actions={(invoice) => (
             <div className="flex justify-end gap-3">
-              <Link href={`/invoices/${invoice.id}?print=1`} className="text-slate-400 hover:text-[#168eea]" aria-label="Print">
-                <PrinterIcon className="h-4 w-4" />
-              </Link>
+              {/* Prints with the invoice's print format (Document Templates > Print Format) */}
+              <PrintButton docType="invoice" id={invoice.id} variant="icon" />
               <Link href={`/invoices/${invoice.id}`} className="text-slate-400 hover:text-[#168eea]" aria-label="Edit">
                 <PencilSquareIcon className="h-4 w-4" />
               </Link>

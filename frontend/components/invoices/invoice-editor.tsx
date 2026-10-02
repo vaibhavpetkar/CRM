@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { invoicesApi } from '@/lib/api';
+import { invoicesApi, documentTemplatesApi, openPrintWindow } from '@/lib/api';
 import Button from '@/components/ui/button';
 import Card from '@/components/ui/card';
 import StatusBadge from '@/components/ui/status-badge';
@@ -13,6 +13,7 @@ import ItemAutocomplete, { ItemSuggestion } from '@/components/ui/item-autocompl
 import { formatCurrency } from '@/lib/utils';
 import { ArrowLeftIcon, PlusIcon, TrashIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { useToast } from '@/components/ui/toast';
+import PrintButton from '@/components/ui/print-button';
 import { useKeyboardShortcuts } from '@/lib/hooks/useKeyboardShortcuts';
 
 type LineItem = { itemId: number | ''; productName: string; quantity: number; unit: string; rate: number };
@@ -102,12 +103,14 @@ export default function InvoiceEditor({ invoiceId, autoPrint = false }: { invoic
     fetchInvoice();
   }, [fetchInvoice]);
 
-  // The list's "Print" action links here with ?print=1 — open the print
-  // dialog once the invoice has loaded.
+  // "?print=1" links open the invoice's real print format once, instead of
+  // printing this edit form. Runs without a click, so a blocked pop-up is
+  // expected; the Print button still works.
+  const printedFromLink = useRef(false);
   useEffect(() => {
-    if (autoPrint && !loading && invoice) {
-      const t = setTimeout(() => window.print(), 300);
-      return () => clearTimeout(t);
+    if (autoPrint && !loading && invoice && !printedFromLink.current) {
+      printedFromLink.current = true;
+      openPrintWindow(documentTemplatesApi.getPrintHtml('invoice', invoice.id)).catch(() => {});
     }
   }, [autoPrint, loading, invoice]);
 
@@ -226,11 +229,7 @@ export default function InvoiceEditor({ invoiceId, autoPrint = false }: { invoic
           </Link>
         )}
         <div className="ml-auto flex flex-wrap gap-2">
-          {!isNew && (
-            <Button type="button" variant="secondary" size="sm" onClick={() => window.print()}>
-              Print
-            </Button>
-          )}
+          {!isNew && invoice && <PrintButton docType="invoice" id={invoice.id} />}
           <Button type="button" onClick={handleSave} disabled={saving}>
             {saving ? 'Saving...' : isNew ? 'Create Invoice' : 'Save'}
           </Button>

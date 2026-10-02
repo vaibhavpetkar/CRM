@@ -940,11 +940,17 @@ export const googleBusinessApi = {
 // with {{field}} placeholders. See documentTemplateController on the backend.
 
 export interface DocTypeOption { value: string; label: string }
-export interface MergeField { key: string; label: string; sample: string }
+export interface MergeField { key: string; label: string; sample: string; group?: string }
+export interface MergeList { key: string; label: string; fields: MergeField[] }
+export type TemplatePurpose = 'email' | 'print';
+export type PrintDocType = 'quote' | 'invoice' | 'task' | 'meeting';
 export interface DocumentTemplate {
   id: number;
   name: string;
   docType: string;
+  purpose: TemplatePurpose;
+  /** Drag-and-drop builder design (JSON), when the print format was made in the builder. */
+  layout?: string | null;
   subject: string;
   htmlBody: string;
   isDefault: boolean;
@@ -953,13 +959,50 @@ export interface DocumentTemplate {
 }
 
 export const documentTemplatesApi = {
-  getDocTypes: async () => request<{ docTypes: DocTypeOption[] }>('/document-templates/doc-types'),
-  getMergeFields: async (docType: string) => request<{ fields: MergeField[]; sample: Record<string, string> }>(`/document-templates/merge-fields/${docType}`),
-  getTemplates: async (docType?: string) => request<{ templates: DocumentTemplate[] }>(`/document-templates${docType ? `?docType=${docType}` : ''}`),
+  getDocTypes: async () => request<{ docTypes: DocTypeOption[]; purposes: DocTypeOption[] }>('/document-templates/doc-types'),
+  getMergeFields: async (docType: string) =>
+    request<{ fields: MergeField[]; lists: MergeList[]; sample: Record<string, unknown> }>(`/document-templates/merge-fields/${docType}`),
+  getStarter: async (docType: string, purpose: TemplatePurpose) =>
+    request<{ subject: string; htmlBody: string }>(`/document-templates/starter/${docType}?purpose=${purpose}`),
+  getTemplates: async (docType?: string, purpose?: TemplatePurpose) => {
+    const params = new URLSearchParams();
+    if (docType) params.set('docType', docType);
+    if (purpose) params.set('purpose', purpose);
+    const qs = params.toString();
+    return request<{ templates: DocumentTemplate[] }>(`/document-templates${qs ? `?${qs}` : ''}`);
+  },
   getTemplate: async (id: string | number) => request<{ template: DocumentTemplate }>(`/document-templates/${id}`),
   createTemplate: async (data: Partial<DocumentTemplate>) => request<{ template: DocumentTemplate }>('/document-templates', { method: 'POST', body: JSON.stringify(data) }),
   updateTemplate: async (id: string | number, data: Partial<DocumentTemplate>) => request<{ template: DocumentTemplate }>(`/document-templates/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteTemplate: async (id: string | number) => request<{ message: string }>(`/document-templates/${id}`, { method: 'DELETE' }),
-  preview: async (data: { docType: string; subject: string; htmlBody: string }) =>
+  preview: async (data: { docType: string; subject: string; htmlBody: string; recordId?: string | number }) =>
     request<{ subject: string; html: string; unknownFields: string[] }>('/document-templates/preview', { method: 'POST', body: JSON.stringify(data) }),
+  /** Full print-ready page for an unsaved template (sample data, or a real record when recordId is set). */
+  previewPage: async (data: { docType: string; htmlBody: string; recordId?: string | number; autoPrint?: boolean }) =>
+    request<string>('/document-templates/preview-page', { method: 'POST', body: JSON.stringify(data) }),
+  /** A record's merge data, for showing real values in the print builder. */
+  getRecordData: async (docType: string, id: string | number) => request<{ data: Record<string, unknown> }>(`/document-templates/data/${docType}/${id}`),
+  /** Print view of a real record, using templateId, else the default print format, else the built-in layout. */
+  getPrintHtml: async (docType: PrintDocType, id: string | number, templateId?: string | number | null) =>
+    request<string>(`/document-templates/print/${docType}/${id}?autoPrint=1${templateId ? `&templateId=${templateId}` : ''}`),
 };
+
+/**
+ * Opens a print window for already-rendered HTML. The window must be opened
+ * synchronously inside the click handler (before any await) or popup blockers
+ * stop it, so callers pass a promise for the HTML and this fills it in.
+ */
+export async function openPrintWindow(html: Promise<string>): Promise<void> {
+  const win = typeof window !== 'undefined' ? window.open('', '_blank') : null;
+  if (!win) throw new Error('Your browser blocked the print window. Allow pop-ups for this site and try again.');
+  win.document.write('<p style="font-family:sans-serif;color:#64748b;padding:24px">Preparing print…</p>');
+  try {
+    const content = await html;
+    win.document.open();
+    win.document.write(content);
+    win.document.close();
+  } catch (err) {
+    win.close();
+    throw err;
+  }
+}
