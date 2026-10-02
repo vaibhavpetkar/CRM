@@ -2,6 +2,7 @@ import { Router } from 'express';
 import {
   register,
   signupCompany,
+  lookupCompany,
   login,
   googleLogin,
   sendInvitation,
@@ -14,7 +15,7 @@ import {
   getMe,
 } from '../controllers/authController';
 import { protect, authorize } from '../middleware/authMiddleware';
-import { loginRateLimiter, passwordResetRateLimiter, registrationRateLimiter } from '../middleware/rateLimiter';
+import { companyLookupRateLimiter, loginRateLimiter, passwordResetRateLimiter, registrationRateLimiter } from '../middleware/rateLimiter';
 
 const router = Router();
 
@@ -22,6 +23,7 @@ const router = Router();
 router.post('/register', registrationRateLimiter, register);
 router.post('/signup-company', registrationRateLimiter, signupCompany);
 router.post('/login', loginRateLimiter, login);
+router.get('/company/:code', companyLookupRateLimiter, lookupCompany);
 router.post('/google', loginRateLimiter, googleLogin);
 router.get('/verify-email/:token', verifyEmail);
 router.post('/forgot-password', passwordResetRateLimiter, forgotPassword);

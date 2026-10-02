@@ -3,6 +3,7 @@ import Company from '../models/Company';
 import logger from '../utils/logger';
 import { runUnscoped } from './context';
 import { TENANT_FIELD, TENANT_MODELS } from './scoping';
+import { generateCompanyCode } from '../utils/companyCode';
 
 /**
  * The company that owns everything created before multi-company support:
@@ -48,6 +49,7 @@ const COMPANY_SUBSCRIPTION_COLUMNS = [
   `"blockedAt" TIMESTAMPTZ`,
   `"blockedReason" VARCHAR(500)`,
   `"lastAlertKey" VARCHAR(100)`,
+  `"code" VARCHAR(30)`,
 ];
 
 const hasRun = async (sequelize: Sequelize, name: string) =>
@@ -143,5 +145,18 @@ export const runTenancyMigration = async (sequelize: Sequelize): Promise<void> =
 
   for (const [table, column] of PER_COMPANY_UNIQUE) {
     await makeUniquePerCompany(sequelize, table, column);
+  }
+
+  // Every tenant needs a company code to sign in with.
+  await sequelize.query(
+    `CREATE UNIQUE INDEX IF NOT EXISTS "companies_code_unique" ON "companies" (LOWER("code")) WHERE "code" IS NOT NULL;`
+  );
+  const withoutCode = await runUnscoped(() =>
+    Company.findAll({ where: { [Op.and]: [where(col(TENANT_FIELD), Op.eq, col('id')), { code: null }] }, order: [['id', 'ASC']] })
+  );
+  for (const company of withoutCode) {
+    const code = await generateCompanyCode(company.name);
+    await runUnscoped(() => company.update({ code }));
+    logger.info(`[tenancy] Company #${company.id} "${company.name}" got company code "${code}".`);
   }
 };

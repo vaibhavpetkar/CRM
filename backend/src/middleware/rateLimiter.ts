@@ -44,3 +44,13 @@ export const websiteLeadRateLimiter = rateLimit({
   legacyHeaders: false,
   message: { message: 'Too many messages from this connection. Please try again later or email us directly.' },
 });
+
+// Company-code checks on the login screen: generous, but enough to stop
+// someone enumerating every company code.
+export const companyLookupRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Too many attempts. Please try again in a few minutes.' },
+});

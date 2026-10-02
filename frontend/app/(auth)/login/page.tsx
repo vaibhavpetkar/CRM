@@ -8,7 +8,7 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import Button from '@/components/ui/button';
-import { authApi } from '@/lib/api';
+import { authApi, getLastCompanyCode, setLastCompanyCode } from '@/lib/api';
 
 declare global {
   interface Window {
@@ -17,6 +17,7 @@ declare global {
 }
 
 const loginSchema = z.object({
+  companyCode: z.string().trim().min(1, 'Company code is required'),
   email: z.string().email('Please enter a valid email address'),
   password: z.string().min(1, 'Password is required'),
 });
@@ -31,10 +32,17 @@ export default function LoginPage() {
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors },
   } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
   });
+
+  // Prefill the company code this browser last signed in with.
+  useEffect(() => {
+    const last = getLastCompanyCode();
+    if (last) setValue('companyCode', last);
+  }, [setValue]);
 
   const handleGoogleCallback = async (response: any) => {
     setLoading(true);
@@ -86,7 +94,8 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      await authApi.login(data);
+      const res = await authApi.login({ ...data, companyCode: data.companyCode.toLowerCase() });
+      setLastCompanyCode(res.company?.code);
       router.push('/dashboard');
     } catch (err: any) {
       setError(err.message || 'Failed to sign in. Check your credentials.');
@@ -150,6 +159,25 @@ export default function LoginPage() {
       )}
 
       <form onSubmit={handleSubmit(onSubmit)} className="mt-7 space-y-5">
+        <div>
+          <label className="mb-1.5 block text-sm font-semibold text-slate-700">Company Code</label>
+          <div className="relative">
+            <svg viewBox="0 0 24 24" fill="none" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400">
+              <path d="M4 21V5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v16M15 9h4a1 1 0 0 1 1 1v11M8 8h3M8 12h3M8 16h3M2.5 21h19" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <input
+              type="text"
+              autoCapitalize="none"
+              placeholder="e.g. inveon"
+              {...register('companyCode')}
+              className={`w-full rounded-lg border border-slate-200 bg-slate-50/60 py-2.5 pl-10 pr-3 text-sm placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/40 focus:border-[var(--primary)] transition-all ${
+                errors.companyCode ? 'ring-1 ring-red-500 bg-red-50/30 focus:ring-red-500' : ''
+              }`}
+            />
+          </div>
+          {errors.companyCode && <p className="mt-1.5 text-xs text-red-500 font-medium">{errors.companyCode.message}</p>}
+        </div>
+
         <div>
           <label className="mb-1.5 block text-sm font-semibold text-slate-700">Email Address</label>
           <div className="relative">

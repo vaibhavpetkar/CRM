@@ -22,6 +22,17 @@ export function removeAuthToken() {
   }
 }
 
+// The last company code used to sign in on this browser, so the login form
+// can prefill it.
+export function getLastCompanyCode(): string {
+  if (typeof window === 'undefined') return '';
+  return localStorage.getItem('crm_company_code') || '';
+}
+
+export function setLastCompanyCode(code: string | null | undefined) {
+  if (typeof window !== 'undefined' && code) localStorage.setItem('crm_company_code', code);
+}
+
 export function getStoredUser(): any | null {
   if (typeof window === 'undefined') return null;
   const user = localStorage.getItem('crm_user');
@@ -87,7 +98,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 
 export const authApi = {
   login: async (credentials: any) => {
-    const data = await request<{ message: string; token: string; user: any }>('/auth/login', {
+    const data = await request<{ message: string; token: string; user: any; company?: { code: string | null } }>('/auth/login', {
       method: 'POST',
       body: JSON.stringify(credentials),
     });
@@ -110,8 +121,8 @@ export const authApi = {
     return data;
   },
 
-  signupCompany: async (payload: { companyName: string; firstName: string; lastName: string; email: string; password: string; phone?: string }) => {
-    const data = await request<{ message: string; token: string; user: any }>('/auth/signup-company', {
+  signupCompany: async (payload: { companyName: string; companyCode?: string; firstName: string; lastName: string; email: string; password: string; phone?: string }) => {
+    const data = await request<{ message: string; token: string; user: any; company?: { code: string | null } }>('/auth/signup-company', {
       method: 'POST',
       body: JSON.stringify(payload),
     });

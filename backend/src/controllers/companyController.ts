@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import Company from '../models/Company';
 import { currentCompanyId } from '../tenancy/context';
+import { COMPANY_CODE_PATTERN, isCompanyCodeTaken, normalizeCompanyCode } from '../utils/companyCode';
 
 // Settings > Company: the logged-in user's own company (name, currency, etc.).
 // Every user belongs to exactly one company (see tenancy/), so this is always
@@ -45,6 +46,18 @@ export const updateCompany = async (req: Request, res: Response) => {
       quoteMessageTemplate,
     } = req.body;
 
+    // The company code employees type at login; changing it means telling them.
+    let code = company.code;
+    if (req.body.code !== undefined) {
+      code = normalizeCompanyCode(req.body.code);
+      if (!COMPANY_CODE_PATTERN.test(code)) {
+        return res.status(400).json({ message: 'Company code must be 3-30 lowercase letters, numbers or dashes' });
+      }
+      if (await isCompanyCodeTaken(code, company.id)) {
+        return res.status(400).json({ message: 'This company code is already taken. Try another one.' });
+      }
+    }
+
     if (currency && !SUPPORTED_CURRENCIES.includes(currency)) {
       return res.status(400).json({ message: `Unsupported currency. Use one of: ${SUPPORTED_CURRENCIES.join(', ')}` });
     }
@@ -69,6 +82,7 @@ export const updateCompany = async (req: Request, res: Response) => {
       youtube: youtube !== undefined ? norm(youtube) : company.youtube,
       twitter: twitter !== undefined ? norm(twitter) : company.twitter,
       quoteMessageTemplate: quoteMessageTemplate !== undefined ? norm(quoteMessageTemplate) : company.quoteMessageTemplate,
+      code,
     });
 
     return res.json({ message: 'Company settings updated successfully', company });

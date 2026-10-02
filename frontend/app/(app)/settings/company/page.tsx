@@ -22,6 +22,7 @@ const CURRENCIES = [
 
 const emptyForm = {
   name: '',
+  code: '',
   industry: '',
   email: '',
   phone: '',
@@ -64,6 +65,7 @@ export default function CompanySettingsPage() {
       .then((company) => {
         setFormData({
           name: company.name || '',
+          code: company.code || '',
           industry: company.industry || '',
           email: company.email || '',
           phone: company.phone || '',
@@ -132,6 +134,16 @@ export default function CompanySettingsPage() {
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea]"
                 />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-slate-700">Company Code</label>
+                <input
+                  required
+                  value={formData.code}
+                  onChange={(e) => setFormData({ ...formData, code: e.target.value.toLowerCase() })}
+                  className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea]"
+                />
+                <p className="mt-1 text-xs text-slate-500">Your team types this on the login screen (web and mobile app). If you change it, tell them the new code.</p>
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-slate-700">Industry</label>

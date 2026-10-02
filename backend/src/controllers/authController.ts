@@ -10,6 +10,8 @@ import { AuthRequest } from '../middleware/authMiddleware';
 import { runUnscoped, runWithTenant } from '../tenancy/context';
 import { createTrialCompany } from '../tenancy/provisioning';
 import { seatLimitMessage } from '../utils/subscription';
+import Company from '../models/Company';
+import { COMPANY_CODE_PATTERN, findCompanyByCode, isCompanyCodeTaken, normalizeCompanyCode } from '../utils/companyCode';
 import { getDefaultCompanyId } from '../tenancy/migration';
 import { sendInviteEmail, sendResetPasswordEmail } from '../utils/mailer';
 
@@ -64,6 +66,13 @@ const userPublicFields = (user: User) => {
   };
 };
 
+// What clients (web and mobile) need about the signed-in user's company.
+const companyPublicFields = (company: Company | null | undefined) =>
+  company ? { id: company.id, name: company.name, code: company.code ?? null, logo: company.logo ?? null } : null;
+
+const loadUserCompany = (user: User) =>
+  user.companyId ? runUnscoped(() => Company.findByPk(user.companyId as number)) : Promise.resolve(null);
+
 // ─── Register ─────────────────────────────────────────────────────────────────
 
 export const register = async (req: Request, res: Response) => {
@@ -117,6 +126,7 @@ export const register = async (req: Request, res: Response) => {
 export const signupCompany = async (req: Request, res: Response) => {
   try {
     const { companyName, firstName, lastName, email, password, phone } = req.body || {};
+    const companyCode = normalizeCompanyCode(req.body?.companyCode);
 
     if (!companyName?.trim() || !firstName?.trim() || !lastName?.trim() || !email?.trim() || !password) {
       return res.status(400).json({ message: 'Company name, first name, last name, email and password are required' });
@@ -132,8 +142,18 @@ export const signupCompany = async (req: Request, res: Response) => {
     if (await User.findOne({ where: { email: normalizedEmail } })) {
       return res.status(400).json({ message: 'An account with this email already exists. Sign in instead.' });
     }
+    if (companyCode) {
+      if (!COMPANY_CODE_PATTERN.test(companyCode)) {
+        return res.status(400).json({ message: 'Company code must be 3-30 lowercase letters, numbers or dashes' });
+      }
+      if (await isCompanyCodeTaken(companyCode)) {
+        return res.status(400).json({ message: 'This company code is already taken. Try another one.' });
+      }
+    }
 
-    const { company, roles } = await createTrialCompany(String(companyName).trim().slice(0, 100));
+    const { company, roles } = await createTrialCompany(String(companyName).trim().slice(0, 100), {
+      ...(companyCode ? { code: companyCode } : {}),
+    });
     const user = await runWithTenant(company.id, async () => {
       const created = await User.create({
         firstName: String(firstName).trim(),
@@ -155,6 +175,7 @@ export const signupCompany = async (req: Request, res: Response) => {
       message: 'Your company is ready. Your 15-day free trial has started.',
       token: generateToken(user!.id),
       user: userPublicFields(user!),
+      company: companyPublicFields(company),
     });
   } catch (error) {
     console.error('Company signup error:', error);
@@ -167,14 +188,28 @@ export const signupCompany = async (req: Request, res: Response) => {
 export const login = async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
+    // Optional on the web for now; the mobile app always sends it so one app
+    // can serve every company.
+    const companyCode = normalizeCompanyCode(req.body?.companyCode);
 
     if (!email || !password) {
       return res.status(400).json({ message: 'Email and password are required' });
     }
 
+    let company: Company | null = null;
+    if (companyCode) {
+      company = await findCompanyByCode(companyCode);
+      if (!company) {
+        return res.status(400).json({ message: 'Invalid company code, email or password' });
+      }
+    }
+
     const user = await User.findOne({ where: { email }, include: [roleInclude] });
     if (!user) {
-      return res.status(400).json({ message: 'Invalid credentials' });
+      return res.status(400).json({ message: companyCode ? 'Invalid company code, email or password' : 'Invalid credentials' });
+    }
+    if (company && user.companyId !== company.id) {
+      return res.status(400).json({ message: 'Invalid company code, email or password' });
     }
 
     const isMatch = await user.validatePassword(password);
@@ -194,6 +229,7 @@ export const login = async (req: Request, res: Response) => {
       message: 'Login successful',
       token,
       user: userPublicFields(user),
+      company: companyPublicFields(company ?? (await loadUserCompany(user))),
     });
   } catch (error) {
     console.error('Login error:', error);
@@ -402,13 +438,28 @@ export const acceptInvitation = async (req: Request, res: Response) => {
 
 // ─── Get Current User ─────────────────────────────────────────────────────────
 
+/**
+ * GET /api/auth/company/:code. Lets the login screen (web or mobile) check
+ * a company code and show the company's name and logo before sign-in.
+ */
+export const lookupCompany = async (req: Request, res: Response) => {
+  try {
+    const company = await findCompanyByCode(req.params.code);
+    if (!company) return res.status(404).json({ message: 'No company found with this code' });
+    return res.json({ company: { name: company.name, code: company.code, logo: company.logo ?? null } });
+  } catch (error) {
+    console.error('Company lookup error:', error);
+    return res.status(500).json({ message: 'Server error' });
+  }
+};
+
 export const getMe = async (req: AuthRequest, res: Response) => {
   try {
     const user = req.user;
     if (!user) {
       return res.status(401).json({ message: 'Not authenticated' });
     }
-    return res.json({ user: userPublicFields(user) });
+    return res.json({ user: userPublicFields(user), company: companyPublicFields(req.company) });
   } catch (error) {
     console.error('getMe error:', error);
     return res.status(500).json({ message: 'Server error' });
