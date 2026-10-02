@@ -629,17 +629,18 @@ export const itemsApi = {
 // ─── Quotes API ────────────────────────────────────────────────────────────────
 
 export const quotesApi = {
-  getQuotes: async (params: { page?: number; limit?: number; search?: string; status?: string } = {}) => {
+  getQuotes: async (params: { page?: number; limit?: number; search?: string; status?: string; includeItems?: boolean } = {}) => {
     const query = new URLSearchParams();
     if (params.page) query.append('page', String(params.page));
     if (params.limit) query.append('limit', String(params.limit));
     if (params.search) query.append('search', params.search);
     if (params.status && params.status !== 'all') query.append('status', params.status);
+    if (params.includeItems) query.append('includeItems', 'true');
     const qs = query.toString();
     return request<{ quotes: any[]; total: number; page: number; pages: number }>(`/quotes${qs ? `?${qs}` : ''}`);
   },
   /** Every quotation matching the filters, across all backend pages. */
-  getAllQuotes: async (params: { search?: string; status?: string } = {}) =>
+  getAllQuotes: async (params: { search?: string; status?: string; includeItems?: boolean } = {}) =>
     fetchAllPages((page, limit) => quotesApi.getQuotes({ ...params, page, limit }), (res) => res.quotes),
   getQuote: async (id: string | number) => request<any>(`/quotes/${id}`),
   createQuote: async (data: any) => request<{ message: string; quote: any }>('/quotes', { method: 'POST', body: JSON.stringify(data) }),
@@ -677,6 +678,7 @@ export const invoicesApi = {
     const qs = query.toString();
     return request<{ invoices: any[]; total: number }>(`/invoices${qs ? `?${qs}` : ''}`);
   },
+  getInvoice: async (id: string | number) => request<any>(`/invoices/${id}`),
   createInvoice: async (data: any) => request<{ message: string; invoice: any }>('/invoices', { method: 'POST', body: JSON.stringify(data) }),
   updateInvoice: async (id: string | number, data: any) => request<{ message: string; invoice: any }>(`/invoices/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteInvoice: async (id: string | number) => request<{ message: string }>(`/invoices/${id}`, { method: 'DELETE' }),

@@ -392,7 +392,7 @@ export default function QuoteDetailPage() {
                 className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none disabled:bg-slate-50"
               >
                 <option value="percentage">Percentage</option>
-                <option value="fixed">Fixed Amount</option>
+                <option value="flat">Fixed Amount</option>
               </select>
             </div>
             <div>

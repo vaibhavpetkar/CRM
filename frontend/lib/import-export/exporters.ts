@@ -12,19 +12,48 @@ import {
   HeadingLevel,
 } from 'docx';
 import { saveAs } from 'file-saver';
-import type { ImportExportField } from './types';
+import type { ImportExportChildTable, ImportExportField } from './types';
 
 export type ExportFormat = 'csv' | 'excel' | 'pdf' | 'word';
 
-function buildRows(data: any[], fields: ImportExportField[]) {
-  return data.map((record) =>
-    fields.map((f) => {
-      const value = record[f.key];
-      if (value === null || value === undefined) return '';
-      if (typeof value === 'boolean') return value ? 'Yes' : 'No';
-      return String(value);
-    })
-  );
+/** Child table columns picked for an export (e.g. a Quote's items). */
+export type ChildExport = {
+  table: ImportExportChildTable;
+  fields: ImportExportField[];
+};
+
+type ExportTable = { headers: string[]; rows: string[][]; recordCount: number };
+
+function formatCell(value: any) {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  return String(value);
+}
+
+/** Flattens records into one sheet. Without a child table that is one line per
+ * record; with one, every child row gets its own line. The first line of a
+ * record carries all parent columns, the following lines only repeat the
+ * group key, so the file reads cleanly and imports back as the same records. */
+function buildTable(data: any[], fields: ImportExportField[], child?: ChildExport, groupKey?: string): ExportTable {
+  const childFields = child?.fields ?? [];
+  const headers = [...fields.map((f) => f.label), ...childFields.map((f) => f.label)];
+  if (!child || childFields.length === 0) {
+    return { headers, rows: data.map((record) => fields.map((f) => formatCell(record[f.key]))), recordCount: data.length };
+  }
+
+  const rows: string[][] = [];
+  data.forEach((record) => {
+    const children: any[] = Array.isArray(record[child.table.key]) ? record[child.table.key] : [];
+    const lines = children.length ? children : [null];
+    lines.forEach((childRow, idx) => {
+      const parentCells = fields.map((f) =>
+        idx === 0 || f.key === groupKey ? formatCell(record[f.key]) : ''
+      );
+      const childCells = childFields.map((f) => (childRow ? formatCell(childRow[f.key]) : ''));
+      rows.push([...parentCells, ...childCells]);
+    });
+  });
+  return { headers, rows, recordCount: data.length };
 }
 
 function timestampedName(base: string, ext: string) {
@@ -32,20 +61,16 @@ function timestampedName(base: string, ext: string) {
   return `${base}-${stamp}.${ext}`;
 }
 
-export function exportToCSV(data: any[], fields: ImportExportField[], entityNamePlural: string) {
-  const headers = fields.map((f) => f.label);
-  const rows = buildRows(data, fields);
+function exportToCSV({ headers, rows }: ExportTable, entityNamePlural: string) {
   const worksheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
   const csv = XLSX.utils.sheet_to_csv(worksheet);
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   saveAs(blob, timestampedName(entityNamePlural, 'csv'));
 }
 
-export function exportToExcel(data: any[], fields: ImportExportField[], entityNamePlural: string) {
-  const headers = fields.map((f) => f.label);
-  const rows = buildRows(data, fields);
+function exportToExcel({ headers, rows }: ExportTable, entityNamePlural: string) {
   const worksheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
-  worksheet['!cols'] = fields.map((f) => ({ wch: Math.max(f.label.length + 2, 14) }));
+  worksheet['!cols'] = headers.map((h) => ({ wch: Math.max(h.length + 2, 14) }));
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, entityNamePlural.slice(0, 31));
   const buffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
@@ -53,18 +78,18 @@ export function exportToExcel(data: any[], fields: ImportExportField[], entityNa
   saveAs(blob, timestampedName(entityNamePlural, 'xlsx'));
 }
 
-export function exportToPDF(data: any[], fields: ImportExportField[], entityNamePlural: string) {
-  const doc = new jsPDF({ orientation: fields.length > 6 ? 'landscape' : 'portrait' });
+function exportToPDF({ headers, rows, recordCount }: ExportTable, entityNamePlural: string) {
+  const doc = new jsPDF({ orientation: headers.length > 6 ? 'landscape' : 'portrait' });
   doc.setFontSize(14);
   doc.text(`${entityNamePlural[0].toUpperCase()}${entityNamePlural.slice(1)} Export`, 14, 15);
   doc.setFontSize(9);
   doc.setTextColor(120);
-  doc.text(`Generated ${new Date().toLocaleString()} · ${data.length} records`, 14, 21);
+  doc.text(`Generated ${new Date().toLocaleString()} · ${recordCount} records`, 14, 21);
 
   autoTable(doc, {
     startY: 26,
-    head: [fields.map((f) => f.label)],
-    body: buildRows(data, fields),
+    head: [headers],
+    body: rows,
     styles: { fontSize: 7, cellPadding: 2 },
     headStyles: { fillColor: [22, 142, 234] },
     theme: 'grid',
@@ -73,19 +98,19 @@ export function exportToPDF(data: any[], fields: ImportExportField[], entityName
   doc.save(timestampedName(entityNamePlural, 'pdf'));
 }
 
-export async function exportToWord(data: any[], fields: ImportExportField[], entityNamePlural: string) {
+async function exportToWord({ headers, rows, recordCount }: ExportTable, entityNamePlural: string) {
   const headerRow = new TableRow({
     tableHeader: true,
-    children: fields.map(
-      (f) =>
+    children: headers.map(
+      (label) =>
         new TableCell({
           shading: { fill: '168EEA' },
-          children: [new Paragraph({ text: f.label, heading: HeadingLevel.HEADING_6 })],
+          children: [new Paragraph({ text: label, heading: HeadingLevel.HEADING_6 })],
         })
     ),
   });
 
-  const dataRows = buildRows(data, fields).map(
+  const dataRows = rows.map(
     (row) =>
       new TableRow({
         children: row.map((cell) => new TableCell({ children: [new Paragraph(cell)] })),
@@ -101,7 +126,7 @@ export async function exportToWord(data: any[], fields: ImportExportField[], ent
             heading: HeadingLevel.HEADING_2,
           }),
           new Paragraph({
-            text: `Generated ${new Date().toLocaleString()} · ${data.length} records`,
+            text: `Generated ${new Date().toLocaleString()} · ${recordCount} records`,
           }),
           new Paragraph({ text: '' }),
           new Table({
@@ -121,24 +146,33 @@ export async function runExport(
   format: ExportFormat,
   data: any[],
   fields: ImportExportField[],
-  entityNamePlural: string
+  entityNamePlural: string,
+  child?: ChildExport,
+  groupKey?: string
 ) {
   if (data.length === 0) throw new Error('There is no data to export.');
+  const table = buildTable(data, fields, child, groupKey);
   switch (format) {
     case 'csv':
-      return exportToCSV(data, fields, entityNamePlural);
+      return exportToCSV(table, entityNamePlural);
     case 'excel':
-      return exportToExcel(data, fields, entityNamePlural);
+      return exportToExcel(table, entityNamePlural);
     case 'pdf':
-      return exportToPDF(data, fields, entityNamePlural);
+      return exportToPDF(table, entityNamePlural);
     case 'word':
-      return exportToWord(data, fields, entityNamePlural);
+      return exportToWord(table, entityNamePlural);
   }
 }
 
 /** Download a blank template (Excel or CSV) containing just the header row,
  * plus one example row of hints, so users know exactly what to fill in. */
-export function downloadTemplate(fields: ImportExportField[], entityNamePlural: string, format: 'excel' | 'csv' = 'excel') {
+export function downloadTemplate(
+  allFields: ImportExportField[],
+  entityNamePlural: string,
+  format: 'excel' | 'csv' = 'excel',
+  childTable?: ImportExportChildTable
+) {
+  const fields = [...allFields, ...(childTable?.fields ?? [])].filter((f) => !f.exportOnly);
   const headers = fields.map((f) => `${f.label}${f.required ? ' *' : ''}`);
   const hintRow = fields.map((f) => {
     if (f.options && f.options.length) return f.options.join(' / ');
