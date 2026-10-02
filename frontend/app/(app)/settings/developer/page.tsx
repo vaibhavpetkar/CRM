@@ -10,7 +10,7 @@ import { useRouter } from 'next/navigation';
 import { LockClosedIcon, EyeIcon, EyeSlashIcon, KeyIcon, Cog6ToothIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 import { useToast } from '@/components/ui/toast';
 
-const ENV_VAR_DEFINITIONS: Record<string, { label: string; type: 'text' | 'password' | 'url'; description: string; redirectPath?: string; testHref?: string; testLabel?: string }> = {
+const ENV_VAR_DEFINITIONS: Record<string, { label: string; type: 'text' | 'password' | 'url'; description: string; redirectPath?: string; redirectLabel?: string; testHref?: string; testLabel?: string }> = {
   GOOGLE_CLIENT_ID: {
     label: 'Google OAuth Client ID',
     type: 'text',
@@ -38,6 +38,24 @@ const ENV_VAR_DEFINITIONS: Record<string, { label: string; type: 'text' | 'passw
     testLabel: 'Test: Settings > Integrations',
   },
   GOOGLE_MEET_CLIENT_SECRET: { label: 'Google Meet Client Secret', type: 'password', description: 'Client Secret for Google Meet integration' },
+  META_APP_ID: {
+    label: 'Meta App ID',
+    type: 'text',
+    description: 'App ID of your Meta (Facebook) app, for Facebook / Instagram Lead Ads',
+    redirectPath: '/api/integrations/meta/callback',
+    redirectLabel: 'Valid OAuth Redirect URI — add this under Facebook Login > Settings in the Meta app',
+    testHref: '/settings/integrations',
+    testLabel: 'Test: Settings > Integrations',
+  },
+  META_APP_SECRET: { label: 'Meta App Secret', type: 'password', description: 'App Secret of your Meta app (also used to check webhook signatures)' },
+  META_VERIFY_TOKEN: {
+    label: 'Meta Webhook Verify Token',
+    type: 'password',
+    description: 'Any random string; enter the same value as the Verify Token of the Page webhook in the Meta app dashboard',
+    redirectPath: '/api/webhooks/meta',
+    redirectLabel: 'Webhook Callback URL — use this for the Page webhook (leadgen field) in the Meta app',
+  },
+  META_LOGIN_CONFIG_ID: { label: 'Meta Login Configuration ID', type: 'text', description: 'Optional: only for apps that use "Facebook Login for Business"' },
   EMAIL_SERVICE: { label: 'Email Service', type: 'text', description: 'Email service provider (e.g., gmail, sendgrid, mailgun)' },
   EMAIL_USER: { label: 'Email User', type: 'text', description: 'Email address for sending emails' },
   EMAIL_PASS: { label: 'Email Password / App Password', type: 'password', description: 'Email password or app-specific password (for Gmail, use App Password)' },
@@ -236,7 +254,7 @@ export default function DeveloperSettingsPage() {
                   {def.redirectPath && (
                     <div className="rounded border border-slate-200 bg-slate-50 p-1.5">
                       <p className="text-[9px] font-medium uppercase tracking-wide text-slate-400">
-                        Redirect URI — register this exactly in Google Cloud Console
+                        {def.redirectLabel || 'Redirect URI — register this exactly in Google Cloud Console'}
                       </p>
                       <code className="block break-all text-[10px] text-slate-600">
                         {(getFieldValue('CLIENT_URL') || 'https://your-domain.com').replace(/\/$/, '')}

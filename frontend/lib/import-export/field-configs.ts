@@ -13,7 +13,7 @@ export const LEAD_FIELDS: ImportExportField[] = [
   { key: 'mobile', label: 'Mobile', type: 'text' },
   { key: 'company', label: 'Company', type: 'text' },
   { key: 'jobTitle', label: 'Job Title', type: 'text' },
-  { key: 'leadSource', label: 'Lead Source', type: 'select', options: ['website', 'linkedin', 'referral', 'event', 'social-media', 'cold-call', 'email', 'other'] },
+  { key: 'leadSource', label: 'Lead Source', type: 'select', options: ['website', 'facebook', 'instagram', 'linkedin', 'referral', 'event', 'social-media', 'cold-call', 'email', 'other'] },
   { key: 'status', label: 'Status', type: 'select', options: ['new', 'contacted', 'working', 'qualified', 'unqualified', 'converted', 'lost'] },
   { key: 'industry', label: 'Industry', type: 'text' },
   { key: 'noOfEmployees', label: 'No. of Employees', type: 'number', defaultExport: false },
@@ -37,7 +37,7 @@ export const CONTACT_FIELDS: ImportExportField[] = [
   { key: 'phone', label: 'Phone', type: 'text' },
   { key: 'company', label: 'Company', type: 'text' },
   { key: 'title', label: 'Job Title', type: 'text' },
-  { key: 'leadSource', label: 'Lead Source', type: 'select', options: ['website', 'linkedin', 'referral', 'event', 'social-media', 'cold-call', 'email', 'other'] },
+  { key: 'leadSource', label: 'Lead Source', type: 'select', options: ['website', 'facebook', 'instagram', 'linkedin', 'referral', 'event', 'social-media', 'cold-call', 'email', 'other'] },
 ];
 
 export const DEAL_FIELDS: ImportExportField[] = [

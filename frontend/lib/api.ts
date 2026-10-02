@@ -988,6 +988,54 @@ export const googleBusinessApi = {
   getAccounts: async () => request<{ accounts: any[] }>('/integrations/google-business/accounts'),
 };
 
+export interface MetaPageRow {
+  id: number;
+  pageId: string;
+  pageName: string;
+  isSubscribed: boolean;
+  leadsReceived: number;
+  lastLeadAt: string | null;
+  lastSyncAt: string | null;
+  lastError: string | null;
+}
+export interface MetaLeadEventRow {
+  id: number;
+  leadgenId: string;
+  pageName: string;
+  formName: string | null;
+  campaignName: string | null;
+  adName: string | null;
+  platform: string | null;
+  status: 'processing' | 'created' | 'duplicate' | 'failed';
+  leadId: number | null;
+  name: string | null;
+  error: string | null;
+  submittedAt: string | null;
+  createdAt: string;
+}
+export interface MetaLeadsStatus {
+  configured: boolean;
+  verifyTokenSet: boolean;
+  connected: boolean;
+  connectedAt: string | null;
+  lastError: string | null;
+  webhookUrl: string;
+  callbackUrl: string;
+  pages: MetaPageRow[];
+  recentLeads: MetaLeadEventRow[];
+}
+
+// Facebook / Instagram Lead Ads (see backend metaLeadsService).
+export const metaLeadsApi = {
+  getStatus: async () => request<MetaLeadsStatus>('/integrations/meta/status'),
+  connect: async () => request<{ url: string }>('/integrations/meta/connect', { method: 'POST' }),
+  disconnect: async () => request<{ message: string }>('/integrations/meta/disconnect', { method: 'POST' }),
+  subscribePage: async (id: number) => request<{ message: string }>(`/integrations/meta/pages/${id}/subscribe`, { method: 'POST' }),
+  unsubscribePage: async (id: number) => request<{ message: string }>(`/integrations/meta/pages/${id}/unsubscribe`, { method: 'POST' }),
+  syncPage: async (id: number) =>
+    request<{ created: number; duplicate: number; skipped: number; failed: number }>(`/integrations/meta/pages/${id}/sync`, { method: 'POST' }),
+};
+
 // ─── Document Templates API ──────────────────────────────────────────────────
 // Distinct from the marketing `templatesApi` above (campaign emails) — these
 // are transactional/auto-send document templates (quotes, invoices, etc.)

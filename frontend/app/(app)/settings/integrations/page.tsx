@@ -6,7 +6,8 @@ import PageHeader from '@/components/ui/page-header';
 import Card from '@/components/ui/card';
 import Button from '@/components/ui/button';
 import StatusBadge from '@/components/ui/status-badge';
-import { integrationsApi, googleMeetApi, googleBusinessApi, IntegrationRow } from '@/lib/api';
+import { integrationsApi, googleMeetApi, googleBusinessApi, metaLeadsApi, IntegrationRow, MetaLeadsStatus } from '@/lib/api';
+import MetaLeadsCard from '@/components/integrations/meta-leads-card';
 import { useToast } from '@/components/ui/toast';
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -97,6 +98,7 @@ export default function IntegrationsSettingsPage() {
 
   const [meetStatus, setMeetStatus] = useState<GoogleConnectionStatus | null>(null);
   const [businessStatus, setBusinessStatus] = useState<GoogleConnectionStatus | null>(null);
+  const [metaStatus, setMetaStatus] = useState<MetaLeadsStatus | null>(null);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -104,6 +106,7 @@ export default function IntegrationsSettingsPage() {
       integrationsApi.getIntegrations().then((res) => setIntegrations(res.integrations)),
       googleMeetApi.getStatus().then(setMeetStatus).catch(() => setMeetStatus(null)),
       googleBusinessApi.getStatus().then(setBusinessStatus).catch(() => setBusinessStatus(null)),
+      metaLeadsApi.getStatus().then(setMetaStatus).catch(() => setMetaStatus(null)),
     ])
       .catch((err) => setError(err.message || 'Failed to load integrations.'))
       .finally(() => setLoading(false));
@@ -116,11 +119,14 @@ export default function IntegrationsSettingsPage() {
   useEffect(() => {
     const meetResult = searchParams.get('googleMeet');
     const businessResult = searchParams.get('googleBusiness');
+    const metaResult = searchParams.get('meta');
     if (meetResult === 'connected') toast.success('Google Meet connected.');
     else if (meetResult === 'error') toast.error('Could not connect Google Meet — please try again.');
     if (businessResult === 'connected') toast.success('Google Business Profile connected.');
     else if (businessResult === 'error') toast.error('Could not connect Google Business Profile — please try again.');
-    if (meetResult || businessResult) {
+    if (metaResult === 'connected') toast.success('Facebook connected. Choose which Pages should send leads.');
+    else if (metaResult === 'error') toast.error('Could not connect Facebook — please try again.');
+    if (meetResult || businessResult || metaResult) {
       load();
       router.replace('/settings/integrations');
     }
@@ -134,7 +140,7 @@ export default function IntegrationsSettingsPage() {
       toast.success('Connected.');
       load();
     } catch (err: any) {
-      // Expected for now — Meta/LinkedIn/Calendly/Mailchimp still need
+      // Expected for now — LinkedIn/Calendly/Mailchimp still need
       // credentials and a real OAuth flow this server doesn't have yet.
       toast.warning(err.message || 'Could not connect.');
     } finally {
@@ -194,6 +200,8 @@ export default function IntegrationsSettingsPage() {
         <p className="text-sm text-slate-500">Loading...</p>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <MetaLeadsCard status={metaStatus} onChange={load} />
+
           <RealGoogleCard
             categoryLabel="Video Meetings"
             label="Google Meet"
