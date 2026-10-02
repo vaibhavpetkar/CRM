@@ -137,6 +137,19 @@ const SCHEMA_PATCHES: { name: string; sql: string }[] = [
 ];
 
 export const runSchemaPatches = async (sequelize: Sequelize): Promise<void> => {
+  // On a brand-new, empty database none of the tables these patches touch
+  // exist yet, so every patch would fail and log a scary stack trace. Nothing
+  // needs patching there anyway: the sync that runs right after creates every
+  // table from the current models, new columns included.
+  const [{ exists }] = await sequelize.query<{ exists: boolean }>(
+    `SELECT to_regclass('public.users') IS NOT NULL AS "exists";`,
+    { type: QueryTypes.SELECT }
+  );
+  if (!exists) {
+    console.log('[schema-patch] Fresh database, skipping patches (sync will create the schema).');
+    return;
+  }
+
   for (const patch of SCHEMA_PATCHES) {
     try {
       await sequelize.query(patch.sql, { type: QueryTypes.RAW });
