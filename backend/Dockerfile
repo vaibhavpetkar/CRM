@@ -22,6 +22,7 @@ COPY --from=builder /usr/src/app/dist ./dist
 COPY --from=builder /usr/src/app/migrations ./migrations
 COPY --from=builder /usr/src/app/src/config/config.js ./src/config/config.js
 COPY --from=builder /usr/src/app/.sequelizerc ./.sequelizerc
+COPY --from=builder /usr/src/app/scripts ./scripts
 
 EXPOSE 5000
 
