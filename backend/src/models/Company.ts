@@ -41,6 +41,7 @@ interface CompanyAttributes {
   blockedAt?: Date | null;
   blockedReason?: string | null;
   lastAlertKey?: string | null; // last subscription alert sent to admins, so each is sent once
+  code?: string | null; // company code typed at login (utils/companyCode.ts); tenants only
 }
 
 // Define the creation attributes (excluding auto-generated fields)
@@ -74,6 +75,7 @@ class Company extends Model<CompanyAttributes, CompanyCreationAttributes> implem
   public blockedAt?: Date | null;
   public blockedReason?: string | null;
   public lastAlertKey?: string | null;
+  public code?: string | null;
 
   // Timestamps
   public readonly createdAt!: Date;
@@ -153,6 +155,7 @@ Company.init(
     blockedAt: { type: DataTypes.DATE, allowNull: true },
     blockedReason: { type: DataTypes.STRING(500), allowNull: true },
     lastAlertKey: { type: DataTypes.STRING(100), allowNull: true },
+    code: { type: DataTypes.STRING(30), allowNull: true },
   },
   {
     tableName: 'companies',

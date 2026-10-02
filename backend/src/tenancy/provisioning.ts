@@ -6,6 +6,7 @@ import { DEFAULT_ROLES } from '../config/permissions';
 import { PLANS, TRIAL_DAYS } from '../config/plans';
 import { runUnscoped, runWithTenant } from './context';
 import { TENANT_FIELD } from './scoping';
+import { generateCompanyCode } from '../utils/companyCode';
 
 /** Makes sure a company has the built-in roles; returns them by name. */
 export const seedRolesForCompany = async (companyId: number): Promise<Record<string, Role>> =>
@@ -32,10 +33,12 @@ export const listTenantCompanies = async (): Promise<Company[]> =>
 
 /** Creates a new tenant company on a free trial, with its built-in roles. */
 export const createTrialCompany = async (name: string, extra: Partial<Company> = {}) => {
+  const code = extra.code || (await generateCompanyCode(name));
   const company = await runUnscoped(async () => {
     const created = await Company.create({ name, currency: 'INR', isActive: true, ...(extra as any) });
     await created.update({
       [TENANT_FIELD]: created.id,
+      code,
       plan: 'trial',
       subscriptionStatus: 'trial',
       trialEndsAt: new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000),

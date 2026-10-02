@@ -7,11 +7,17 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import Button from '@/components/ui/button';
-import { authApi } from '@/lib/api';
+import { authApi, setLastCompanyCode } from '@/lib/api';
 
 const signupSchema = z
   .object({
     companyName: z.string().trim().min(2, 'Company name is required'),
+    companyCode: z
+      .string()
+      .trim()
+      .toLowerCase()
+      .refine((v) => v === '' || /^[a-z0-9][a-z0-9-]{1,28}[a-z0-9]$/.test(v), '3-30 lowercase letters, numbers or dashes')
+      .optional(),
     firstName: z.string().trim().min(1, 'First name is required'),
     lastName: z.string().trim().min(1, 'Last name is required'),
     email: z.string().email('Please enter a valid email address'),
@@ -43,8 +49,9 @@ export default function SignupPage() {
     setLoading(true);
     setError(null);
     try {
-      const { companyName, firstName, lastName, email, phone, password } = values;
-      await authApi.signupCompany({ companyName, firstName, lastName, email, phone, password });
+      const { companyName, companyCode, firstName, lastName, email, phone, password } = values;
+      const res = await authApi.signupCompany({ companyName, companyCode: companyCode || undefined, firstName, lastName, email, phone, password });
+      setLastCompanyCode(res.company?.code);
       router.push('/dashboard');
     } catch (err) {
       setError((err as Error).message || 'Could not create your company. Please try again.');
@@ -72,6 +79,7 @@ export default function SignupPage() {
 
       <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-4">
         {field('companyName', 'Company name', 'text', 'Your company')}
+        {field('companyCode', 'Company code (optional)', 'text', 'Used by your team to sign in, e.g. acme')}
         <div className="grid grid-cols-2 gap-3">
           {field('firstName', 'First name')}
           {field('lastName', 'Last name')}
