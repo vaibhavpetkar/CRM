@@ -62,9 +62,21 @@ jobs:
             git fetch --all
             git reset --hard origin/master
             
-            # Rebuild and restart the Docker containers
-            sudo docker compose down
-            sudo docker compose up -d --build
+            # Rebuild and restart the Docker containers.
+            # A recreate that gets interrupted (failed build, dropped SSH,
+            # cancelled run) leaves a half-made container behind under
+            # Compose's temporary name, e.g. "491c802bc577_crm_frontend".
+            # Compose doesn't clean those up itself, and every later deploy
+            # then dies with "container name ... is already in use". Remove
+            # any such leftovers first; the pattern only matches that
+            # temporary <12-hex-id>_crm_<service> form, never the real
+            # crm_* containers or anything from other projects on the box.
+            sudo docker ps -a --format '{{.ID}} {{.Names}}' \
+              | grep -E ' [0-9a-f]{12}_crm_[a-z]+$' \
+              | awk '{print $1}' \
+              | xargs -r sudo docker rm -f
+            sudo docker compose down --remove-orphans
+            sudo docker compose up -d --build --remove-orphans
             
             # Run any pending DB migrations against the now-running backend
             # container. Without this, new columns/tables added by a
