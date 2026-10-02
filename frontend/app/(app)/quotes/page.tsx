@@ -75,8 +75,8 @@ export default function QuotesPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await quotesApi.getQuotes();
-      setQuotes(res.quotes || []);
+      const rows = await quotesApi.getAllQuotes();
+      setQuotes(rows);
     } catch (err: any) {
       setError(err.message || 'Failed to load quotes. Is the backend running?');
       setQuotes([]);
@@ -241,7 +241,7 @@ export default function QuotesPage() {
                 fields: QUOTE_FIELDS,
                 childTable: QUOTE_ITEMS_TABLE,
                 groupKey: 'quoteNumber',
-                getExportData: async () => (await quotesApi.getQuotes({ includeItems: true, limit: 200 })).quotes || [],
+                getExportData: () => quotesApi.getAllQuotes({ includeItems: true }),
                 onImportRow: (row) => quotesApi.createQuote(toQuotePayload(row)),
                 onImportComplete: fetchQuotes,
               }}
@@ -261,6 +261,11 @@ export default function QuotesPage() {
           data={quotes}
           rowKey={(q) => q.id}
           loading={loading}
+          bulkDelete={{
+            deleteRow: (q) => quotesApi.deleteQuote(q.id),
+            onComplete: fetchQuotes,
+            entityName: 'quotes',
+          }}
           emptyMessage='No quotes yet. Click "New Quote" to create one.'
           actions={(quote) => (
             <div className="flex justify-end gap-3">

@@ -128,3 +128,24 @@ export function cacheRoute(keyFn: (req: Request) => string, ttlSeconds: number) 
     next();
   };
 }
+
+/**
+ * Router-level middleware: after any successful non-GET request, clears every
+ * cache key under `prefix` BEFORE the response is sent, so a client that
+ * refetches straight after a create/update/delete never gets the stale list
+ * back from `cacheRoute`.
+ */
+export function invalidateOnWrite(prefix: string) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') return next();
+
+    const originalJson = res.json.bind(res);
+    res.json = ((body: unknown) => {
+      if (res.statusCode < 200 || res.statusCode >= 300) return originalJson(body);
+      invalidateCache(prefix).finally(() => originalJson(body));
+      return res;
+    }) as typeof res.json;
+
+    next();
+  };
+}

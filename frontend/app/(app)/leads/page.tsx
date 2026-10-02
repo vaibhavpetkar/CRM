@@ -218,12 +218,12 @@ export default function LeadsPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await leadsApi.getLeads({
+      const rows = await leadsApi.getAllLeads({
         search,
         status: filter,
         territory: territoryFilter,
       });
-      setLeads(res.leads || []);
+      setLeads(rows);
     } catch (err: any) {
       setError(err.message || 'Failed to load leads. Is the backend running?');
       setLeads([]);
@@ -590,6 +590,12 @@ export default function LeadsPage() {
           data={leads}
           rowKey={(l) => l.id}
           loading={loading}
+          bulkDelete={{
+            deleteRow: (l) => leadsApi.deleteLead(l.id),
+            onComplete: fetchLeads,
+            entityName: 'leads',
+            restorable: true,
+          }}
           showToolbar
           canEdit={canEditLeads}
           onSelectionChange={setSelectedLeadIds}
