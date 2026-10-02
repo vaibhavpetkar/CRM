@@ -97,7 +97,7 @@ export default function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose
             <div className="flex h-8 w-8 items-center justify-center rounded-md bg-[var(--primary)] text-sm font-bold text-white shadow-sm">
               Z
             </div>
-            <span className="text-sm font-bold text-slate-800 tracking-tight">CRM Pro</span>
+            <span className="text-sm font-bold text-slate-800 tracking-tight">Inveon One CRM</span>
           </Link>
         ) : (
           <Link href="/dashboard" className="mx-auto flex h-8 w-8 items-center justify-center rounded-md bg-[var(--primary)] text-sm font-bold text-white shadow-sm">
