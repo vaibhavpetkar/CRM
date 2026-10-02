@@ -40,7 +40,7 @@ class Integration
 Integration.init(
   {
     id: { type: DataTypes.INTEGER.UNSIGNED, autoIncrement: true, primaryKey: true },
-    provider: { type: DataTypes.STRING(40), allowNull: false, unique: true },
+    provider: { type: DataTypes.STRING(40), allowNull: false }, // unique per company (see tenancy/migration.ts)
     status: { type: DataTypes.STRING(20), allowNull: false, defaultValue: 'not_configured' },
     isEnabled: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
     config: { type: DataTypes.TEXT, allowNull: true },

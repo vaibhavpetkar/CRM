@@ -17,6 +17,7 @@ import {
   PresentationChartLineIcon,
   ViewColumnsIcon,
   BuildingOffice2Icon,
+  CreditCardIcon,
   ClockIcon,
   TrashIcon,
   CubeIcon,
@@ -93,6 +94,7 @@ export const navigation: NavSection[] = [
     items: [
       { name: 'Team', href: '/team', icon: UsersIcon, permission: 'users:read' },
       { name: 'Company', href: '/settings/company', icon: BuildingOffice2Icon, permission: 'company:manage' },
+      { name: 'Subscription', href: '/settings/subscription', icon: CreditCardIcon, permission: 'company:manage' },
       { name: 'Integrations', href: '/settings/integrations', icon: PuzzlePieceIcon, permission: 'integrations:manage' },
       { name: 'Roles', href: '/settings/roles', icon: ShieldCheckIcon, permission: 'roles:view' },
       { name: 'Activity Logs', href: '/activity-logs', icon: ClockIcon }, // Administrator only (handled in page)

@@ -5,8 +5,6 @@ import bcrypt from 'bcryptjs';
 import sequelize from './config/database';
 import { runSchemaPatches } from './utils/ensureSchema';
 import User from './models/User';
-import Role from './models/Role';
-import { DEFAULT_ROLES } from './config/permissions';
 import logger from './utils/logger';
 import { errorHandler } from './utils/errorHandler';
 import path from 'path';
@@ -47,6 +45,7 @@ import expenseRoutes from './routes/expenseRoutes';
 import reportRoutes from './routes/reportRoutes';
 import documentTemplateRoutes from './routes/documentTemplateRoutes';
 import publicRoutes from './routes/publicRoutes';
+import subscriptionRoutes from './routes/subscriptionRoutes';
 
 // Import models in dependency order before sync
 import './models/Company';
@@ -87,6 +86,7 @@ import './models/associations';
 // filters queries to the logged-in user's company. Must run before sync.
 import { applyTenantScoping } from './tenancy/scoping';
 import { getDefaultCompanyId, runTenancyMigration } from './tenancy/migration';
+import { listTenantCompanies, seedRolesForCompany } from './tenancy/provisioning';
 applyTenantScoping();
 
 // Import middleware
@@ -171,6 +171,7 @@ app.use('/api/items', itemRoutes);
 app.use('/api/item-categories', itemCategoryRoutes);
 app.use('/api/taxes', taxMasterRoutes);
 app.use('/api/company', companyRoutes);
+app.use('/api/subscription', subscriptionRoutes);
 app.use('/api/attachments', attachmentRoutes);
 app.use('/api/settings', settingsRoutes);
 // Must come BEFORE the generic /api/integrations mount below — Express
@@ -287,23 +288,6 @@ const createSuperAdmin = async (adminRoleId?: number) => {
   });
 };
 
-const seedDefaultRoles = async (): Promise<Record<string, Role>> => {
-  const roles: Record<string, Role> = {};
-  for (const roleDef of DEFAULT_ROLES) {
-    const [role] = await Role.findOrCreate({
-      where: { name: roleDef.name },
-      defaults: {
-        name: roleDef.name,
-        description: roleDef.description,
-        permissions: JSON.stringify(roleDef.permissions),
-        isActive: true,
-      },
-    });
-    roles[roleDef.name] = role;
-  }
-  return roles;
-};
-
 const startServer = async () => {
   try {
     await sequelize.authenticate();
@@ -325,7 +309,10 @@ const startServer = async () => {
     // Seed default roles and the super admin account on every boot.
     // Both are idempotent (skip/update anything that already exists), so this is
     // safe to run every time the server starts, not just once via `npm run seed:admin`.
-    const roles = await seedDefaultRoles();
+    // Every company gets the built-in roles (each company has its own copy).
+    const defaultCompanyId = await getDefaultCompanyId();
+    for (const company of await listTenantCompanies()) await seedRolesForCompany(company.id);
+    const roles = await seedRolesForCompany(defaultCompanyId);
     await createSuperAdmin(roles['Administrator']?.id);
 
     await initRealtime(httpServer);

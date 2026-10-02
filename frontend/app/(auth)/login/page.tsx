@@ -222,7 +222,14 @@ export default function LoginPage() {
 
       <div id="googleSignInBtn" className="w-full flex justify-center"></div>
 
-      <p className="mt-6 text-center text-xs text-slate-400">
+      <p className="mt-6 text-center text-sm text-slate-500">
+        New to Inveon One CRM?{' '}
+        <Link href="/signup" className="font-semibold text-[var(--primary)] hover:underline">
+          Start a 15-day free trial
+        </Link>
+      </p>
+
+      <p className="mt-3 text-center text-xs text-slate-400">
         Having trouble?{' '}
         <Link href="/contact" className="font-semibold text-[var(--primary)] hover:underline">
           Contact your administrator

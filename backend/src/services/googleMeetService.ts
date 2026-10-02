@@ -1,6 +1,7 @@
 import { OAuth2Client } from 'google-auth-library';
 import jwt from 'jsonwebtoken';
 import GoogleMeetConnection from '../models/GoogleMeetConnection';
+import { runAsUser } from '../tenancy/provisioning';
 
 // Google Meet doesn't have a link-creation API of its own — real Meet links
 // are created as a side effect of a Calendar API event insert with
@@ -54,19 +55,21 @@ export const handleOAuthCallback = async (code: string, state: string): Promise<
   if (decoded?.purpose !== 'google-meet-connect' || !decoded?.userId) {
     throw new Error('Invalid connection request.');
   }
+  // OAuth redirects arrive without a login: act as the connecting user's company.
+  return runAsUser(decoded.userId, async () => {
+    const { tokens } = await client.getToken(code);
+    if (!tokens.access_token) throw new Error('Google did not return a usable access token.');
 
-  const { tokens } = await client.getToken(code);
-  if (!tokens.access_token) throw new Error('Google did not return a usable access token.');
-
-  const connection = await getConnection();
-  await connection.update({
-    accessToken: tokens.access_token,
-    ...(tokens.refresh_token ? { refreshToken: tokens.refresh_token } : {}),
-    tokenExpiresAt: tokens.expiry_date ? new Date(tokens.expiry_date) : null,
-    isEnabled: true,
-    connectedById: decoded.userId,
-    connectedAt: new Date(),
-    lastError: connection.refreshToken || tokens.refresh_token ? null : 'No refresh token received from Google — you may need to reconnect periodically.',
+    const connection = await getConnection();
+    await connection.update({
+      accessToken: tokens.access_token,
+      ...(tokens.refresh_token ? { refreshToken: tokens.refresh_token } : {}),
+      tokenExpiresAt: tokens.expiry_date ? new Date(tokens.expiry_date) : null,
+      isEnabled: true,
+      connectedById: decoded.userId,
+      connectedAt: new Date(),
+      lastError: connection.refreshToken || tokens.refresh_token ? null : 'No refresh token received from Google — you may need to reconnect periodically.',
+    });
   });
 };
 

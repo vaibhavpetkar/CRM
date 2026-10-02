@@ -1,18 +1,13 @@
 import { Request, Response } from 'express';
 import Company from '../models/Company';
+import { currentCompanyId } from '../tenancy/context';
 
 // Settings > Company: the logged-in user's own company (name, currency, etc.).
-// Company reads are filtered to the user's company (tenancy/scoping.ts), so
-// "the first row" here is always the caller's company.
+// Every user belongs to exactly one company (see tenancy/), so this is always
+// the caller's tenant row, never another company's or a customer account.
 const getOrCreateCompany = async () => {
-  let company = await Company.findOne({ order: [['id', 'ASC']] });
-  if (!company) {
-    company = await Company.create({
-      name: 'My Company',
-      currency: 'INR',
-      isActive: true,
-    });
-  }
+  const company = await Company.findByPk(currentCompanyId() ?? undefined);
+  if (!company) throw new Error('Company not found for the current user');
   return company;
 };
 

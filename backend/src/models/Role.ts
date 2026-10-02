@@ -35,7 +35,7 @@ Role.init(
     name: {
       type: DataTypes.STRING(50),
       allowNull: false,
-      unique: true,
+      // Unique per company (see tenancy/migration.ts), not globally.
     },
     description: {
       type: DataTypes.TEXT,

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Sidebar from './sidebar';
 import Topbar from './topbar';
 import AuthGuard from './auth-guard';
+import SubscriptionGate from '@/components/subscription/subscription-gate';
 import { cn } from '@/lib/utils';
 import { companyApi } from '@/lib/api';
 import { setCachedCurrency } from '@/lib/currency';
@@ -39,7 +40,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <div className={cn('transition-all duration-200', sidebarCollapsed ? 'md:pl-[68px]' : 'md:pl-60')}>
         <Topbar onMobileMenuClick={() => setMobileNavOpen(true)} />
         <main className="p-4 sm:p-6">
-          <AuthGuard>{children}</AuthGuard>
+          <AuthGuard>
+            <SubscriptionGate>{children}</SubscriptionGate>
+          </AuthGuard>
         </main>
       </div>
     </div>

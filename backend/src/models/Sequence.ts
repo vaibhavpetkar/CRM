@@ -36,7 +36,7 @@ Sequence.init(
     key: {
       type: DataTypes.STRING(50),
       allowNull: false,
-      unique: true,
+      // Unique per company (see tenancy/migration.ts), not globally.
     },
     currentNumber: {
       type: DataTypes.INTEGER.UNSIGNED,

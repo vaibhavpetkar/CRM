@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import {
   register,
+  signupCompany,
   login,
   googleLogin,
   sendInvitation,
@@ -19,6 +20,7 @@ const router = Router();
 
 // Public auth routes
 router.post('/register', registrationRateLimiter, register);
+router.post('/signup-company', registrationRateLimiter, signupCompany);
 router.post('/login', loginRateLimiter, login);
 router.post('/google', loginRateLimiter, googleLogin);
 router.get('/verify-email/:token', verifyEmail);

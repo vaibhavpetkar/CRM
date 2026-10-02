@@ -111,7 +111,7 @@ class Quote extends Model<QuoteAttributes, QuoteCreationAttributes> implements Q
 Quote.init(
   {
     id: { type: DataTypes.INTEGER.UNSIGNED, autoIncrement: true, primaryKey: true },
-    quoteNumber: { type: DataTypes.STRING(30), allowNull: false, unique: true },
+    quoteNumber: { type: DataTypes.STRING(30), allowNull: false }, // unique per company (see tenancy/migration.ts)
     quotationDate: { type: DataTypes.DATEONLY, allowNull: false, defaultValue: DataTypes.NOW },
     status: { type: DataTypes.STRING(20), allowNull: false, defaultValue: 'draft' },
 
