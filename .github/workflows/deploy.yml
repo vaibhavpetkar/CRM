@@ -8,6 +8,15 @@ on:
       - 'v*'
   workflow_dispatch:
 
+# Only one deploy may touch the VPS at a time. Two overlapping runs (e.g.
+# merging two PRs back to back) race each other's `compose down` / `up` and
+# fail with "container name ... is already in use". A run that's already
+# deploying is never cancelled mid-way; newer pushes wait their turn, and
+# GitHub keeps only the latest waiting run, which deploys latest master.
+concurrency:
+  group: deploy-vps
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
