@@ -108,6 +108,17 @@ services:
       - META_APP_SECRET=${META_APP_SECRET:-}
       - META_VERIFY_TOKEN=${META_VERIFY_TOKEN:-}
       - META_LOGIN_CONFIG_ID=${META_LOGIN_CONFIG_ID:-}
+      # Click-to-call (call icon next to phone numbers). Default provider is
+      # Exotel; VOICE_PROVIDER=mock gives a demo with no real calls. Call
+      # status webhook: ${CLIENT_URL}/api/webhooks/voice/<per-call token>.
+      - VOICE_PROVIDER=${VOICE_PROVIDER:-exotel}
+      - VOICE_CALLBACK_BASE_URL=${VOICE_CALLBACK_BASE_URL:-}
+      - EXOTEL_ACCOUNT_SID=${EXOTEL_ACCOUNT_SID:-}
+      - EXOTEL_API_KEY=${EXOTEL_API_KEY:-}
+      - EXOTEL_API_TOKEN=${EXOTEL_API_TOKEN:-}
+      - EXOTEL_CALLER_ID=${EXOTEL_CALLER_ID:-}
+      - EXOTEL_SUBDOMAIN=${EXOTEL_SUBDOMAIN:-}
+      - EXOTEL_TIME_LIMIT=${EXOTEL_TIME_LIMIT:-}
       - SUPER_ADMIN_EMAIL=${SUPER_ADMIN_EMAIL:-admin@crmpro.com}
       - SUPER_ADMIN_PASSWORD=${SUPER_ADMIN_PASSWORD:-et4t8HjfnhRYocM3Z22p!Aa1}
       # AI Assistant — free, local Ollama provider (see the `ollama` service

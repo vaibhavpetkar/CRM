@@ -8,6 +8,7 @@ import SubscriptionGate from '@/components/subscription/subscription-gate';
 import { cn } from '@/lib/utils';
 import { companyApi } from '@/lib/api';
 import { setCachedCurrency } from '@/lib/currency';
+import { CallProvider } from '@/components/calls/call-context';
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -41,7 +42,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <Topbar onMobileMenuClick={() => setMobileNavOpen(true)} />
         <main className="p-4 sm:p-6">
           <AuthGuard>
-            <SubscriptionGate>{children}</SubscriptionGate>
+            <SubscriptionGate>
+              {/* Click-to-call: the calling panel floats over every page. */}
+              <CallProvider>{children}</CallProvider>
+            </SubscriptionGate>
           </AuthGuard>
         </main>
       </div>
