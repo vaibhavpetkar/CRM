@@ -16,6 +16,8 @@ import { PlusIcon, XMarkIcon, PencilSquareIcon, TrashIcon, ShareIcon } from '@he
 import { useToast } from '@/components/ui/toast';
 import CompanyAutocomplete from '@/components/ui/company-autocomplete';
 import { ContactRows, LeadRows, DealRows, RelatedSection, companyHref } from '@/components/contacts/related-records';
+import CallButton from '@/components/calls/call-button';
+import CallHistory from '@/components/calls/call-history';
 
 const emptyForm = {
   firstName: '',
@@ -501,7 +503,15 @@ export default function ContactsPage() {
                 </div>
                 <div>
                   <dt className="text-xs font-medium uppercase text-slate-400">Phone</dt>
-                  <dd className="text-slate-700">{panelContact.phone || '—'}</dd>
+                  <dd className="flex items-center gap-2 text-slate-700">
+                    <span>{panelContact.phone || '—'}</span>
+                    <CallButton
+                      number={panelContact.phone || ''}
+                      contactId={panelContact.id}
+                      name={`${panelContact.firstName || ''} ${panelContact.lastName || ''}`.trim()}
+                      className="h-7 w-7"
+                    />
+                  </dd>
                 </div>
                 <div>
                   <dt className="text-xs font-medium uppercase text-slate-400">Job Title</dt>
@@ -525,6 +535,11 @@ export default function ContactsPage() {
                 </div>
               </dl>
             )}
+
+            <div className="mt-6 border-t border-slate-100 pt-4">
+              <h4 className="mb-2 text-sm font-semibold text-slate-900">Calls</h4>
+              <CallHistory contactId={panelContact.id} compact />
+            </div>
 
             <div className="mt-6 border-t border-slate-100 pt-4">
               <div className="flex items-center justify-between">

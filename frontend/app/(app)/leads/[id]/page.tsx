@@ -17,6 +17,8 @@ import SearchableSelect from '@/components/ui/searchable-select';
 import { ArrowLeftIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { useToast } from '@/components/ui/toast';
 import { useKeyboardShortcuts } from '@/lib/hooks/useKeyboardShortcuts';
+import CallButton from '@/components/calls/call-button';
+import CallHistory from '@/components/calls/call-history';
 
 export default function LeadDetailsPage() {
   const toast = useToast();
@@ -25,6 +27,7 @@ export default function LeadDetailsPage() {
   const leadId = params.id as string;
 
   const [lead, setLead] = useState<any>(null);
+  const leadName = lead ? `${lead.firstName || ''} ${lead.lastName || ''}`.trim() : '';
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -326,6 +329,14 @@ export default function LeadDetailsPage() {
         >
           Activity
         </button>
+        <button
+          onClick={() => setActiveTab('calls')}
+          className={`px-4 py-2 text-sm font-medium border-b-2 ${
+            activeTab === 'calls' ? 'border-[#168eea] text-[#168eea]' : 'border-transparent text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          Calls
+        </button>
       </div>
 
       {activeTab === 'lead-form' && (
@@ -528,35 +539,44 @@ export default function LeadDetailsPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700">Telephone</label>
-                  <input
-                    type="tel"
-                    value={formData.phone || ''}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
-                  />
+                  <div className="mt-1 flex items-center gap-2">
+                    <input
+                      type="tel"
+                      value={formData.phone || ''}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      className="w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                    />
+                    <CallButton number={lead?.phone || ''} leadId={lead?.id} name={leadName} />
+                  </div>
                 </div>
 <div>
                       <label className="block text-sm font-medium text-slate-700">Mobile Number <span className="text-red-500">*</span></label>
-                      <input
-                        type="tel"
-                        required
-                        maxLength={10}
-                        value={formData.mobile || ''}
-                        onChange={(e) => setFormData({ ...formData, mobile: e.target.value.replace(/\D/g, '') })}
-                        placeholder="10-digit number"
-                        className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
-                      />
+                      <div className="mt-1 flex items-center gap-2">
+                        <input
+                          type="tel"
+                          required
+                          maxLength={10}
+                          value={formData.mobile || ''}
+                          onChange={(e) => setFormData({ ...formData, mobile: e.target.value.replace(/\D/g, '') })}
+                          placeholder="10-digit number"
+                          className="w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                        />
+                        <CallButton number={lead?.mobile || ''} leadId={lead?.id} name={leadName} />
+                      </div>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-700">Alternate Mobile</label>
-                      <input
-                        type="tel"
-                        maxLength={10}
-                        value={formData.alternateMobile || ''}
-                        onChange={(e) => setFormData({ ...formData, alternateMobile: e.target.value.replace(/\D/g, '') })}
-                        placeholder="10-digit number"
-                        className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
-                      />
+                      <div className="mt-1 flex items-center gap-2">
+                        <input
+                          type="tel"
+                          maxLength={10}
+                          value={formData.alternateMobile || ''}
+                          onChange={(e) => setFormData({ ...formData, alternateMobile: e.target.value.replace(/\D/g, '') })}
+                          placeholder="10-digit number"
+                          className="w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                        />
+                        <CallButton number={lead?.alternateMobile || ''} leadId={lead?.id} name={leadName} />
+                      </div>
                     </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700">Assigned To (Lead Owner)</label>
@@ -770,6 +790,12 @@ export default function LeadDetailsPage() {
           )}
         </Card>
         </>
+      )}
+
+      {activeTab === 'calls' && (
+        <Card title="Calls">
+          <CallHistory leadId={leadId} />
+        </Card>
       )}
     </div>
   );

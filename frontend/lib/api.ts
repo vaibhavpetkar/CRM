@@ -1036,6 +1036,61 @@ export const metaLeadsApi = {
     request<{ created: number; duplicate: number; skipped: number; failed: number }>(`/integrations/meta/pages/${id}/sync`, { method: 'POST' }),
 };
 
+// ─── Calls API (click-to-call) ──────────────────────────────────────────────
+
+export type CallStatus = 'queued' | 'ringing' | 'in-progress' | 'completed' | 'busy' | 'no-answer' | 'failed' | 'canceled';
+
+export interface CallRow {
+  id: number;
+  provider: string;
+  status: CallStatus;
+  isActive: boolean;
+  customerNumber: string;
+  agentNumber: string;
+  leadId: number | null;
+  contactId: number | null;
+  userId: number;
+  notes: string;
+  durationSeconds: number | null;
+  startedAt: string | null;
+  endedAt: string | null;
+  hasRecording: boolean;
+  recordingPending: boolean;
+  error: string | null;
+  createdAt: string;
+  calledBy?: string | null;
+}
+
+export interface CallConfig {
+  enabled: boolean;
+  provider: string;
+  providerLabel: string;
+  missingEnvVars: string[];
+  agentNumber: string | null;
+  recording: boolean;
+}
+
+export const callsApi = {
+  getConfig: async () => request<CallConfig>('/calls/config'),
+  setMyNumber: async (phone: string) => request<CallConfig>('/calls/my-number', { method: 'PUT', body: JSON.stringify({ phone }) }),
+  start: async (payload: { leadId?: number; contactId?: number; number: string }) =>
+    request<CallRow>('/calls', { method: 'POST', body: JSON.stringify(payload) }),
+  get: async (id: number) => request<CallRow>(`/calls/${id}`),
+  saveNotes: async (id: number, notes: string) =>
+    request<CallRow>(`/calls/${id}`, { method: 'PATCH', body: JSON.stringify({ notes }) }),
+  list: async (target: { leadId?: number | string; contactId?: number | string }) => {
+    const qs = target.leadId ? `leadId=${target.leadId}` : `contactId=${target.contactId}`;
+    return request<CallRow[]>(`/calls?${qs}`);
+  },
+  /** Recordings need the login token, so they're fetched as a blob for <audio>. */
+  getRecordingUrl: async (id: number) => {
+    const token = getAuthToken();
+    const res = await fetch(`${API_BASE}/calls/${id}/recording`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+    if (!res.ok) throw new Error(res.status === 404 ? 'The recording is not available yet.' : 'Could not load the recording.');
+    return URL.createObjectURL(await res.blob());
+  },
+};
+
 // ─── Document Templates API ──────────────────────────────────────────────────
 // Distinct from the marketing `templatesApi` above (campaign emails) — these
 // are transactional/auto-send document templates (quotes, invoices, etc.)

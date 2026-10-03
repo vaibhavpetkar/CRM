@@ -43,6 +43,8 @@ import googleMeetRoutes from './routes/googleMeetRoutes';
 import googleBusinessRoutes from './routes/googleBusinessRoutes';
 import metaLeadsRoutes from './routes/metaLeadsRoutes';
 import metaWebhookRoutes from './routes/metaWebhookRoutes';
+import callRoutes from './routes/callRoutes';
+import voiceWebhookRoutes from './routes/voiceWebhookRoutes';
 import expenseRoutes from './routes/expenseRoutes';
 import reportRoutes from './routes/reportRoutes';
 import documentTemplateRoutes from './routes/documentTemplateRoutes';
@@ -113,6 +115,8 @@ app.set('trust proxy', 1);
 app.use('/api/public', publicRoutes);
 // Facebook Lead Ads webhook: needs the raw body to check Meta's signature.
 app.use('/api/webhooks/meta', metaWebhookRoutes);
+// Call status updates from the telephony provider (click-to-call).
+app.use('/api/webhooks/voice', voiceWebhookRoutes);
 
 const allowedOrigins = [
   process.env.CLIENT_URL || 'http://localhost:3000',
@@ -193,6 +197,7 @@ app.use('/api/ai', aiRoutes);
 app.use('/api/expenses', expenseRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/document-templates', documentTemplateRoutes);
+app.use('/api/calls', callRoutes);
 
 // Serve uploaded files (attachments, generated PDFs) statically — but only to
 // authenticated users. Nothing in the frontend loads these via raw <img>/<a>
