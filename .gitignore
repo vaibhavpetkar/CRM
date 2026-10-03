@@ -28,3 +28,6 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
+
+# Runtime uploads (attachments, call recordings); production keeps them in a Docker volume
+backend/uploads/
