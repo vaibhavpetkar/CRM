@@ -6,6 +6,7 @@ import { useState, Suspense } from 'react';
 import Button from '@/components/ui/button';
 import LoadingSpinner from '@/components/ui/loading-spinner';
 import { authApi } from '@/lib/api';
+import PasswordInput from '@/components/ui/password-input';
 
 function ResetPasswordForm() {
   const router = useRouter();
@@ -80,8 +81,7 @@ function ResetPasswordForm() {
       <form onSubmit={handleSubmit} className="mt-6 space-y-4">
         <div>
           <label className="mb-1.5 block text-sm font-medium text-slate-700">New Password</label>
-          <input
-            type="password"
+          <PasswordInput
             required
             minLength={6}
             value={password}
@@ -92,8 +92,7 @@ function ResetPasswordForm() {
         </div>
         <div>
           <label className="mb-1.5 block text-sm font-medium text-slate-700">Confirm Password</label>
-          <input
-            type="password"
+          <PasswordInput
             required
             minLength={6}
             value={confirmPassword}
