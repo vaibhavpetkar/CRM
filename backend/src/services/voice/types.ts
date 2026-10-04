@@ -13,6 +13,7 @@ import type { CallStatus } from '../../models/Call';
 export interface PlaceCallInput {
   agentNumber: string; // E.164, the CRM user's phone
   customerNumber: string; // E.164, the lead/contact
+  callerId?: string | null; // E.164, the company number the customer sees; null = provider default
   statusCallbackUrl: string;
   record: boolean;
 }
@@ -43,6 +44,8 @@ export interface VoiceProvider {
   readonly label: string;
   /** Env vars this provider still needs; empty when it is ready to call. */
   missingEnvVars(): string[];
+  /** The caller ID used when the company has no numbers set up in the CRM. */
+  defaultCallerId(): string | null;
   placeCall(input: PlaceCallInput): Promise<PlaceCallResult>;
   getCall(providerCallId: string): Promise<CallUpdate>;
   /** Turns a webhook body (already parsed: JSON or form fields) into an update. */

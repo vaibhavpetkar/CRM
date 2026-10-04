@@ -140,6 +140,7 @@ export default function CallPanel({ target, call, config, placing, error, needsM
       {!minimized && (
         <div className="space-y-3 px-4 py-3">
           <p className="text-xs text-slate-600">{headline}</p>
+          {call?.callerId && <p className="text-[11px] text-slate-400">Customer sees {call.callerId}</p>}
 
           {error && (
             <div className="space-y-2">
