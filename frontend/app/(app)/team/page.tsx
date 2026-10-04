@@ -21,6 +21,7 @@ import {
   BuildingOfficeIcon,
 } from '@heroicons/react/24/outline';
 import { useToast } from '@/components/ui/toast';
+import LiveStatusPanel from '@/components/team/live-status-panel';
 
 const AVATAR_COLORS = [
   'bg-blue-100 text-blue-700',
@@ -263,6 +264,8 @@ export default function TeamPage() {
           </Button>
         }
       />
+
+      <LiveStatusPanel />
 
       <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard label="Total Members" value={stats.total} icon={<UserGroupIcon className="h-5 w-5" />} />

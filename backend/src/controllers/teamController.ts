@@ -3,6 +3,9 @@ import { Op } from 'sequelize';
 import User from '../models/User';
 import Role from '../models/Role';
 import { AuthRequest } from '../middleware/authMiddleware';
+import { asyncHandler } from '../utils/errorHandler';
+import * as presenceService from '../services/presenceService';
+import { getOnlineUserIds } from '../realtime/presence';
 
 // Serialize a user to the shape the frontend Team page expects
 const serializeMember = (user: any) => {
@@ -197,3 +200,9 @@ export const deleteTeamMember = async (req: AuthRequest, res: Response) => {
     return res.status(500).json({ message: 'Server error' });
   }
 };
+
+// Live sales-team status (Available / On call / After call work / Offline).
+export const getTeamPresence = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const online = await getOnlineUserIds(req.user.companyId);
+  return res.json(await presenceService.getTeamPresence(online));
+});
