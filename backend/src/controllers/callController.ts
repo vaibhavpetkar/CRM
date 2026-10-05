@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { AuthRequest } from '../middleware/authMiddleware';
 import { asyncHandler } from '../utils/errorHandler';
 import * as callService from '../services/callService';
+import * as callerNumbers from '../services/callerNumbers';
 import logger from '../utils/logger';
 
 const optionalId = (value: unknown) => {
@@ -10,7 +11,7 @@ const optionalId = (value: unknown) => {
 };
 
 export const getCallConfig = asyncHandler(async (req: AuthRequest, res: Response) => {
-  return res.json(callService.getConfig(req.user));
+  return res.json(await callService.getConfig(req.user));
 });
 
 export const setMyNumber = asyncHandler(async (req: AuthRequest, res: Response) => {
@@ -57,3 +58,21 @@ export const receiveVoiceWebhook = (req: Request, res: Response) => {
     })
     .catch((err) => logger.error(`[voice] Webhook processing failed: ${err}`));
 };
+
+// ─── Calling numbers (admin) ────────────────────────────────────────────────
+
+export const listCallerNumbers = asyncHandler(async (_req: AuthRequest, res: Response) => {
+  return res.json(await callerNumbers.listCallerNumbers());
+});
+
+export const addCallerNumber = asyncHandler(async (req: AuthRequest, res: Response) => {
+  return res.status(201).json(await callerNumbers.addCallerNumber(req.body || {}));
+});
+
+export const updateCallerNumber = asyncHandler(async (req: AuthRequest, res: Response) => {
+  return res.json(await callerNumbers.updateCallerNumber(Number(req.params.id), req.body || {}));
+});
+
+export const removeCallerNumber = asyncHandler(async (req: AuthRequest, res: Response) => {
+  return res.json(await callerNumbers.removeCallerNumber(Number(req.params.id)));
+});

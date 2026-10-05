@@ -6,9 +6,11 @@ import { CallUpdate, PlaceCallInput, PlaceCallResult, RecordingDownload, VoicePr
  * telephony company whose "Connect two numbers" API is built for exactly this
  * CRM click-to-call flow, with call recording included.
  *
- * Env: EXOTEL_ACCOUNT_SID, EXOTEL_API_KEY, EXOTEL_API_TOKEN, EXOTEL_CALLER_ID
- * (your ExoPhone), optional EXOTEL_SUBDOMAIN (default api.exotel.com; use
- * api.in.exotel.com for an account on Exotel's Mumbai cluster).
+ * Env: EXOTEL_ACCOUNT_SID, EXOTEL_API_KEY, EXOTEL_API_TOKEN, optional
+ * EXOTEL_SUBDOMAIN (default api.exotel.com; use api.in.exotel.com for an
+ * account on Exotel's Mumbai cluster). The caller ID (ExoPhone) comes from the
+ * CRM's calling numbers (Settings > Integrations), or EXOTEL_CALLER_ID when
+ * none are set up there.
  */
 const env = (name: string) => (process.env[name] || '').trim();
 
@@ -38,6 +40,9 @@ const toUrl = (value: unknown): string | null => {
   return /^https?:\/\//i.test(s) ? s : null;
 };
 
+/** "+918047112345" -> "08047112345", the way Exotel writes ExoPhones. */
+export const toExotelNumber = (e164: string) => (/^\+91\d{10}$/.test(e164) ? `0${e164.slice(3)}` : e164);
+
 /** Maps an Exotel call object (API response or webhook) onto our fields. */
 export const mapExotelCall = (c: Record<string, any>): CallUpdate => ({
   providerCallId: c.Sid || c.CallSid || null,
@@ -54,7 +59,11 @@ export class ExotelProvider implements VoiceProvider {
   readonly label = 'Exotel';
 
   missingEnvVars() {
-    return ['EXOTEL_ACCOUNT_SID', 'EXOTEL_API_KEY', 'EXOTEL_API_TOKEN', 'EXOTEL_CALLER_ID'].filter((n) => !env(n));
+    return ['EXOTEL_ACCOUNT_SID', 'EXOTEL_API_KEY', 'EXOTEL_API_TOKEN'].filter((n) => !env(n));
+  }
+
+  defaultCallerId() {
+    return env('EXOTEL_CALLER_ID') || null;
   }
 
   private authHeader() {
@@ -92,10 +101,12 @@ export class ExotelProvider implements VoiceProvider {
   }
 
   async placeCall(input: PlaceCallInput): Promise<PlaceCallResult> {
+    const callerId = input.callerId ? toExotelNumber(input.callerId) : env('EXOTEL_CALLER_ID');
+    if (!callerId) throw new VoiceProviderError('No calling number is set up. Add an ExoPhone under Settings > Integrations > Calling numbers.', 400);
     const form = new URLSearchParams({
       From: input.agentNumber,
       To: input.customerNumber,
-      CallerId: env('EXOTEL_CALLER_ID'),
+      CallerId: callerId,
       Record: input.record ? 'true' : 'false',
       StatusCallback: input.statusCallbackUrl,
       'StatusCallbackEvents[0]': 'terminal',
@@ -109,7 +120,7 @@ export class ExotelProvider implements VoiceProvider {
     });
     const call = body?.Call;
     if (!call?.Sid) throw new VoiceProviderError('Exotel did not return a call id.');
-    return { providerCallId: call.Sid, status: toStatus(call.Status) || 'queued', callerId: env('EXOTEL_CALLER_ID') };
+    return { providerCallId: call.Sid, status: toStatus(call.Status) || 'queued', callerId };
   }
 
   async getCall(providerCallId: string): Promise<CallUpdate> {

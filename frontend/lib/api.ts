@@ -1047,6 +1047,7 @@ export interface CallRow {
   isActive: boolean;
   customerNumber: string;
   agentNumber: string;
+  callerId: string | null;
   leadId: number | null;
   contactId: number | null;
   userId: number;
@@ -1067,7 +1068,20 @@ export interface CallConfig {
   providerLabel: string;
   missingEnvVars: string[];
   agentNumber: string | null;
+  /** Which company number this user's calls show; null when none are set up in the CRM. */
+  callerNumber: { mode: 'dedicated'; number: string } | { mode: 'pool'; number: null; poolSize: number } | null;
   recording: boolean;
+}
+
+export interface CallerNumberRow {
+  id: number;
+  number: string;
+  label: string;
+  userId: number | null;
+  assignedTo: string | null;
+  isActive: boolean;
+  lastUsedAt: string | null;
+  liveCalls: { callId: number; status: CallStatus; by: string | null; to: string; since: string }[];
 }
 
 export const callsApi = {
@@ -1089,6 +1103,13 @@ export const callsApi = {
     if (!res.ok) throw new Error(res.status === 404 ? 'The recording is not available yet.' : 'Could not load the recording.');
     return URL.createObjectURL(await res.blob());
   },
+  /** The company's calling numbers (admins: integrations:manage). */
+  listNumbers: async () => request<CallerNumberRow[]>('/calls/numbers'),
+  addNumber: async (payload: { number: string; label?: string; userId?: number | null }) =>
+    request<CallerNumberRow[]>('/calls/numbers', { method: 'POST', body: JSON.stringify(payload) }),
+  updateNumber: async (id: number, payload: { label?: string; userId?: number | null; isActive?: boolean }) =>
+    request<CallerNumberRow[]>(`/calls/numbers/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
+  removeNumber: async (id: number) => request<CallerNumberRow[]>(`/calls/numbers/${id}`, { method: 'DELETE' }),
 };
 
 // ─── Document Templates API ──────────────────────────────────────────────────

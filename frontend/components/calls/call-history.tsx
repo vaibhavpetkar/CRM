@@ -39,6 +39,7 @@ export default function CallHistory({ leadId, contactId, compact = false }: { le
           <div className="flex flex-wrap items-center gap-2">
             <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${CALL_STATUS_CLASS[c.status]}`}>{CALL_STATUS_LABEL[c.status]}</span>
             <span className="text-xs text-slate-600">{c.customerNumber}</span>
+            {c.callerId && <span className="text-[11px] text-slate-400">from {c.callerId}</span>}
             {c.status === 'completed' && <span className="font-mono text-xs text-slate-500">{formatDuration(c.durationSeconds)}</span>}
             <span className="ml-auto text-xs text-slate-400">
               {new Date(c.createdAt).toLocaleString()}

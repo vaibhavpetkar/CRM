@@ -13,6 +13,7 @@ import { logActivity } from './activityLogger';
 import { getVoiceProvider, providerKey, CallUpdate, VoiceProvider, VoiceProviderError } from './voice';
 import { formatIndianNumber, normalizeIndianNumber } from '../utils/indianPhone';
 import logger from '../utils/logger';
+import { assignCallerNumber, describeMyCallerNumber, hasCallerNumbers } from './callerNumbers';
 
 export const RECORDINGS_DIR = path.join(UPLOAD_DIR, 'recordings');
 
@@ -56,25 +57,30 @@ const STATUS_LABEL: Record<string, string> = {
 
 // ─── Setup / config ─────────────────────────────────────────────────────────
 
-export const getConfig = (user: any) => {
+export const getConfig = async (user: any) => {
   const provider = getVoiceProvider();
-  const missingEnvVars = provider ? provider.missingEnvVars() : [];
+  const missingEnvVars = provider ? provider.missingEnvVars() : ['VOICE_PROVIDER'];
+  // A caller ID comes from the numbers added in Settings, or the provider's default.
+  const hasNumbers = await hasCallerNumbers();
+  const hasCallerId = hasNumbers || !!provider?.defaultCallerId();
+  if (provider && !hasCallerId && provider.key === 'exotel') missingEnvVars.push('EXOTEL_CALLER_ID');
   const agentNumber = normalizeIndianNumber(user?.phone);
   return {
     enabled: !!provider && missingEnvVars.length === 0,
     provider: provider?.key || providerKey(),
     providerLabel: provider?.label || providerKey(),
     // Variable names only (never values), and only to people who can fix them.
-    missingEnvVars: userCan(user, 'integrations:manage') ? (provider ? missingEnvVars : ['VOICE_PROVIDER']) : [],
+    missingEnvVars: userCan(user, 'integrations:manage') ? missingEnvVars : [],
     agentNumber: agentNumber ? formatIndianNumber(agentNumber) : null,
+    callerNumber: hasNumbers ? await describeMyCallerNumber(user.id) : null,
     recording: true,
   };
 };
 
-const requireProvider = (): VoiceProvider => {
+const requireProvider = async (): Promise<VoiceProvider> => {
   const provider = getVoiceProvider();
   if (!provider) throw new AppError(`Unknown calling provider "${providerKey()}". Check VOICE_PROVIDER.`, 503);
-  if (provider.missingEnvVars().length) {
+  if (provider.missingEnvVars().length || (!provider.defaultCallerId() && !(await hasCallerNumbers()))) {
     throw new AppError('Calling is not set up yet. Ask your administrator to add the calling provider details.', 503);
   }
   return provider;
@@ -85,7 +91,7 @@ export const setMyNumber = async (user: any, phone: unknown) => {
   const agentNumber = normalizeIndianNumber(typeof phone === 'string' ? phone : '');
   if (!agentNumber) throw new ValidationError('Enter a valid Indian mobile number, e.g. 98765 43210.');
   await user.update({ phone: agentNumber });
-  return getConfig(user);
+  return await getConfig(user);
 };
 
 // ─── The record being called ────────────────────────────────────────────────
@@ -121,7 +127,7 @@ const loadTarget = async (user: any, target: Target, action: 'read' | 'update') 
 // ─── Placing a call ─────────────────────────────────────────────────────────
 
 export const startCall = async (user: any, input: Target & { number?: string }) => {
-  const provider = requireProvider();
+  const provider = await requireProvider();
   const target = await loadTarget(user, input, 'read');
 
   const customerNumber = normalizeIndianNumber(input.number);
@@ -137,6 +143,10 @@ export const startCall = async (user: any, input: Target & { number?: string }) 
     throw new ValidationError('Add your own mobile number in your Profile first. The call rings your phone, then connects to the customer.');
   }
 
+  // Each call is its own bridge at the provider, so team members can call at
+  // the same time; this picks which company number the customer sees.
+  const callerId = (await assignCallerNumber(user.id, customerNumber)) || normalizeIndianNumber(provider.defaultCallerId()) || null;
+
   const callbackToken = crypto.randomBytes(24).toString('hex');
   const call = await Call.create({
     provider: provider.key,
@@ -144,6 +154,7 @@ export const startCall = async (user: any, input: Target & { number?: string }) 
     status: 'queued',
     agentNumber,
     customerNumber,
+    callerId,
     leadId: target.kind === 'Lead' ? target.id : null,
     contactId: target.kind === 'Contact' ? target.id : null,
     userId: user.id,
@@ -153,10 +164,15 @@ export const startCall = async (user: any, input: Target & { number?: string }) 
     const placed = await provider.placeCall({
       agentNumber,
       customerNumber,
+      callerId,
       statusCallbackUrl: `${callbackBaseUrl()}/api/webhooks/voice/${callbackToken}`,
       record: true,
     });
-    await call.update({ providerCallId: placed.providerCallId, status: placed.status, callerId: placed.callerId || null });
+    await call.update({
+      providerCallId: placed.providerCallId,
+      status: placed.status,
+      callerId: callerId || normalizeIndianNumber(placed.callerId) || placed.callerId || null,
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     await call.update({ status: 'failed', error: message.slice(0, 500), endedAt: new Date() });
@@ -284,6 +300,7 @@ const serialize = (call: Call, extra: Record<string, any> = {}) => ({
   isActive: !isTerminal(call.status),
   customerNumber: formatIndianNumber(call.customerNumber),
   agentNumber: formatIndianNumber(call.agentNumber),
+  callerId: call.callerId ? formatIndianNumber(call.callerId) : null,
   leadId: call.leadId,
   contactId: call.contactId,
   userId: call.userId,
