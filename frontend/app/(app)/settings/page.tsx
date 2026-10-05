@@ -10,6 +10,7 @@ import { authApi, googleTasksApi, getStoredUser } from '@/lib/api';
 import Link from 'next/link';
 import { Cog6ToothIcon } from '@heroicons/react/24/outline';
 import { useToast } from '@/components/ui/toast';
+import PasswordInput from '@/components/ui/password-input';
 
 const tabs = [
   { id: 'profile', label: 'Profile' },
@@ -261,8 +262,7 @@ export default function SettingsPage() {
           <form onSubmit={handleChangePassword} className="max-w-md space-y-4">
             <div>
               <label className="mb-1.5 block text-sm font-medium text-slate-700">Current Password</label>
-              <input
-                type="password"
+              <PasswordInput
                 required
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
@@ -271,8 +271,7 @@ export default function SettingsPage() {
             </div>
             <div>
               <label className="mb-1.5 block text-sm font-medium text-slate-700">New Password</label>
-              <input
-                type="password"
+              <PasswordInput
                 required
                 minLength={6}
                 value={newPassword}
@@ -282,8 +281,7 @@ export default function SettingsPage() {
             </div>
             <div>
               <label className="mb-1.5 block text-sm font-medium text-slate-700">Confirm New Password</label>
-              <input
-                type="password"
+              <PasswordInput
                 required
                 minLength={6}
                 value={confirmPassword}
