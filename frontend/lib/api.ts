@@ -204,7 +204,31 @@ export const authApi = {
 
 // ─── Team API ─────────────────────────────────────────────────────────────────
 
+export type PresenceState = 'on_call' | 'after_call' | 'available' | 'offline';
+
+export interface TeamPresenceAgent {
+  userId: number;
+  name: string;
+  role: string | null;
+  department: string | null;
+  state: PresenceState;
+  since: string | null;
+  online: boolean;
+  lastLogin: string | null;
+  call: { id: number; status: CallStatus; leadId: number | null; contactId: number | null; withName: string; fromNumber: string | null } | null;
+  today: { calls: number; talkSeconds: number };
+}
+
+export interface TeamPresence {
+  serverTime: string;
+  afterCallSeconds: number;
+  counts: Record<PresenceState, number>;
+  agents: TeamPresenceAgent[];
+}
+
 export const teamApi = {
+  getPresence: async () => request<TeamPresence>('/team/presence'),
+
   getMembers: async (params: { search?: string; department?: string; status?: string; roleId?: string } = {}) => {
     const query = new URLSearchParams();
     if (params.search) query.append('search', params.search);
