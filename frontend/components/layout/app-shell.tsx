@@ -38,9 +38,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         onMobileClose={() => setMobileNavOpen(false)}
       />
       {/* No left padding on mobile — the sidebar is an off-canvas drawer there, not a permanent column. */}
-      <div className={cn('transition-all duration-200', sidebarCollapsed ? 'md:pl-[68px]' : 'md:pl-60')}>
+      <div className={cn('transition-all duration-200', sidebarCollapsed ? 'md:pl-[72px]' : 'md:pl-64')}>
         <Topbar onMobileMenuClick={() => setMobileNavOpen(true)} />
-        <main className="p-4 sm:p-6">
+        <main className="p-4 sm:p-6 md:p-8">
           <AuthGuard>
             <SubscriptionGate>
               {/* Click-to-call: the calling panel floats over every page. */}

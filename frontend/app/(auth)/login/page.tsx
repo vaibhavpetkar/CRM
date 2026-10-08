@@ -9,6 +9,8 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import Button from '@/components/ui/button';
 import { authApi, getLastCompanyCode, setLastCompanyCode } from '@/lib/api';
+import PasswordInput from '@/components/ui/password-input';
+import ThemeToggle from '@/components/ui/theme-toggle';
 
 declare global {
   interface Window {
@@ -104,8 +106,6 @@ export default function LoginPage() {
     }
   };
 
-  const [dark, setDark] = useState(false);
-
   return (
     <div className="w-full max-w-md rounded-2xl border border-slate-200/70 bg-[var(--card-bg)] p-8 shadow-xl shadow-slate-200/50 sm:p-10">
       <Script
@@ -122,7 +122,7 @@ export default function LoginPage() {
         </div>
       </div>
 
-      {/* Header row: greeting + light/dark toggle (cosmetic) */}
+      {/* Header row: greeting + light/dark toggle */}
       <div className="flex items-start justify-between">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-900 tracking-tight">
@@ -132,28 +132,11 @@ export default function LoginPage() {
             Sign in to continue to <span className="font-semibold text-[var(--primary)]">Inveon One CRM</span>
           </p>
         </div>
-        <div className="flex shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-slate-50 p-1">
-          <button
-            type="button"
-            aria-label="Light mode"
-            onClick={() => setDark(false)}
-            className={`flex h-7 w-7 items-center justify-center rounded-full transition-colors ${!dark ? 'bg-white shadow-sm text-slate-800' : 'text-slate-400'}`}
-          >
-            <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4"><circle cx="12" cy="12" r="4.5" stroke="currentColor" strokeWidth="1.8" /><path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>
-          </button>
-          <button
-            type="button"
-            aria-label="Dark mode"
-            onClick={() => setDark(true)}
-            className={`flex h-7 w-7 items-center justify-center rounded-full transition-colors ${dark ? 'bg-white shadow-sm text-slate-800' : 'text-slate-400'}`}
-          >
-            <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" /></svg>
-          </button>
-        </div>
+        <ThemeToggle />
       </div>
 
       {error && (
-        <div className="mt-5 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-600 font-medium">
+        <div className="mt-5 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600 font-medium">
           {error}
         </div>
       )}
@@ -209,8 +192,7 @@ export default function LoginPage() {
               <rect x="5" y="10.5" width="14" height="9" rx="2" stroke="currentColor" strokeWidth="1.6" />
               <path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
             </svg>
-            <input
-              type="password"
+            <PasswordInput
               placeholder="Enter your password"
               {...register('password')}
               className={`w-full rounded-lg border border-slate-200 bg-slate-50/60 py-2.5 pl-10 pr-3 text-sm placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/40 focus:border-[var(--primary)] transition-all ${

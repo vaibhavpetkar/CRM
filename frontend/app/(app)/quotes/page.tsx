@@ -210,7 +210,7 @@ export default function QuotesPage() {
   };
 
   const columns: DataTableColumn<any>[] = [
-    { header: 'Quote #', accessor: (q) => <Link href={`/quotes/${q.id}`} className="font-medium text-[#168eea] hover:underline">{q.quoteNumber}</Link> },
+    { header: 'Quote #', accessor: (q) => <Link href={`/quotes/${q.id}`} className="font-medium text-[var(--primary)] hover:underline">{q.quoteNumber}</Link> },
     { header: 'Client', accessor: (q) => <span className="text-slate-600">{q.client}</span> },
     { header: 'Amount', accessor: (q) => <span className="font-medium text-slate-900">{formatCurrency(q.amount)}</span> },
     { header: 'Status', accessor: (q) => <StatusBadge status={q.status} /> },
@@ -252,7 +252,7 @@ export default function QuotesPage() {
         }
       />
 
-      {error && <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
+      {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
 
       <Card>
         <DataTable
@@ -270,7 +270,7 @@ export default function QuotesPage() {
           emptyMessage='No quotes yet. Click "New Quote" to create one.'
           actions={(quote) => (
             <div className="flex justify-end gap-3">
-              <button onClick={() => openSendModal(quote)} className="text-slate-400 hover:text-[#168eea]" aria-label="Send">
+              <button onClick={() => openSendModal(quote)} className="text-slate-400 hover:text-[var(--primary)]" aria-label="Send">
                 <PaperAirplaneIcon className="h-4 w-4" />
               </button>
               {/* Prints with the quote's print format (Document Templates > Print Format) */}
@@ -310,7 +310,7 @@ export default function QuotesPage() {
                   placeholder="e.g. Enterprise License - TechCorp"
                   value={formData.deal}
                   onChange={(e) => setFormData({ ...formData, deal: e.target.value })}
-                  className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                  className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -321,7 +321,7 @@ export default function QuotesPage() {
                       required
                       value={formData.amount}
                       onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                      className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                      className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                     />
                 </div>
                 <div>
@@ -329,7 +329,7 @@ export default function QuotesPage() {
                   <select
                     value={formData.status}
                     onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                   >
                     <option value="draft">Draft</option>
                     <option value="sent">Sent</option>
@@ -344,7 +344,7 @@ export default function QuotesPage() {
                   type="date"
                   value={formData.validUntil}
                   onChange={(e) => setFormData({ ...formData, validUntil: e.target.value })}
-                  className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                  className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                 />
               </div>
 
@@ -377,7 +377,7 @@ export default function QuotesPage() {
                       value="email"
                       checked={sendMethod === 'email'}
                       onChange={() => handleMethodChange('email')}
-                      className="text-[#168eea] focus:ring-[#168eea]"
+                      className="text-[var(--primary)] focus:ring-[var(--primary)]"
                     />
                     Email
                   </label>
@@ -388,7 +388,7 @@ export default function QuotesPage() {
                       value="whatsapp"
                       checked={sendMethod === 'whatsapp'}
                       onChange={() => handleMethodChange('whatsapp')}
-                      className="text-[#168eea] focus:ring-[#168eea]"
+                      className="text-[var(--primary)] focus:ring-[var(--primary)]"
                     />
                     WhatsApp
                   </label>
@@ -404,7 +404,7 @@ export default function QuotesPage() {
                   value={sendTarget}
                   onChange={(e) => setSendTarget(e.target.value)}
                   placeholder={sendMethod === 'email' ? 'client@example.com' : 'e.g. 919876543210'}
-                  className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                  className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                 />
                 {sendMethod === 'whatsapp' && !shareLoading && shareContent && !shareContent.customerPhone && (
                   <p className="mt-1 text-[11px] text-amber-600">No phone number on file for this quote — enter one to continue.</p>
@@ -418,7 +418,7 @@ export default function QuotesPage() {
                       type="button"
                       disabled={aiLoading || shareLoading || !shareContent}
                       onClick={handleAIPersonalize}
-                      className="flex items-center gap-1 text-[11px] font-medium text-[#168eea] hover:underline disabled:opacity-50"
+                      className="flex items-center gap-1 text-[11px] font-medium text-[var(--primary)] hover:underline disabled:opacity-50"
                     >
                       <SparklesIcon className="h-3.5 w-3.5" />
                       {aiLoading ? 'Generating...' : 'Personalize with AI'}
@@ -431,7 +431,7 @@ export default function QuotesPage() {
                       rows={6}
                       value={messageText}
                       onChange={(e) => setMessageText(e.target.value)}
-                      className="mt-1 w-full resize-none rounded-md border border-slate-200 bg-slate-50 p-2 text-xs text-slate-600 focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea]"
+                      className="mt-1 w-full resize-none rounded-lg border border-slate-200 bg-slate-50 p-2 text-xs text-slate-600 focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
                     />
                   )}
                 </div>

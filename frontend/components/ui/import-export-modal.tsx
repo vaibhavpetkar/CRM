@@ -273,7 +273,7 @@ export default function ImportExportModal({ open, onClose, config, initialTab = 
               className={cn(
                 'flex items-center gap-1.5 rounded-t-md px-4 py-2 text-sm font-medium transition-colors',
                 tab === t
-                  ? 'border-b-2 border-[#168eea] text-[#168eea]'
+                  ? 'border-b-2 border-[var(--primary)] text-[var(--primary)]'
                   : 'text-slate-500 hover:text-slate-700'
               )}
             >
@@ -296,7 +296,7 @@ export default function ImportExportModal({ open, onClose, config, initialTab = 
                       className={cn(
                         'flex flex-col items-center gap-1.5 rounded-lg border p-3 text-sm transition-colors',
                         format === id
-                          ? 'border-[#168eea] bg-[#168eea]/5 text-[#168eea]'
+                          ? 'border-[var(--primary)] bg-[var(--primary)]/5 text-[var(--primary)]'
                           : 'border-slate-200 text-slate-600 hover:border-slate-300'
                       )}
                     >
@@ -313,7 +313,7 @@ export default function ImportExportModal({ open, onClose, config, initialTab = 
                   <p className="text-sm font-medium text-slate-700">Choose fields to include</p>
                   <div className="flex gap-3 text-xs">
                     <button
-                      className="text-[#168eea] hover:underline"
+                      className="text-[var(--primary)] hover:underline"
                       onClick={() => setSelectedFields(new Set(allFieldKeys))}
                     >
                       Select all
@@ -330,7 +330,7 @@ export default function ImportExportModal({ open, onClose, config, initialTab = 
                         type="checkbox"
                         checked={selectedFields.has(field.key)}
                         onChange={() => toggleField(field.key)}
-                        className="h-3.5 w-3.5 rounded border-slate-300 text-[#168eea] focus:ring-[#168eea]"
+                        className="h-3.5 w-3.5 rounded border-slate-300 text-[var(--primary)] focus:ring-[var(--primary)]"
                       />
                       {field.label}
                     </label>
@@ -348,7 +348,7 @@ export default function ImportExportModal({ open, onClose, config, initialTab = 
                             type="checkbox"
                             checked={selectedFields.has(childKey(field.key))}
                             onChange={() => toggleField(childKey(field.key))}
-                            className="h-3.5 w-3.5 rounded border-slate-300 text-[#168eea] focus:ring-[#168eea]"
+                            className="h-3.5 w-3.5 rounded border-slate-300 text-[var(--primary)] focus:ring-[var(--primary)]"
                           />
                           {field.label}
                         </label>
@@ -359,7 +359,7 @@ export default function ImportExportModal({ open, onClose, config, initialTab = 
               </div>
 
               {exportError && (
-                <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-600">{exportError}</div>
+                <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">{exportError}</div>
               )}
             </div>
           )}
@@ -400,7 +400,7 @@ export default function ImportExportModal({ open, onClose, config, initialTab = 
                     onClick={() => fileInputRef.current?.click()}
                     className={cn(
                       'flex cursor-pointer flex-col items-center gap-2 rounded-lg border-2 border-dashed p-10 text-center transition-colors',
-                      dragOver ? 'border-[#168eea] bg-[#168eea]/5' : 'border-slate-200 hover:border-slate-300'
+                      dragOver ? 'border-[var(--primary)] bg-[var(--primary)]/5' : 'border-slate-200 hover:border-slate-300'
                     )}
                   >
                     <CloudArrowUpIcon className="h-9 w-9 text-slate-400" />
@@ -453,7 +453,7 @@ export default function ImportExportModal({ open, onClose, config, initialTab = 
                               type="checkbox"
                               checked={rows.length > 0 && rows.every((r) => r.__selected)}
                               onChange={(e) => toggleAll(e.target.checked)}
-                              className="h-3.5 w-3.5 rounded border-slate-300 text-[#168eea] focus:ring-[#168eea]"
+                              className="h-3.5 w-3.5 rounded border-slate-300 text-[var(--primary)] focus:ring-[var(--primary)]"
                             />
                           </th>
                           {previewColumns.map((field) => (
@@ -484,7 +484,7 @@ export default function ImportExportModal({ open, onClose, config, initialTab = 
                                   checked={row.__selected}
                                   disabled={row.__status === 'success'}
                                   onChange={() => toggleRow(row.__rowId)}
-                                  className="h-3.5 w-3.5 rounded border-slate-300 text-[#168eea] focus:ring-[#168eea]"
+                                  className="h-3.5 w-3.5 rounded border-slate-300 text-[var(--primary)] focus:ring-[var(--primary)]"
                                 />
                               </td>
                               {previewColumns.map((field) => (
@@ -493,7 +493,7 @@ export default function ImportExportModal({ open, onClose, config, initialTab = 
                                     value={row[field.key] ?? ''}
                                     disabled={row.__status === 'success'}
                                     onChange={(e) => updateCell(row.__rowId, field.key, e.target.value)}
-                                    className="w-full min-w-[90px] rounded border border-transparent bg-transparent px-1.5 py-1 text-xs focus:border-[#168eea] focus:bg-white focus:outline-none disabled:text-slate-400"
+                                    className="w-full min-w-[90px] rounded border border-transparent bg-transparent px-1.5 py-1 text-xs focus:border-[var(--primary)] focus:bg-white focus:outline-none disabled:text-slate-400"
                                   />
                                 </td>
                               ))}
@@ -501,7 +501,7 @@ export default function ImportExportModal({ open, onClose, config, initialTab = 
                                 <td className="px-3 py-1.5 text-xs">
                                   <button
                                     onClick={() => toggleExpanded(row.__rowId)}
-                                    className="flex items-center gap-1 whitespace-nowrap font-medium text-[#168eea] hover:underline"
+                                    className="flex items-center gap-1 whitespace-nowrap font-medium text-[var(--primary)] hover:underline"
                                   >
                                     {expandedRows.has(row.__rowId) ? (
                                       <ChevronDownIcon className="h-3.5 w-3.5" />
@@ -560,7 +560,7 @@ export default function ImportExportModal({ open, onClose, config, initialTab = 
                                                 value={childRow[field.key] ?? ''}
                                                 disabled={row.__status === 'success'}
                                                 onChange={(e) => updateChildCell(row.__rowId, idx, field.key, e.target.value)}
-                                                className="w-full min-w-[80px] rounded border border-slate-200 bg-white px-1.5 py-1 text-xs focus:border-[#168eea] focus:outline-none disabled:text-slate-400"
+                                                className="w-full min-w-[80px] rounded border border-slate-200 bg-white px-1.5 py-1 text-xs focus:border-[var(--primary)] focus:outline-none disabled:text-slate-400"
                                               />
                                             </td>
                                           ))}
@@ -578,7 +578,7 @@ export default function ImportExportModal({ open, onClose, config, initialTab = 
                                   {row.__status !== 'success' && (
                                     <button
                                       onClick={() => addChildRow(row.__rowId)}
-                                      className="mt-1.5 flex items-center gap-1 text-xs font-medium text-[#168eea] hover:underline"
+                                      className="mt-1.5 flex items-center gap-1 text-xs font-medium text-[var(--primary)] hover:underline"
                                     >
                                       <PlusIcon className="h-3.5 w-3.5" /> Add {childTable.label.toLowerCase().replace(/s$/, '')}
                                     </button>

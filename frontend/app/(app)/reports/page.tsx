@@ -86,7 +86,7 @@ export default function ReportsPage() {
               <select
                 value={dateRange}
                 onChange={(e) => setDateRange(e.target.value)}
-                className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea]"
+                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
               >
                 <option value="this-week">This Week</option>
                 <option value="this-month">This Month</option>
@@ -117,7 +117,7 @@ export default function ReportsPage() {
 
       {tab === 'overview' && (
         <>
-          {error && <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
+          {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
 
           {loading ? (
             <div className="flex h-48 items-center justify-center"><LoadingSpinner size="md" /></div>
@@ -166,7 +166,7 @@ export default function ReportsPage() {
                   ) : (
                     <div className="space-y-3">
                       {stageBreakdown.map((s: any) => (
-                        <div key={s.stage} className="flex items-center justify-between rounded-md border-2 border-slate-100 p-3">
+                        <div key={s.stage} className="flex items-center justify-between rounded-lg border-2 border-slate-100 p-3">
                           <span className="text-sm font-medium capitalize text-slate-900">{String(s.stage).replace('-', ' ')}</span>
                           <p className="text-sm font-medium text-slate-900">{s.count} deal{s.count === 1 ? '' : 's'}</p>
                         </div>
@@ -201,7 +201,7 @@ const toDayString = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 const dateInputClass =
-  'rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea]';
+  'rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]';
 
 function ForecastTab() {
   const now = new Date();
@@ -243,7 +243,7 @@ function ForecastTab() {
         </div>
       </div>
 
-      {error && <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
+      {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
 
       {loading ? (
         <div className="flex h-48 items-center justify-center"><LoadingSpinner size="md" /></div>
@@ -271,7 +271,7 @@ function ForecastTab() {
           </div>
 
           {t.undatedCount > 0 && (
-            <div className="mb-6 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+            <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
               {t.undatedCount} open deal{t.undatedCount === 1 ? ' has' : 's have'} no expected close date (
               {formatCurrency(t.undatedValue)}) and {t.undatedCount === 1 ? 'is' : 'are'} left out of this forecast. Add a
               date on the Deals page to include {t.undatedCount === 1 ? 'it' : 'them'}.
@@ -438,7 +438,7 @@ function ProfitLossTab() {
             type="date"
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
-            className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea]"
+            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
           />
         </div>
         <div>
@@ -447,12 +447,12 @@ function ProfitLossTab() {
             type="date"
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
-            className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea]"
+            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
           />
         </div>
       </div>
 
-      {error && <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
+      {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
 
       {loading ? (
         <div className="flex h-48 items-center justify-center"><LoadingSpinner size="md" /></div>

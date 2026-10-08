@@ -211,12 +211,12 @@ export default function ItemsPage() {
         </div>
       )}
 
-      <div className="mb-4 flex items-center gap-3">
+      <div className="mb-4 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs flex items-center gap-3">
         <SearchInput value={search} onChange={setSearch} placeholder="Search items by name, code, SKU, HSN..." className="sm:max-w-xs" />
         <span className="text-sm text-slate-500">{items.length} item{items.length === 1 ? '' : 's'}</span>
       </div>
 
-      {error && <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
+      {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
 
       <Card>
         <DataTable

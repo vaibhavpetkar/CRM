@@ -81,7 +81,7 @@ export default function TemplatesPage() {
         actions={<Button size="sm" onClick={() => setIsModalOpen(true)}><PlusIcon className="h-4 w-4" /> New Template</Button>}
       />
 
-      {error && <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
+      {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
 
       {loading ? (
         <div className="flex h-48 items-center justify-center"><LoadingSpinner size="md" /></div>
@@ -97,7 +97,7 @@ export default function TemplatesPage() {
             >
               <div className="flex items-start justify-between">
                 {template.type === 'email' ? (
-                  <EnvelopeIcon className="h-5 w-5 text-[#168eea]" />
+                  <EnvelopeIcon className="h-5 w-5 text-[var(--primary)]" />
                 ) : (
                   <DevicePhoneMobileIcon className="h-5 w-5 text-emerald-500" />
                 )}
@@ -138,7 +138,7 @@ export default function TemplatesPage() {
                   required
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                  className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -147,7 +147,7 @@ export default function TemplatesPage() {
                   <select
                     value={formData.type}
                     onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                   >
                     <option value="email">Email</option>
                     <option value="sms">SMS</option>
@@ -160,7 +160,7 @@ export default function TemplatesPage() {
                     placeholder="e.g. Onboarding"
                     value={formData.category}
                     onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                   />
                 </div>
               </div>
@@ -171,7 +171,7 @@ export default function TemplatesPage() {
                     type="text"
                     value={formData.subject}
                     onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                   />
                 </div>
               )}
@@ -181,7 +181,7 @@ export default function TemplatesPage() {
                   rows={4}
                   value={formData.content}
                   onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                  className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                  className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                 />
               </div>
 

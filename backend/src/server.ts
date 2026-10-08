@@ -118,10 +118,12 @@ app.use('/api/webhooks/meta', metaWebhookRoutes);
 // Call status updates from the telephony provider (click-to-call).
 app.use('/api/webhooks/voice', voiceWebhookRoutes);
 
+// Browser origins allowed to call the API: the CRM itself (CLIENT_URL), any
+// extra comma-separated CORS_ORIGINS, and local dev servers outside production.
 const allowedOrigins = [
   process.env.CLIENT_URL || 'http://localhost:3000',
-  'http://localhost:3000',
-  'http://localhost:3001',
+  ...(process.env.CORS_ORIGINS || '').split(',').map((o) => o.trim()).filter(Boolean),
+  ...(process.env.NODE_ENV === 'production' ? [] : ['http://localhost:3000', 'http://localhost:3001']),
 ];
 
 app.use(

@@ -49,7 +49,7 @@ export default function EmailMarketingPage() {
         }
       />
 
-      {error && <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
+      {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard label="Emails Sent (Total)" value={(stats?.sent ?? 0).toLocaleString()} icon={<EnvelopeIcon className="h-5 w-5" />} />
@@ -64,14 +64,14 @@ export default function EmailMarketingPage() {
           ) : campaigns.length === 0 ? (
             <p className="py-4 text-center text-sm text-slate-400">
               No email campaigns yet.{' '}
-              <Link href="/marketing/campaigns" className="font-medium text-[#168eea] hover:underline">Create one</Link>.
+              <Link href="/marketing/campaigns" className="font-medium text-[var(--primary)] hover:underline">Create one</Link>.
             </p>
           ) : (
             <div className="space-y-3">
               {campaigns.slice(0, 5).map((campaign) => (
-                <div key={campaign.id} className="flex items-center justify-between rounded-md border-2 border-slate-100 p-3">
+                <div key={campaign.id} className="flex items-center justify-between rounded-lg border-2 border-slate-100 p-3">
                   <div className="flex items-center gap-3">
-                    <EnvelopeIcon className="h-5 w-5 text-[#168eea]" />
+                    <EnvelopeIcon className="h-5 w-5 text-[var(--primary)]" />
                     <span className="text-sm font-medium text-slate-900">{campaign.name}</span>
                   </div>
                   <span className="text-xs capitalize text-slate-400">{campaign.status}</span>
@@ -83,16 +83,16 @@ export default function EmailMarketingPage() {
 
         <Card title="Quick Actions">
           <div className="grid grid-cols-2 gap-3">
-            <Link href="/marketing/campaigns" className="rounded-md border-2 border-slate-200 p-4 text-sm font-medium text-slate-700 hover:bg-slate-50">
+            <Link href="/marketing/campaigns" className="rounded-lg border-2 border-slate-200 p-4 text-sm font-medium text-slate-700 hover:bg-slate-50">
               New Campaign
             </Link>
-            <Link href="/marketing/templates" className="rounded-md border-2 border-slate-200 p-4 text-sm font-medium text-slate-700 hover:bg-slate-50">
+            <Link href="/marketing/templates" className="rounded-lg border-2 border-slate-200 p-4 text-sm font-medium text-slate-700 hover:bg-slate-50">
               Browse Templates
             </Link>
-            <Link href="/contacts" className="rounded-md border-2 border-slate-200 p-4 text-sm font-medium text-slate-700 hover:bg-slate-50">
+            <Link href="/contacts" className="rounded-lg border-2 border-slate-200 p-4 text-sm font-medium text-slate-700 hover:bg-slate-50">
               Import List
             </Link>
-            <Link href="/marketing/analytics" className="rounded-md border-2 border-slate-200 p-4 text-sm font-medium text-slate-700 hover:bg-slate-50">
+            <Link href="/marketing/analytics" className="rounded-lg border-2 border-slate-200 p-4 text-sm font-medium text-slate-700 hover:bg-slate-50">
               View Analytics
             </Link>
           </div>
@@ -102,7 +102,7 @@ export default function EmailMarketingPage() {
       <div className="mt-6">
         <Card title="SMS Marketing">
           <div className="flex items-center gap-4">
-            <DevicePhoneMobileIcon className="h-8 w-8 text-[#168eea]" />
+            <DevicePhoneMobileIcon className="h-8 w-8 text-[var(--primary)]" />
             <div>
               <p className="text-sm font-medium text-slate-900">SMS campaigns</p>
               <p className="text-xs text-slate-500">Create an SMS-type campaign from the Campaigns page to get started</p>

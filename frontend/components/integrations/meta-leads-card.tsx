@@ -99,7 +99,7 @@ export default function MetaLeadsCard({ status, onChange }: { status: MetaLeadsS
       </p>
 
       {status && !configured && (
-        <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-2.5 text-[11px] text-amber-700">
+        <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-[11px] text-amber-700">
           Needs your Meta app&apos;s details: set META_APP_ID, META_APP_SECRET and META_VERIFY_TOKEN under{' '}
           <Link href="/settings/developer" className="underline">
             Settings &gt; Developer
@@ -108,16 +108,16 @@ export default function MetaLeadsCard({ status, onChange }: { status: MetaLeadsS
         </div>
       )}
       {status && configured && !status.verifyTokenSet && (
-        <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-2.5 text-[11px] text-amber-700">
+        <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-[11px] text-amber-700">
           META_VERIFY_TOKEN isn&apos;t set, so Meta can&apos;t verify the webhook yet. Set it under Settings &gt; Developer.
         </div>
       )}
       {status?.lastError && (
-        <div className="mt-3 rounded-md border border-red-200 bg-red-50 p-2.5 text-[11px] text-red-700">{status.lastError}</div>
+        <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-2.5 text-[11px] text-red-700">{status.lastError}</div>
       )}
 
       {status && configured && (
-        <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 p-2.5 text-[11px] text-slate-600">
+        <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-[11px] text-slate-600">
           <p>
             Webhook URL for your Meta app (Page &gt; <code>leadgen</code>):{' '}
             <code className="break-all font-mono text-slate-800">{status.webhookUrl}</code>
@@ -134,7 +134,7 @@ export default function MetaLeadsCard({ status, onChange }: { status: MetaLeadsS
           {status!.pages.length === 0 ? (
             <p className="mt-1 text-xs text-slate-500">No Pages yet. Reconnect and tick the Pages your lead forms run on.</p>
           ) : (
-            <ul className="mt-2 divide-y divide-slate-100 rounded-md border border-slate-200">
+            <ul className="mt-2 divide-y divide-slate-100 rounded-lg border border-slate-200">
               {status!.pages.map((page) => (
                 <li key={page.id} className="flex flex-wrap items-center justify-between gap-2 p-2.5">
                   <div className="min-w-0">
@@ -168,7 +168,7 @@ export default function MetaLeadsCard({ status, onChange }: { status: MetaLeadsS
           {status!.recentLeads.length > 0 && (
             <div className="mt-4">
               <p className="text-xs font-semibold text-slate-700">Latest leads from Meta</p>
-              <div className="mt-2 overflow-x-auto rounded-md border border-slate-200">
+              <div className="mt-2 overflow-x-auto rounded-lg border border-slate-200">
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-400">
                     <tr>
@@ -183,7 +183,7 @@ export default function MetaLeadsCard({ status, onChange }: { status: MetaLeadsS
                       <tr key={lead.id}>
                         <td className="px-2.5 py-2">
                           {lead.leadId ? (
-                            <Link href={`/leads/${lead.leadId}`} className="text-[#168eea] hover:underline">
+                            <Link href={`/leads/${lead.leadId}`} className="text-[var(--primary)] hover:underline">
                               {lead.name || 'Lead'}
                             </Link>
                           ) : (

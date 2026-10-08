@@ -140,7 +140,7 @@ export default function MeetingsPage() {
         }
       />
 
-      {error && <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
+      {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
 
       {loading ? (
         <div className="flex h-48 items-center justify-center"><LoadingSpinner size="md" /></div>
@@ -152,7 +152,7 @@ export default function MeetingsPage() {
             <Card key={meeting.id} className="!border-2 !p-4">
               <div className="flex items-start justify-between">
                 <div className="flex items-start gap-4">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#168eea]/10 text-[#168eea]">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--primary)]/10 text-[var(--primary)]">
                     {icon(meeting.type)}
                   </div>
                   <div>
@@ -160,7 +160,7 @@ export default function MeetingsPage() {
                     {meeting.lead ? (
                       <a
                         href={`/leads/${meeting.leadId}`}
-                        className="text-xs text-[#168eea] hover:underline"
+                        className="text-xs text-[var(--primary)] hover:underline"
                         title="Linked Lead — opens Lead record"
                       >
                         🔗 {meeting.lead.company || `${meeting.lead.firstName || ''} ${meeting.lead.lastName || ''}`.trim()}
@@ -204,12 +204,12 @@ export default function MeetingsPage() {
                   required
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                  className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                 />
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-700">
-                  Client {formData.leadId && <span className="font-normal text-[#168eea]">(linked to Lead — details auto-filled)</span>}
+                  Client {formData.leadId && <span className="font-normal text-[var(--primary)]">(linked to Lead — details auto-filled)</span>}
                 </label>
                 <SearchableSelect
                   value={formData.client}
@@ -241,7 +241,7 @@ export default function MeetingsPage() {
                   value={formData.customerEmail}
                   onChange={(e) => setFormData({ ...formData, customerEmail: e.target.value })}
                   placeholder="client@example.com"
-                  className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                  className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                 />
                 <p className="mt-1 text-[11px] text-slate-400">
                   A meeting invite is emailed automatically to this address (and to whoever it's assigned to) when scheduled.
@@ -260,7 +260,7 @@ export default function MeetingsPage() {
                     required
                     value={formData.date}
                     onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                   />
                 </div>
                 <div>
@@ -270,7 +270,7 @@ export default function MeetingsPage() {
                     placeholder="e.g. 10:00 AM"
                     value={formData.time}
                     onChange={(e) => setFormData({ ...formData, time: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                   />
                 </div>
               </div>
@@ -282,7 +282,7 @@ export default function MeetingsPage() {
                     placeholder="e.g. 30 min"
                     value={formData.duration}
                     onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                   />
                 </div>
                 <div>
@@ -290,7 +290,7 @@ export default function MeetingsPage() {
                   <select
                     value={formData.type}
                     onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                   >
                     <option value="video">Video</option>
                     <option value="in-person">In Person</option>

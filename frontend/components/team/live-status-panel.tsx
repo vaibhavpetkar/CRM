@@ -133,7 +133,7 @@ export default function LiveStatusPanel() {
         ))}
       </div>
 
-      {error && <div className="mb-3 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
+      {error && <div className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
 
       {!data && !error ? (
         <p className="text-sm text-slate-500">Loading live status...</p>
@@ -163,7 +163,7 @@ export default function LiveStatusPanel() {
                     <p className="truncate text-xs text-slate-500">
                       with{' '}
                       {href ? (
-                        <Link href={href} className="text-[#168eea] hover:underline">
+                        <Link href={href} className="text-[var(--primary)] hover:underline">
                           {a.call.withName}
                         </Link>
                       ) : (

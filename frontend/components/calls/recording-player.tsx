@@ -29,7 +29,7 @@ export default function RecordingPlayer({ callId, autoLoad = true }: { callId: n
 
   if (!requested) {
     return (
-      <button type="button" onClick={() => setRequested(true)} className="text-xs font-medium text-[#168eea] hover:underline">
+      <button type="button" onClick={() => setRequested(true)} className="text-xs font-medium text-[var(--primary)] hover:underline">
         ▶ Play recording
       </button>
     );
@@ -39,7 +39,7 @@ export default function RecordingPlayer({ callId, autoLoad = true }: { callId: n
   return (
     <div className="flex items-center gap-2">
       <audio controls src={src} className="h-8 w-full max-w-xs" />
-      <a href={src} download={`call-${callId}`} className="shrink-0 text-xs font-medium text-[#168eea] hover:underline">
+      <a href={src} download={`call-${callId}`} className="shrink-0 text-xs font-medium text-[var(--primary)] hover:underline">
         Download
       </a>
     </div>

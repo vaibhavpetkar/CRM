@@ -202,7 +202,7 @@ function EditableCell<T>({
               onEndContextEdit?.();
             }
           }}
-          className="min-w-0 flex-1 rounded-md border-2 border-[#168eea] bg-white px-2 py-1 text-sm text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-[#168eea]/20"
+          className="min-w-0 flex-1 rounded-lg border-2 border-[var(--primary)] bg-white px-2 py-1 text-sm text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20"
         />
         {col.editDatalist && (
           <datalist id={col.editDatalist.id}>
@@ -215,7 +215,7 @@ function EditableCell<T>({
         <button
           onClick={commit}
           title="Save (Enter)"
-          className="flex shrink-0 items-center gap-1 rounded-md bg-emerald-500 px-2 py-1 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-600 active:scale-95"
+          className="flex shrink-0 items-center gap-1 rounded-lg bg-emerald-500 px-2 py-1 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-600 active:scale-95"
         >
           <svg className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
             <path d="M17.414 2.586A2 2 0 0016 2H4a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V4a2 2 0 00-.586-1.414zM10 16a3 3 0 110-6 3 3 0 010 6zm4-10H6V3h8v3z" />
@@ -226,7 +226,7 @@ function EditableCell<T>({
         <button
           onClick={cancel}
           title="Cancel (Esc)"
-          className="flex shrink-0 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-600 shadow-sm transition hover:bg-slate-100 active:scale-95"
+          className="flex shrink-0 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-600 shadow-sm transition hover:bg-slate-100 active:scale-95"
         >
           <svg className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
             <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
@@ -644,7 +644,7 @@ export default function DataTable<T>({
   if (loading) {
     return (
       <div className="flex h-48 items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-[#168eea]" />
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-[var(--primary)]" />
       </div>
     );
   }
@@ -663,7 +663,7 @@ export default function DataTable<T>({
 
           <div className="flex items-center gap-3">
             <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 shadow-sm">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#168eea]" />
+              <span className="h-1.5 w-1.5 rounded-full bg-[var(--primary)]" />
               Total Entries:&nbsp;
               <strong>{totalEntries ?? data.length}</strong>
             </span>
@@ -674,7 +674,7 @@ export default function DataTable<T>({
               <select
                 value={pageSizeStr}
                 onChange={(e) => setPageSizeStr(e.target.value)}
-                className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 shadow-sm focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea]/30"
+                className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 shadow-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]/30"
               >
                 {PAGE_SIZE_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
@@ -733,13 +733,13 @@ export default function DataTable<T>({
                               type="checkbox"
                               checked={!isHidden}
                               onChange={() => toggleColumnVisibility(colId)}
-                              className="h-3.5 w-3.5 rounded border-slate-300 text-[#168eea] focus:ring-[#168eea]"
+                              className="h-3.5 w-3.5 rounded border-slate-300 text-[var(--primary)] focus:ring-[var(--primary)]"
                             />
                             <span className={cn(isHidden && 'line-through text-slate-400')}>
                               {col.header}
                             </span>
                             {col.optional && (
-                              <span className="rounded-full bg-blue-50 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-[#168eea]">
+                              <span className="rounded-full bg-blue-50 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-[var(--primary)]">
                                 Add
                               </span>
                             )}
@@ -751,7 +751,7 @@ export default function DataTable<T>({
                               onClick={() => toggleFreezeColumn(colId)}
                               className={cn(
                                 'rounded p-0.5 disabled:opacity-30',
-                                isFrozenHere ? 'text-[#168eea]' : 'text-slate-400 hover:bg-slate-200 hover:text-slate-700'
+                                isFrozenHere ? 'text-[var(--primary)]' : 'text-slate-400 hover:bg-slate-200 hover:text-slate-700'
                               )}
                               title={isFrozenHere ? 'Unfreeze this column' : 'Freeze this column'}
                             >
@@ -792,7 +792,7 @@ export default function DataTable<T>({
                     </button>
                     <button
                       onClick={() => setIsSettingsOpen(false)}
-                      className="rounded bg-[#168eea] px-2.5 py-1 text-xs font-semibold text-white shadow hover:bg-[#1278cc]"
+                      className="rounded bg-[var(--primary)] px-2.5 py-1 text-xs font-semibold text-white shadow hover:bg-[var(--primary-hover)]"
                     >
                       Done
                     </button>
@@ -807,11 +807,11 @@ export default function DataTable<T>({
       {/* ══════════════════════════════════════════════════════════════
           TABLE WITH SORTABLE HEADERS & RIGHT-CLICK CONTEXT MENU
           ══════════════════════════════════════════════════════════════ */}
-      <div className="overflow-x-auto rounded-lg border-2 border-slate-800/10">
+      <div className="overflow-x-auto rounded-2xl border border-slate-200/80 bg-white shadow-xs">
         <table className="w-full border-collapse text-sm">
           {/* Header */}
           <thead>
-            <tr className="border-b border-slate-200 bg-slate-50/80 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">
+            <tr className="border-b border-slate-200 bg-slate-50/70 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">
               {selectable && (
                 <th
                   ref={(el) => { if (el) headerCellRefs.current.set('__checkbox', el); }}
@@ -825,7 +825,7 @@ export default function DataTable<T>({
                       if (el) el.indeterminate = someSelected;
                     }}
                     onChange={toggleAll}
-                    className="h-4 w-4 cursor-pointer rounded border-2 border-slate-400 text-[#168eea] focus:ring-[#168eea]"
+                    className="h-4 w-4 cursor-pointer rounded border-2 border-slate-400 text-[var(--primary)] focus:ring-[var(--primary)]"
                     aria-label="Select all rows"
                   />
                 </th>
@@ -860,9 +860,9 @@ export default function DataTable<T>({
                       <span className="text-slate-300">
                         {isSorted ? (
                           sortDirection === 'asc' ? (
-                            <ArrowUpIcon className="h-3.5 w-3.5 text-[#168eea]" />
+                            <ArrowUpIcon className="h-3.5 w-3.5 text-[var(--primary)]" />
                           ) : (
-                            <ArrowDownIcon className="h-3.5 w-3.5 text-[#168eea]" />
+                            <ArrowDownIcon className="h-3.5 w-3.5 text-[var(--primary)]" />
                           )
                         ) : (
                           <ArrowsUpDownIcon className="h-3.5 w-3.5 opacity-0 transition-opacity group-hover:opacity-100 text-slate-400" />
@@ -927,7 +927,7 @@ export default function DataTable<T>({
                             type="checkbox"
                             checked={isSelected}
                             onChange={() => toggleRow(id)}
-                            className="h-4 w-4 cursor-pointer rounded border-2 border-slate-400 text-[#168eea] focus:ring-[#168eea]"
+                            className="h-4 w-4 cursor-pointer rounded border-2 border-slate-400 text-[var(--primary)] focus:ring-[var(--primary)]"
                             aria-label={`Select row ${index + 1}`}
                           />
                         </td>
@@ -1034,9 +1034,9 @@ export default function DataTable<T>({
                 setActiveContextEditRowId(rowKey(contextMenu.row));
                 setContextMenu(null);
               }}
-              className="flex w-full items-center gap-2.5 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-blue-50 hover:text-[#168eea]"
+              className="flex w-full items-center gap-2.5 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-blue-50 hover:text-[var(--primary)]"
             >
-              <PencilSquareIcon className="h-4 w-4 text-[#168eea]" />
+              <PencilSquareIcon className="h-4 w-4 text-[var(--primary)]" />
               <span>Edit "{visibleColumns[contextMenu.colIndex]?.header}" Field</span>
             </button>
           ) : (

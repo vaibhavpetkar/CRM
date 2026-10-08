@@ -137,7 +137,7 @@ export default function TerritoryAutocomplete({
           placeholder={placeholder}
           disabled={disabled}
           className={cn(
-            'w-full rounded-md border-0 bg-slate-100/50 py-2 pl-9 pr-10 text-sm text-slate-900 placeholder:text-slate-400',
+            'w-full rounded-lg border-0 bg-slate-100/50 py-2 pl-9 pr-10 text-sm text-slate-900 placeholder:text-slate-400',
             'focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)] transition-all',
             disabled && 'opacity-50 cursor-not-allowed'
           )}
@@ -163,7 +163,7 @@ export default function TerritoryAutocomplete({
         <div
           ref={dropdownRef}
           id="territory-suggestions"
-          className="absolute z-20 mt-1 w-full max-h-60 overflow-y-auto rounded-md border border-slate-200 bg-white shadow-lg ring-1 ring-black ring-opacity-5"
+          className="absolute z-20 mt-1 w-full max-h-60 overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg ring-1 ring-black ring-opacity-5"
           role="listbox"
         >
           {suggestions.map((suggestion, index) => (
@@ -191,7 +191,7 @@ export default function TerritoryAutocomplete({
       )}
 
       {isOpen && suggestions.length === 0 && value.length >= 2 && (
-        <div className="absolute z-20 mt-1 w-full rounded-md border border-slate-200 bg-white shadow-lg ring-1 ring-black ring-opacity-5 p-3 text-sm text-slate-500 text-center">
+        <div className="absolute z-20 mt-1 w-full rounded-lg border border-slate-200 bg-white shadow-lg ring-1 ring-black ring-opacity-5 p-3 text-sm text-slate-500 text-center">
           No territories found
         </div>
       )}

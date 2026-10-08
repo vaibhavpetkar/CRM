@@ -15,7 +15,7 @@ FROM node:20-alpine AS runner
 WORKDIR /usr/src/app
 
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm ci --omit=dev && npm cache clean --force
 
 # Copy dist files and other necessary files (migrations, config, sequelizerc)
 COPY --from=builder /usr/src/app/dist ./dist

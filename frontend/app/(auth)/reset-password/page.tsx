@@ -6,6 +6,7 @@ import { useState, Suspense } from 'react';
 import Button from '@/components/ui/button';
 import LoadingSpinner from '@/components/ui/loading-spinner';
 import { authApi } from '@/lib/api';
+import PasswordInput from '@/components/ui/password-input';
 
 function ResetPasswordForm() {
   const router = useRouter();
@@ -26,7 +27,7 @@ function ResetPasswordForm() {
           This password reset link is missing its token. Please request a new one.
         </p>
         <div className="mt-6">
-          <Link href="/forgot-password" className="text-sm font-medium text-[#168eea] hover:underline">
+          <Link href="/forgot-password" className="text-sm font-medium text-[var(--primary)] hover:underline">
             ← Request a new reset link
           </Link>
         </div>
@@ -74,32 +75,30 @@ function ResetPasswordForm() {
       <p className="mt-2 text-sm text-slate-500">Choose a new password for your account.</p>
 
       {error && (
-        <div className="mt-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>
+        <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>
       )}
 
       <form onSubmit={handleSubmit} className="mt-6 space-y-4">
         <div>
           <label className="mb-1.5 block text-sm font-medium text-slate-700">New Password</label>
-          <input
-            type="password"
+          <PasswordInput
             required
             minLength={6}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Min. 6 characters"
-            className="w-full rounded-md border border-slate-200 bg-white px-3 py-2.5 text-sm focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea]"
+            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
           />
         </div>
         <div>
           <label className="mb-1.5 block text-sm font-medium text-slate-700">Confirm Password</label>
-          <input
-            type="password"
+          <PasswordInput
             required
             minLength={6}
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             placeholder="Repeat new password"
-            className="w-full rounded-md border border-slate-200 bg-white px-3 py-2.5 text-sm focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea]"
+            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
           />
         </div>
         <Button type="submit" className="w-full" disabled={submitting}>
@@ -108,7 +107,7 @@ function ResetPasswordForm() {
       </form>
 
       <p className="mt-6 text-sm text-slate-500">
-        <Link href="/login" className="font-medium text-[#168eea] hover:underline">← Back to Sign In</Link>
+        <Link href="/login" className="font-medium text-[var(--primary)] hover:underline">← Back to Sign In</Link>
       </p>
     </div>
   );

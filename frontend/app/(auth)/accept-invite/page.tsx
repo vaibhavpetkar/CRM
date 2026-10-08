@@ -6,6 +6,7 @@ import { useState, useEffect, Suspense } from 'react';
 import Button from '@/components/ui/button';
 import LoadingSpinner from '@/components/ui/loading-spinner';
 import { authApi } from '@/lib/api';
+import PasswordInput from '@/components/ui/password-input';
 
 function AcceptInviteForm() {
   const router = useRouter();
@@ -90,7 +91,7 @@ function AcceptInviteForm() {
         <h2 className="text-xl font-semibold text-red-600">Invitation Invalid</h2>
         <p className="mt-2 text-sm text-slate-600">{error}</p>
         <div className="mt-6">
-          <Link href="/login" className="text-sm font-medium text-[#168eea] hover:underline">
+          <Link href="/login" className="text-sm font-medium text-[var(--primary)] hover:underline">
             ← Return to Sign In
           </Link>
         </div>
@@ -106,7 +107,7 @@ function AcceptInviteForm() {
       </p>
 
       {error && (
-        <div className="mt-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-600">
+        <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">
           {error}
         </div>
       )}
@@ -120,7 +121,7 @@ function AcceptInviteForm() {
               required
               value={firstName}
               onChange={(e) => setFirstName(e.target.value)}
-              className="w-full rounded-md border border-slate-200 bg-white px-3 py-2.5 text-sm focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea]"
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
             />
           </div>
           <div>
@@ -130,34 +131,32 @@ function AcceptInviteForm() {
               required
               value={lastName}
               onChange={(e) => setLastName(e.target.value)}
-              className="w-full rounded-md border border-slate-200 bg-white px-3 py-2.5 text-sm focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea]"
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
             />
           </div>
         </div>
 
         <div>
           <label className="mb-1.5 block text-sm font-medium text-slate-700">Set Password</label>
-          <input
-            type="password"
+          <PasswordInput
             required
             minLength={6}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Min. 6 characters"
-            className="w-full rounded-md border border-slate-200 bg-white px-3 py-2.5 text-sm focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea]"
+            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
           />
         </div>
 
         <div>
           <label className="mb-1.5 block text-sm font-medium text-slate-700">Confirm Password</label>
-          <input
-            type="password"
+          <PasswordInput
             required
             minLength={6}
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             placeholder="Repeat password"
-            className="w-full rounded-md border border-slate-200 bg-white px-3 py-2.5 text-sm focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea]"
+            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
           />
         </div>
 

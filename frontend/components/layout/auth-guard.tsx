@@ -76,7 +76,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
         </p>
         <button
           onClick={() => router.replace('/dashboard')}
-          className="mt-4 rounded-md bg-[#168eea] px-4 py-2 text-sm font-medium text-white hover:bg-[#1278cc]"
+          className="mt-4 rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--primary-hover)]"
         >
           Back to Dashboard
         </button>

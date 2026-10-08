@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import Button from '@/components/ui/button';
 import { authApi, setLastCompanyCode } from '@/lib/api';
+import PasswordInput from '@/components/ui/password-input';
 
 const signupSchema = z
   .object({
@@ -63,7 +64,11 @@ export default function SignupPage() {
   const field = (name: keyof SignupFormValues, label: string, type = 'text', placeholder = '') => (
     <div>
       <label className="mb-1.5 block text-sm font-semibold text-slate-700">{label}</label>
-      <input type={type} placeholder={placeholder} {...register(name)} className={inputClass(!!errors[name])} />
+      {type === 'password' ? (
+        <PasswordInput placeholder={placeholder} {...register(name)} className={inputClass(!!errors[name])} />
+      ) : (
+        <input type={type} placeholder={placeholder} {...register(name)} className={inputClass(!!errors[name])} />
+      )}
       {errors[name] && <p className="mt-1.5 text-xs text-red-500 font-medium">{errors[name]?.message}</p>}
     </div>
   );
@@ -74,7 +79,7 @@ export default function SignupPage() {
       <p className="mt-1.5 text-sm text-slate-500">15 days free, no card needed. Set up your company and invite your team.</p>
 
       {error && (
-        <div className="mt-5 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-600 font-medium">{error}</div>
+        <div className="mt-5 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600 font-medium">{error}</div>
       )}
 
       <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-4">

@@ -27,7 +27,7 @@ export function ContactRows({ contacts, onSelect, showCompany = false }: { conta
             </div>
           </>
         );
-        const cls = 'flex w-full items-center gap-2 rounded-md border border-slate-100 p-2 text-left text-sm hover:bg-slate-50';
+        const cls = 'flex w-full items-center gap-2 rounded-lg border border-slate-100 p-2 text-left text-sm hover:bg-slate-50';
         return onSelect ? (
           <button key={c.id} type="button" onClick={() => onSelect(c)} className={cls}>
             {body}
@@ -49,7 +49,7 @@ export function LeadRows({ leads }: { leads: any[] }) {
         <Link
           key={l.id}
           href={`/leads/${l.id}`}
-          className="flex items-center justify-between gap-2 rounded-md border border-slate-100 p-2 text-sm hover:bg-slate-50"
+          className="flex items-center justify-between gap-2 rounded-lg border border-slate-100 p-2 text-sm hover:bg-slate-50"
         >
           <div className="min-w-0">
             <p className="truncate font-medium text-slate-900">
@@ -71,7 +71,7 @@ export function DealRows({ deals }: { deals: any[] }) {
         <Link
           key={d.id}
           href={`/deals?search=${encodeURIComponent(d.title)}`}
-          className="flex items-center justify-between gap-2 rounded-md border border-slate-100 p-2 text-sm hover:bg-slate-50"
+          className="flex items-center justify-between gap-2 rounded-lg border border-slate-100 p-2 text-sm hover:bg-slate-50"
         >
           <div className="min-w-0">
             <p className="truncate font-medium text-slate-900">{d.title}</p>

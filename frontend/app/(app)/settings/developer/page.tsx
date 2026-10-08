@@ -196,7 +196,7 @@ export default function DeveloperSettingsPage() {
         description="Manage environment variables and system configuration (Super Admin only)"
       />
 
-      <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
+      <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
         <strong>⚠️ Warning:</strong> Changes here modify the <code>.env</code> file on the server. 
         After saving, you must restart the Docker containers for changes to take effect. 
         Incorrect values may break the application.
@@ -204,7 +204,7 @@ export default function DeveloperSettingsPage() {
 
       {message && (
         <div
-          className={`mb-4 rounded-md border p-3 text-sm ${
+          className={`mb-4 rounded-lg border p-3 text-sm ${
             message.type === 'success'
               ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
               : 'border-red-200 bg-red-50 text-red-600'
@@ -238,7 +238,7 @@ export default function DeveloperSettingsPage() {
                           : 'Enter value...'
                       }
                       autoComplete="off"
-                      className="w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea]"
+                      className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
                     />
                     {def.type === 'password' && (
                       <button
@@ -263,7 +263,7 @@ export default function DeveloperSettingsPage() {
                     </div>
                   )}
                   {def.testHref && (
-                    <a href={def.testHref} className="inline-block text-[10px] text-[#168eea] hover:underline">
+                    <a href={def.testHref} className="inline-block text-[10px] text-[var(--primary)] hover:underline">
                       {def.testLabel} →
                     </a>
                   )}
