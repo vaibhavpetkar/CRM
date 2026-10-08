@@ -5,6 +5,8 @@ the Express backend and the Next.js frontend. Any Linux cloud VM works (AWS
 EC2, Google Compute Engine, Azure VM, DigitalOcean Droplet, Hetzner, a VPS).
 Production domain: **crm.eleviq.buzz**.
 
+Deploying on AWS? Follow [deploy-aws.md](./deploy-aws.md) for the EC2-specific steps.
+
 ## What you need
 
 - A Linux server with at least 2 vCPU and 4 GB RAM (Ollama uses ~2 GB; set

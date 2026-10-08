@@ -182,7 +182,7 @@ docker compose up --build
 ## 🌐 Production Deployment (VPS)
 
 > For a fresh cloud server (AWS, GCP, Azure, DigitalOcean, any Linux VM) with
-> HTTPS handled by an nginx container, follow [docs/deployment.md](./docs/deployment.md).
+> HTTPS handled by an nginx container, follow [docs/deployment.md](./docs/deployment.md). For AWS EC2, see [docs/deploy-aws.md](./docs/deploy-aws.md).
 
 ### Prerequisites on VPS
 - Ubuntu 20.04+ or similar Linux
