@@ -147,6 +147,12 @@ const SCHEMA_PATCHES: { name: string; sql: string }[] = [
       ALTER TABLE "leads" ADD COLUMN IF NOT EXISTS "budgetMax" DECIMAL(15,2);
     `,
   },
+  {
+    // Incoming calls (a customer calling the company's Vi / Exotel number)
+    // are logged next to click-to-call ones.
+    name: 'calls.direction',
+    sql: `ALTER TABLE "calls" ADD COLUMN IF NOT EXISTS "direction" VARCHAR(10) NOT NULL DEFAULT 'outbound';`,
+  },
 ];
 
 export const runSchemaPatches = async (sequelize: Sequelize): Promise<void> => {

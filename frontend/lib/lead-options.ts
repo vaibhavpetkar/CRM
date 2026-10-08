@@ -88,6 +88,7 @@ export const LEAD_SOURCE_OPTIONS: { value: string; label: string }[] = [
   { value: 'referral', label: 'Referral' },
   { value: 'hoarding', label: 'Hoarding / Banner' },
   { value: 'newspaper', label: 'Newspaper' },
+  { value: 'incoming-call', label: 'Incoming Call' },
   { value: 'cold-call', label: 'Cold Call' },
   { value: 'linkedin', label: 'LinkedIn' },
   { value: 'event', label: 'Event / Exhibition' },

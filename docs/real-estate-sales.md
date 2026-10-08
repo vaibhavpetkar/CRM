@@ -55,6 +55,62 @@ Calls placed through Vi show up in Call Tracking, Sales Activity and the live
 green/red status exactly like Exotel calls. Restart the backend after
 changing `.env` (`docker compose up -d`).
 
+## Incoming calls (Vi)
+
+Settings > Integrations > **Incoming calls (Vi)** shows a secret *call events
+URL* (`https://<your domain>/api/webhooks/voice/incoming/<token>`). Ask Vi
+Business support to send every incoming call's events to it (ringing,
+answered, ended, recording link); in Exotel, add it as a Passthru applet in
+the incoming call flow. JSON, form fields and GET query strings all work, and
+the CRM reads the usual field names (`caller_number`/`from`/`CallFrom`,
+`agent_number`/`DialWhomNumber`, `did`/`to`/`CallTo`, plus the call id,
+status, duration and recording fields listed above).
+
+For each incoming call the CRM:
+
+- matches the caller to a lead by mobile (any format), or creates a lead with
+  source **Incoming Call** (switch this off on the card);
+- gives the call to the sales person who answered (matched by the mobile in
+  their profile), else the lead's owner, else the next person in the lead
+  rotation;
+- shows it in Call Tracking with an incoming arrow (filter: Incoming /
+  Outgoing), in Sales Activity ("n incoming"), on the lead's timeline and in
+  the live green/red status, and saves the recording;
+- sends a "Missed call from ..." notification to the owner when nobody answered.
+
+"Make a new URL" replaces the token; the old URL stops working.
+
+## Property portals (99acres, MagicBricks, Housing.com)
+
+Settings > Integrations > **Property portals**. Each portal has a secret
+*lead push URL* (`https://<your domain>/api/webhooks/leads/<portal>/<token>`)
+and an on/off switch.
+
+| Portal | How leads arrive |
+| --- | --- |
+| 99acres | Save the 99acres login on the card and new responses are read every few minutes (99acres response API). Or ask 99acres to push leads to the URL. |
+| MagicBricks | Send the URL to your MagicBricks account manager and ask them to enable lead push to it. |
+| Housing.com | Save the Housing.com profile id and API (encryption) key and new leads are read every few minutes. Or ask Housing.com to push to the URL. |
+
+A pushed body can be JSON, form fields or 99acres-style XML, one lead or a
+list (`leads`/`data`/`results`). Name, mobile, email, project, locality, city,
+BHK, property type and budget ("50-75 lakh", "under 1.2 Cr") are filled in
+whatever the portal calls them; anything else goes in the lead description.
+A retried push never creates a second lead, and a buyer who is already a lead
+(same mobile or email) gets an "Enquired again on ..." timeline note instead.
+New leads go to the lead rotation when it is on. "Send a test lead" adds a
+sample lead so you can see one arrive; "Check now" reads the portal straight
+away.
+
+Server settings (optional): `PORTAL_POLL_MINUTES` (default 10),
+`ACRES99_API_URL` and `HOUSING_API_URL` if the portal gives you a different
+endpoint.
+
+**Facebook / Instagram** leads use the existing Meta Lead Ads card (needs
+`META_APP_ID`, `META_APP_SECRET`, `META_VERIFY_TOKEN` and Meta app review).
+Real-estate questions on the form (BHK, budget, preferred location, project)
+now fill the lead's requirement fields too.
+
 ## Lead rotation (rotational calling)
 
 Settings > Integrations > **Lead rotation**:
@@ -77,5 +133,6 @@ mobile saved (Profile, or the calling panel).
 
 - `REPORT_TZ_OFFSET_MINUTES` (default 330, India): which time zone days are
   counted in for reports and the lead date filter.
-- No new tables need creating by hand: `site_visits` is created on start, and
-  the new lead columns are added by the start-up schema patches.
+- No new tables need creating by hand: `site_visits`, `portal_connections`
+  and `portal_lead_events` are created on start, and the new lead and call
+  columns are added by the start-up schema patches.

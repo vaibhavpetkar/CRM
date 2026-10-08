@@ -60,7 +60,7 @@ export const fillTemplate = (template: string, values: Record<string, string>) =
 };
 
 /** First non-empty value found under any of `keys`, looking inside data/result/call wrappers too. */
-const pick = (body: any, keys: string[]): any => {
+export const pick = (body: any, keys: string[]): any => {
   const layers = [body, body?.data, body?.result, body?.call, body?.Call, body?.response, body?.data?.call];
   for (const layer of layers) {
     if (!layer || typeof layer !== 'object') continue;

@@ -10,6 +10,7 @@ import leadRepository from '../repositories/LeadRepository';
 import { logActivity } from './activityLogger';
 import { notifyUser } from '../utils/notificationService';
 import { mapMetaLead, MetaFieldDatum } from '../utils/metaLeadMapping';
+import { mapPropertyLead } from '../utils/propertyLeadMapping';
 import { runUnscoped, runWithTenant, currentCompanyId } from '../tenancy/context';
 import { runAsUser } from '../tenancy/provisioning';
 import logger from '../utils/logger';
@@ -386,6 +387,8 @@ const importLead = async (page: MetaPage, leadgenId: string, prefetched?: any): 
     const metaLead = prefetched || (await graph(leadgenId, { fields: LEAD_FIELDS, access_token: page.pageAccessToken || '' }));
     const fieldData: MetaFieldDatum[] = metaLead?.field_data || [];
     const mapped = mapMetaLead(fieldData);
+    // Real-estate questions (BHK, budget, preferred location, project) fill the requirement fields.
+    const property = mapPropertyLead(fieldData);
     const formName = await getFormName(metaLead?.form_id, page.pageAccessToken || '');
     const platform = metaLead?.platform === 'ig' ? 'ig' : 'fb';
     const channel = platform === 'ig' ? 'Instagram' : 'Facebook';
@@ -447,6 +450,12 @@ const importLead = async (page: MetaPage, leadgenId: string, prefetched?: any): 
           website: mapped.website,
           leadSource: platform === 'ig' ? 'instagram' : 'facebook',
           status: 'new',
+          projectName: property.projectName,
+          preferredLocation: property.preferredLocation,
+          configuration: property.configuration,
+          propertyType: property.propertyType,
+          budgetMin: property.budgetMin,
+          budgetMax: property.budgetMax,
           sourceDetails,
           description: answers ? `Answers from the ${channel} lead form:\n${answers}` : null,
           allowDuplicate: true, // already checked above

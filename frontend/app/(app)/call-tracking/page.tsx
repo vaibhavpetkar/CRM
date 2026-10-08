@@ -2,7 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ChevronDownIcon, ChevronRightIcon, PhoneIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { ChevronDownIcon, ChevronRightIcon, PhoneIcon, PhoneArrowDownLeftIcon, PhoneArrowUpRightIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import PageHeader from '@/components/ui/page-header';
 import Card from '@/components/ui/card';
 import Button from '@/components/ui/button';
@@ -26,12 +26,19 @@ const STATUS_FILTERS = [
   { key: 'live', label: 'Live now' },
 ];
 
+const DIRECTION_FILTERS = [
+  { key: 'all', label: 'Incoming and outgoing' },
+  { key: 'inbound', label: 'Incoming' },
+  { key: 'outbound', label: 'Outgoing' },
+];
+
 const PAGE_SIZE = 50;
 
 export default function CallTrackingPage() {
   const [range, setRange] = useState<DateRange>(() => presetRange('today'));
   const [userId, setUserId] = useState('all');
   const [status, setStatus] = useState('all');
+  const [direction, setDirection] = useState('all');
   const [number, setNumber] = useState('');
   const [page, setPage] = useState(1);
   const [calls, setCalls] = useState<CallLogRow[] | null>(null);
@@ -53,7 +60,7 @@ export default function CallTrackingPage() {
 
   const loadCalls = useCallback(async () => {
     try {
-      const res = await salesApi.getCallLog({ ...range, userId, status, number: number.replace(/\s/g, '').length >= 10 ? number : undefined, page, limit: PAGE_SIZE });
+      const res = await salesApi.getCallLog({ ...range, userId, status, direction: direction === 'all' ? undefined : direction, number: number.replace(/\s/g, '').length >= 10 ? number : undefined, page, limit: PAGE_SIZE });
       setCalls(res.calls);
       setTotal(res.total);
       setPages(res.pages);
@@ -61,7 +68,7 @@ export default function CallTrackingPage() {
     } catch (err: any) {
       setError(err.message || 'Could not load calls.');
     }
-  }, [range, userId, status, number, page]);
+  }, [range, userId, status, direction, number, page]);
 
   const loadAgents = useCallback(async () => {
     try {
@@ -92,7 +99,7 @@ export default function CallTrackingPage() {
     };
   }, [loadAgents, loadCalls]);
 
-  useEffect(() => setPage(1), [range, userId, status, number]);
+  useEffect(() => setPage(1), [range, userId, status, direction, number]);
 
   const stateByUser = useMemo(() => new Map<number, PresenceState>(agents.map((a) => [a.userId, a.state])), [agents]);
   const selected = agents.find((a) => String(a.userId) === userId);
@@ -103,7 +110,7 @@ export default function CallTrackingPage() {
     <>
       <PageHeader
         title="Call Tracking"
-        description="Every call your team made, with outcome, talk time, notes and recordings"
+        description="Every incoming and outgoing call, with outcome, talk time, notes and recordings"
         actions={<Link href="/sales-activity"><Button size="sm" variant="secondary">Sales activity</Button></Link>}
       />
 
@@ -123,6 +130,11 @@ export default function CallTrackingPage() {
           <select value={status} onChange={(e) => setStatus(e.target.value)} className={select} aria-label="Outcome">
             {STATUS_FILTERS.map((s) => (
               <option key={s.key} value={s.key}>{s.label}</option>
+            ))}
+          </select>
+          <select value={direction} onChange={(e) => setDirection(e.target.value)} className={select} aria-label="Direction">
+            {DIRECTION_FILTERS.map((d) => (
+              <option key={d.key} value={d.key}>{d.label}</option>
             ))}
           </select>
           <div className="relative sm:w-56">
@@ -196,7 +208,16 @@ export default function CallTrackingPage() {
                           )}
                           {c.requirement && <p className="text-xs text-slate-400">{c.requirement}</p>}
                         </td>
-                        <td className="whitespace-nowrap px-3 py-3 text-slate-600">{c.customerNumber}</td>
+                        <td className="whitespace-nowrap px-3 py-3 text-slate-600">
+                          <span className="flex items-center gap-1.5" title={c.direction === 'inbound' ? 'Incoming call' : 'Outgoing call'}>
+                            {c.direction === 'inbound' ? (
+                              <PhoneArrowDownLeftIcon className="h-3.5 w-3.5 text-blue-500" aria-label="Incoming" />
+                            ) : (
+                              <PhoneArrowUpRightIcon className="h-3.5 w-3.5 text-slate-400" aria-label="Outgoing" />
+                            )}
+                            {c.customerNumber}
+                          </span>
+                        </td>
                         <td className="px-3 py-3">
                           <span className={cn('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold', CALL_STATUS_CLASS[c.status])}>
                             {c.isLive && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />}

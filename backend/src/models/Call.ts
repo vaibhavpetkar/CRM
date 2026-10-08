@@ -10,8 +10,11 @@ export type CallStatus = 'queued' | 'ringing' | 'in-progress' | 'completed' | 'b
 
 export const TERMINAL_CALL_STATUSES: CallStatus[] = ['completed', 'busy', 'no-answer', 'failed', 'canceled'];
 
+export type CallDirection = 'outbound' | 'inbound';
+
 interface CallAttributes {
   id: number;
+  direction?: CallDirection; // outbound = click-to-call from the CRM; inbound = a customer called the company number
   provider: string;
   providerCallId?: string | null;
   callbackToken: string;
@@ -37,6 +40,7 @@ interface CallCreationAttributes extends Optional<CallAttributes, 'id' | 'status
 
 class Call extends Model<CallAttributes, CallCreationAttributes> implements CallAttributes {
   public id!: number;
+  public direction?: CallDirection;
   public provider!: string;
   public providerCallId?: string | null;
   public callbackToken!: string;
@@ -64,6 +68,7 @@ class Call extends Model<CallAttributes, CallCreationAttributes> implements Call
 Call.init(
   {
     id: { type: DataTypes.INTEGER.UNSIGNED, autoIncrement: true, primaryKey: true },
+    direction: { type: DataTypes.STRING(10), allowNull: false, defaultValue: 'outbound' },
     provider: { type: DataTypes.STRING(30), allowNull: false },
     providerCallId: { type: DataTypes.STRING(80), allowNull: true },
     callbackToken: { type: DataTypes.STRING(64), allowNull: false, unique: true },

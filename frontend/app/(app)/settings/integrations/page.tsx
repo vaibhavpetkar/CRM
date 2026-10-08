@@ -10,6 +10,8 @@ import { integrationsApi, googleMeetApi, googleBusinessApi, metaLeadsApi, Integr
 import MetaLeadsCard from '@/components/integrations/meta-leads-card';
 import CallerNumbersCard from '@/components/integrations/caller-numbers-card';
 import LeadRotationCard from '@/components/integrations/lead-rotation-card';
+import PropertyPortalsCard from '@/components/integrations/property-portals-card';
+import IncomingCallsCard from '@/components/integrations/incoming-calls-card';
 import { useToast } from '@/components/ui/toast';
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -203,7 +205,9 @@ export default function IntegrationsSettingsPage() {
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <MetaLeadsCard status={metaStatus} onChange={load} />
+          <PropertyPortalsCard />
           <CallerNumbersCard />
+          <IncomingCallsCard />
           <LeadRotationCard />
 
           <RealGoogleCard

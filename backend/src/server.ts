@@ -46,6 +46,8 @@ import metaWebhookRoutes from './routes/metaWebhookRoutes';
 import callRoutes from './routes/callRoutes';
 import salesRoutes from './routes/salesRoutes';
 import voiceWebhookRoutes from './routes/voiceWebhookRoutes';
+import portalWebhookRoutes from './routes/portalWebhookRoutes';
+import { startPortalPoller } from './services/portalLeadsService';
 import expenseRoutes from './routes/expenseRoutes';
 import reportRoutes from './routes/reportRoutes';
 import documentTemplateRoutes from './routes/documentTemplateRoutes';
@@ -118,6 +120,8 @@ app.use('/api/public', publicRoutes);
 app.use('/api/webhooks/meta', metaWebhookRoutes);
 // Call status updates from the telephony provider (click-to-call).
 app.use('/api/webhooks/voice', voiceWebhookRoutes);
+// Property portal lead push (99acres, MagicBricks, Housing.com).
+app.use('/api/webhooks/leads', portalWebhookRoutes);
 
 // Browser origins allowed to call the API: the CRM itself (CLIENT_URL), any
 // extra comma-separated CORS_ORIGINS, and local dev servers outside production.
@@ -334,6 +338,7 @@ const startServer = async () => {
     httpServer.listen(port, () => {
       logger.info(`🚀 Server is running on http://localhost:${port}`);
       logger.info(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
+      startPortalPoller();
     });
   } catch (error) {
     logger.error(`❌ Unable to connect to the database: ${error}`);

@@ -1168,6 +1168,7 @@ export interface SalesAgentActivity {
   stateSince: string | null;
   onCallWith: string | null;
   calls: number;
+  incoming: number;
   connected: number;
   missed: number;
   talkSeconds: number;
@@ -1182,7 +1183,7 @@ export interface SalesActivity {
   from: string;
   to: string;
   canSeeTeam: boolean;
-  totals: { calls: number; connected: number; missed: number; talkSeconds: number; visitsScheduled: number; visitsCompleted: number; leadsAssigned: number; onCall: number; online: number };
+  totals: { calls: number; incoming: number; connected: number; missed: number; talkSeconds: number; visitsScheduled: number; visitsCompleted: number; leadsAssigned: number; onCall: number; online: number };
   agents: SalesAgentActivity[];
   daily: { date: string; calls: number; connected: number; visits: number }[];
 }
@@ -1208,8 +1209,11 @@ export interface LeadSourceReport {
   daily: { date: string; leads: number }[];
 }
 
+export type CallDirection = 'outbound' | 'inbound';
+
 export interface CallLogRow {
   id: number;
+  direction: CallDirection;
   provider: string;
   status: CallStatus;
   isLive: boolean;
@@ -1274,7 +1278,7 @@ export const salesApi = {
     request<SalesActivity>(`/sales/activity${qs(params)}`),
   getLeadSources: async (params: { from?: string; to?: string } = {}) =>
     request<LeadSourceReport>(`/sales/lead-sources${qs(params)}`),
-  getCallLog: async (params: { from?: string; to?: string; userId?: number | string; status?: string; number?: string; page?: number; limit?: number } = {}) =>
+  getCallLog: async (params: { from?: string; to?: string; userId?: number | string; status?: string; direction?: string; number?: string; page?: number; limit?: number } = {}) =>
     request<{ from: string; to: string; total: number; page: number; pages: number; calls: CallLogRow[] }>(`/sales/calls${qs(params)}`),
   listVisits: async (params: { from?: string; to?: string; userId?: number | string; status?: string; leadId?: number | string } = {}) =>
     request<{ visits: SiteVisitRow[] }>(`/sales/visits${qs(params)}`),
@@ -1287,7 +1291,49 @@ export const salesApi = {
   saveRotation: async (payload: Partial<Omit<RotationSettings, 'routingPath' | 'lastUserId'>>) =>
     request<RotationSettings>('/sales/rotation', { method: 'PUT', body: JSON.stringify(payload) }),
   distributeUnassigned: async () => request<{ assigned: number; byUser: Record<string, number> }>('/sales/rotation/distribute', { method: 'POST' }),
+  listPortals: async () => request<PortalConnectionRow[]>('/sales/portals'),
+  updatePortal: async (source: string, payload: { isEnabled?: boolean; credentials?: Record<string, string | null> }) =>
+    request<PortalConnectionRow>(`/sales/portals/${encodeURIComponent(source)}`, { method: 'PUT', body: JSON.stringify(payload) }),
+  syncPortal: async (source: string) =>
+    request<PortalImportCounts & { portal: PortalConnectionRow }>(`/sales/portals/${encodeURIComponent(source)}/sync`, { method: 'POST' }),
+  sendPortalTestLead: async (source: string) =>
+    request<{ result: string; portal: PortalConnectionRow }>(`/sales/portals/${encodeURIComponent(source)}/test`, { method: 'POST' }),
+  getIncomingCalls: async () => request<IncomingCallSettings>('/sales/incoming-calls'),
+  saveIncomingCalls: async (payload: { createLeads?: boolean; regenerate?: boolean }) =>
+    request<IncomingCallSettings>('/sales/incoming-calls', { method: 'PUT', body: JSON.stringify(payload) }),
 };
+
+export interface PortalImportCounts {
+  created: number;
+  duplicate: number;
+  skipped: number;
+  failed: number;
+}
+
+export interface PortalConnectionRow {
+  source: string;
+  label: string;
+  isEnabled: boolean;
+  webhookUrl: string;
+  pushHelp: string;
+  pullHelp: string;
+  canPull: boolean;
+  credentialFields: { key: string; label: string; secret?: boolean; isSet: boolean; value: string }[];
+  hasCredentials: boolean;
+  leadsReceived: number;
+  lastLeadAt: string | null;
+  lastPolledAt: string | null;
+  lastError: string | null;
+  recent: { id: number; status: 'created' | 'duplicate' | 'failed'; name: string | null; mobile: string | null; projectName: string | null; leadId: number | null; error: string | null; createdAt: string }[];
+}
+
+export interface IncomingCallSettings {
+  webhookUrl: string | null;
+  createLeads: boolean;
+  lastCallAt: string | null;
+  callsLast7Days: number;
+  provider: string;
+}
 
 // ─── Document Templates API ──────────────────────────────────────────────────
 // Distinct from the marketing `templatesApi` above (campaign emails) — these

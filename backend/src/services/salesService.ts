@@ -70,7 +70,7 @@ export const getActivity = async (user: any, query: Record<string, unknown>, onl
 
   const [users, calls, visits, leads, presence] = await Promise.all([
     User.findAll({ where: userWhere, attributes: ['id', 'firstName', 'lastName', 'email', 'department', 'position'], order: [['firstName', 'ASC']] }),
-    Call.findAll({ where: { ...byUser, createdAt: inRange } as any, attributes: ['userId', 'status', 'durationSeconds', 'createdAt'], raw: true }),
+    Call.findAll({ where: { ...byUser, createdAt: inRange } as any, attributes: ['userId', 'status', 'direction', 'durationSeconds', 'createdAt'], raw: true }),
     SiteVisit.findAll({ where: { ...byUser, scheduledAt: inRange }, attributes: ['userId', 'status', 'scheduledAt'], raw: true }),
     Lead.findAll({
       where: { createdAt: inRange, ...(onlyUserId ? { assignedToId: onlyUserId } : {}) } as any,
@@ -86,7 +86,7 @@ export const getActivity = async (user: any, query: Record<string, unknown>, onl
   );
   const leadsByUser = new Map(leads.map((l) => [Number(l.assignedToId), Number(l.count) || 0]));
 
-  const blank = () => ({ calls: 0, connected: 0, missed: 0, talkSeconds: 0, visitsScheduled: 0, visitsCompleted: 0, visitsCancelled: 0 });
+  const blank = () => ({ calls: 0, incoming: 0, connected: 0, missed: 0, talkSeconds: 0, visitsScheduled: 0, visitsCompleted: 0, visitsCancelled: 0 });
   const stats = new Map<number, ReturnType<typeof blank>>();
   const statFor = (id: number) => {
     if (!stats.has(id)) stats.set(id, blank());
@@ -98,6 +98,7 @@ export const getActivity = async (user: any, query: Record<string, unknown>, onl
   for (const c of calls) {
     const s = statFor(Number(c.userId));
     s.calls += 1;
+    if ((c as any).direction === 'inbound') s.incoming += 1;
     if (c.status === 'completed') s.connected += 1;
     else if (MISSED.includes(c.status)) s.missed += 1;
     s.talkSeconds += Number(c.durationSeconds) || 0;
@@ -138,6 +139,7 @@ export const getActivity = async (user: any, query: Record<string, unknown>, onl
   const totals = agents.reduce(
     (t, a) => {
       t.calls += a.calls;
+      t.incoming += a.incoming;
       t.connected += a.connected;
       t.missed += a.missed;
       t.talkSeconds += a.talkSeconds;
@@ -146,7 +148,7 @@ export const getActivity = async (user: any, query: Record<string, unknown>, onl
       t.leadsAssigned += a.leadsAssigned;
       return t;
     },
-    { calls: 0, connected: 0, missed: 0, talkSeconds: 0, visitsScheduled: 0, visitsCompleted: 0, leadsAssigned: 0 }
+    { calls: 0, incoming: 0, connected: 0, missed: 0, talkSeconds: 0, visitsScheduled: 0, visitsCompleted: 0, leadsAssigned: 0 }
   );
 
   return {
@@ -226,6 +228,9 @@ export const listCallLog = async (user: any, query: Record<string, unknown>) => 
   const number = normalizeIndianNumber(String(query.number || ''));
   if (number) where.customerNumber = number;
 
+  const direction = String(query.direction || '');
+  if (direction === 'inbound' || direction === 'outbound') where.direction = direction;
+
   const page = Math.max(1, parseInt(String(query.page || 1), 10) || 1);
   const limit = Math.min(200, Math.max(1, parseInt(String(query.limit || 50), 10) || 50));
 
@@ -253,6 +258,7 @@ export const listCallLog = async (user: any, query: Record<string, unknown>) => 
       const lead = c.leadId ? leadById.get(c.leadId) : null;
       return {
         id: c.id,
+        direction: c.direction || 'outbound',
         provider: c.provider,
         status: c.status,
         isLive: !(TERMINAL_CALL_STATUSES as string[]).includes(c.status),

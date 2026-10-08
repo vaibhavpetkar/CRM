@@ -216,7 +216,7 @@ const logCallActivity = async (call: Call) => {
     entityType: target.entityType,
     entityId: target.entityId,
     performedById: call.userId,
-    details: `Call to ${formatIndianNumber(call.customerNumber)}: ${outcome}${talk}.`,
+    details: `${call.direction === 'inbound' ? 'Incoming call from' : 'Call to'} ${formatIndianNumber(call.customerNumber)}: ${outcome}${talk}.`,
   });
 };
 
@@ -290,17 +290,23 @@ export const handleCallback = async (token: string, body: Record<string, any>) =
 const loadCall = async (user: any, id: number, action: 'read' | 'update') => {
   const call = await Call.findByPk(id);
   if (!call) throw new NotFoundError('Call', id);
+  // An incoming call from someone who isn't a lead: theirs, or a manager's.
+  if (!call.leadId && !call.contactId) {
+    if (call.userId !== user.id && !userCan(user, 'users:read')) throw new ForbiddenError();
+    return call;
+  }
   await loadTarget(user, { leadId: call.leadId, contactId: call.contactId }, action === 'update' && call.userId === user.id ? 'read' : action);
   return call;
 };
 
 const serialize = (call: Call, extra: Record<string, any> = {}) => ({
   id: call.id,
+  direction: call.direction || 'outbound',
   provider: call.provider,
   status: call.status as CallStatus,
   isActive: !isTerminal(call.status),
   customerNumber: formatIndianNumber(call.customerNumber),
-  agentNumber: formatIndianNumber(call.agentNumber),
+  agentNumber: call.agentNumber ? formatIndianNumber(call.agentNumber) : '',
   callerId: call.callerId ? formatIndianNumber(call.callerId) : null,
   leadId: call.leadId,
   contactId: call.contactId,

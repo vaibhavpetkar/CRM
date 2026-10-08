@@ -40,6 +40,8 @@ import MetaLeadEvent from '../models/MetaLeadEvent';
 import Call from '../models/Call';
 import CallerNumber from '../models/CallerNumber';
 import SiteVisit from '../models/SiteVisit';
+import PortalConnection from '../models/PortalConnection';
+import PortalLeadEvent from '../models/PortalLeadEvent';
 
 /**
  * Multi-company data isolation.
@@ -96,6 +98,8 @@ export const TENANT_MODELS: ModelStatic<Model>[] = [
   Call,
   CallerNumber,
   SiteVisit,
+  PortalConnection,
+  PortalLeadEvent,
 ];
 
 export const TENANT_FIELD = 'companyId';

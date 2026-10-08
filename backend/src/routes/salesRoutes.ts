@@ -21,4 +21,12 @@ router.get('/rotation', ...manage, salesController.getRotation);
 router.put('/rotation', ...manage, salesController.saveRotation);
 router.post('/rotation/distribute', ...manage, salesController.distributeUnassigned);
 
+router.get('/portals', ...manage, salesController.listPortals);
+router.put('/portals/:source', ...manage, salesController.updatePortal);
+router.post('/portals/:source/sync', ...manage, salesController.syncPortal);
+router.post('/portals/:source/test', ...manage, salesController.sendPortalTestLead);
+
+router.get('/incoming-calls', ...manage, salesController.getIncomingCalls);
+router.put('/incoming-calls', ...manage, salesController.saveIncomingCalls);
+
 export default router;

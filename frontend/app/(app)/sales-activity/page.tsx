@@ -107,7 +107,7 @@ export default function SalesActivityPage() {
       {data && t && (
         <>
           <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-            <StatCard label="Calls" value={t.calls} icon={<PhoneIcon className="h-5 w-5" />} />
+            <StatCard label="Calls" value={t.calls} change={t.incoming ? `${t.incoming} incoming` : undefined} icon={<PhoneIcon className="h-5 w-5" />} />
             <StatCard label="Connected" value={t.connected} change={`${connectRate}% connect rate`} icon={<PhoneArrowUpRightIcon className="h-5 w-5" />} tone="emerald" />
             <StatCard label="Missed" value={t.missed} icon={<PhoneXMarkIcon className="h-5 w-5" />} tone="rose" />
             <StatCard label="Talk time" value={talkTime(t.talkSeconds)} icon={<ClockIcon className="h-5 w-5" />} tone="indigo" />
@@ -147,7 +147,10 @@ export default function SalesActivityPage() {
                         </div>
                       </td>
                       <td className="px-3 py-3"><AgentStatusBadge state={a.state} detail={a.onCallWith} /></td>
-                      <td className="px-3 py-3 text-right font-bold text-slate-900">{a.calls}</td>
+                      <td className="px-3 py-3 text-right font-bold text-slate-900">
+                        {a.calls}
+                        {a.incoming > 0 && <span className="block text-[11px] font-normal text-slate-400">{a.incoming} in</span>}
+                      </td>
                       <td className="px-3 py-3 text-right text-emerald-700">{a.connected}</td>
                       <td className="px-3 py-3 text-right text-rose-600">{a.missed}</td>
                       <td className="px-3 py-3 text-right text-slate-600">{talkTime(a.talkSeconds)}</td>
