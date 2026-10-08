@@ -108,7 +108,7 @@ EC2 Instance Connect / SSM instead.
 
 The workflow runs `docker compose` with `docker-compose.yml` only. On EC2,
 nginx comes from `docker-compose.prod.yml`, so add the override to the two
-compose lines in the workflow, or create `/var/www/crm/.env` with
+compose lines in the workflow, or add this line to `/var/www/crm/.env`:
 `COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml`, which makes plain
 `docker compose` pick up both files.
 
