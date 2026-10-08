@@ -6,6 +6,7 @@ import { useState, useEffect, Suspense } from 'react';
 import Button from '@/components/ui/button';
 import LoadingSpinner from '@/components/ui/loading-spinner';
 import { authApi } from '@/lib/api';
+import PasswordInput from '@/components/ui/password-input';
 
 function AcceptInviteForm() {
   const router = useRouter();
@@ -137,8 +138,7 @@ function AcceptInviteForm() {
 
         <div>
           <label className="mb-1.5 block text-sm font-medium text-slate-700">Set Password</label>
-          <input
-            type="password"
+          <PasswordInput
             required
             minLength={6}
             value={password}
@@ -150,8 +150,7 @@ function AcceptInviteForm() {
 
         <div>
           <label className="mb-1.5 block text-sm font-medium text-slate-700">Confirm Password</label>
-          <input
-            type="password"
+          <PasswordInput
             required
             minLength={6}
             value={confirmPassword}

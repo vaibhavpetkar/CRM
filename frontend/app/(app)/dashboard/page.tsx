@@ -207,6 +207,8 @@ export default function DashboardPage() {
                   cx="50%"
                   cy="50%"
                   outerRadius={90}
+                  stroke="var(--card-bg)"
+                  strokeWidth={leadsByStatus.length > 1 ? 2 : 0}
                   label={(entry) => `${entry.name} (${entry.value})`}
                 >
                   {leadsByStatus.map((_, i) => (
@@ -233,6 +235,8 @@ export default function DashboardPage() {
                   cx="50%"
                   cy="50%"
                   outerRadius={90}
+                  stroke="var(--card-bg)"
+                  strokeWidth={leadsBySource.length > 1 ? 2 : 0}
                   label={(entry) => `${entry.name} (${entry.value})`}
                 >
                   {leadsBySource.map((_, i) => (

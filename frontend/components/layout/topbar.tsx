@@ -27,6 +27,7 @@ import {
 import { getSocket, disconnectSocket } from '@/lib/socket';
 import { useToast } from '@/components/ui/toast';
 import AIChatWidget from './ai-chat-widget';
+import ThemeToggle from '@/components/ui/theme-toggle';
 
 const QUICK_CREATE_OPTIONS = [
   { label: 'New Lead', href: '/leads?quickCreate=1', icon: UserPlusIcon },
@@ -331,6 +332,8 @@ export default function Topbar({ onMobileMenuClick }: { onMobileMenuClick?: () =
 
         <div className="mx-1 h-6 w-px bg-slate-200/60 hidden sm:block"></div>
 
+        <ThemeToggle className="hidden sm:flex" />
+
         <Link
           href="/calendar"
           className="rounded-full p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors"
@@ -429,6 +432,10 @@ export default function Topbar({ onMobileMenuClick }: { onMobileMenuClick?: () =
                 <Link href="/settings" className="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
                   Settings
                 </Link>
+                <div className="flex items-center justify-between px-4 py-2 text-sm text-slate-700 sm:hidden">
+                  Theme
+                  <ThemeToggle />
+                </div>
                 <div className="my-1 h-px bg-slate-100" />
                 <button
                   onClick={handleSignOut}
