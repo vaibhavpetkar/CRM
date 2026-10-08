@@ -42,7 +42,7 @@ If the GitHub repo is private, the clone in user data fails. In that case SSH
 in after launch and clone with a
 [deploy key](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/managing-deploy-keys)
 or a fine-grained token:
-`git clone git@github.com:vaibhavpetkar/CRM.git /var/www/crm`.
+`git clone -b real-estate git@github.com:vaibhavpetkar/CRM.git /var/www/crm`.
 
 ## 4. Elastic IP and DNS
 
@@ -57,7 +57,7 @@ or a fine-grained token:
 ```bash
 ssh -i your-key.pem ubuntu@<Elastic IP>
 cd /var/www/crm
-git checkout master            # or the branch you are deploying
+git checkout real-estate       # this server runs the real-estate branch
 nano .env                      # set DB_PASSWORD, JWT_SECRET, SUPER_ADMIN_PASSWORD (+ email, Google, Exotel...)
 
 sudo certbot certonly --standalone -d crm.eleviq.buzz
@@ -91,26 +91,47 @@ out. The volume name prefix (`crm_`) follows the folder name; check with
 
 ## 7. Automatic deploys from GitHub
 
-`.github/workflows/deploy.yml` deploys over SSH and works with EC2 unchanged.
-In GitHub > Settings > Secrets and variables > Actions, point the secrets at
-the instance:
+Two servers, two branches, two workflows:
+
+| Branch | Workflow | Server | Secrets |
+|---|---|---|---|
+| `master` | `.github/workflows/deploy.yml` | old VPS | `VPS_*` |
+| `real-estate` | `.github/workflows/deploy-aws.yml` | AWS EC2 | `AWS_*` |
+
+Each workflow only runs for its own branch and only knows its own server's
+secrets, so a push to `real-estate` never touches the old VPS and a push to
+`master` never touches AWS. Leave the `VPS_*` secrets as they are.
+
+In GitHub > Settings > Secrets and variables > Actions, add:
 
 | Secret | Value |
 |---|---|
-| `VPS_HOST` | The Elastic IP |
-| `VPS_USER` | `ubuntu` |
-| `VPS_SSH_KEY` | Contents of the key pair's `.pem` file |
-| `VPS_DEPLOY_PATH` | `/var/www/crm` |
+| `AWS_HOST` | The Elastic IP |
+| `AWS_USER` | `ubuntu` |
+| `AWS_SSH_KEY` | Full contents of the key pair's `.pem` file |
+| `AWS_DEPLOY_PATH` | `/var/www/crm` |
+| `AWS_PORT` | Optional, only if SSH is not on 22 |
 
-GitHub-hosted runners use changing IP addresses, so port 22 must accept them
-(0.0.0.0/0 with key-only SSH, which is the Ubuntu default), or use
-EC2 Instance Connect / SSM instead.
+After that, every push or merge into `real-estate` rebuilds the AWS server,
+runs migrations and keeps HTTPS running. You can also start it by hand from
+the Actions tab ("Deploy real-estate to AWS" > Run workflow).
 
-The workflow runs `docker compose` with `docker-compose.yml` only. On EC2,
-nginx comes from `docker-compose.prod.yml`, so add the override to the two
-compose lines in the workflow, or add this line to `/var/www/crm/.env`:
-`COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml`, which makes plain
-`docker compose` pick up both files.
+GitHub-hosted runners use changing IP addresses, so port 22 in the security
+group must accept them (0.0.0.0/0 is fine with key-only SSH, which is the
+Ubuntu default).
+
+If the GitHub repository is private, the server needs read access to pull
+code. On the server run `ssh-keygen -t ed25519 -f ~/.ssh/crm_deploy -N ""`,
+add `~/.ssh/crm_deploy.pub` under GitHub > Settings > Deploy keys (read
+only), then:
+
+```bash
+cat >> ~/.ssh/config <<'CFG'
+Host github.com
+  IdentityFile ~/.ssh/crm_deploy
+CFG
+cd /var/www/crm && git remote set-url origin git@github.com:vaibhavpetkar/CRM.git
+```
 
 ## 8. Backups and monitoring
 
