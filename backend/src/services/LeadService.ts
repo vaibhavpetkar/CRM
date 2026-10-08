@@ -17,6 +17,7 @@ import { logActivity, getTimeline, diffFields, computeChanges } from './activity
 import { sanitizeDateFields, sanitizeNumericFields } from '../utils/sanitize';
 import { notifyUser } from '../utils/notificationService';
 import { getOrSetCache } from '../utils/cache';
+import { assigneeForNewLead } from './leadRotation';
 import { NotFoundError, ConflictError, ValidationError } from '../errors/AppError';
 
 interface ProductInput {
@@ -146,7 +147,7 @@ class LeadService {
     data = sanitizeDateFields(data, ['date', 'lastContacted', 'nextFollowUp']);
     data = sanitizeNumericFields(data, [
       'noOfEmployees', 'leadOwnerId', 'assignedToId', 'qualifiedById',
-      'latitude', 'longitude', 'value', 'score',
+      'latitude', 'longitude', 'value', 'score', 'budgetMin', 'budgetMax',
     ]);
     await validateUserReferences(data);
 
@@ -170,6 +171,13 @@ class LeadService {
       if (existing) {
         throw new ConflictError('A lead with this email address or mobile number already exists');
       }
+    }
+
+    // Rotational calling: a lead nobody picked an owner for goes to the next
+    // sales person in turn (Settings > Integrations > Lead rotation).
+    if (data.assignedToId == null) {
+      const next = await assigneeForNewLead((data.leadSource ?? data.source ?? 'website') as string);
+      if (next) data.assignedToId = next;
     }
 
     return sequelize.transaction(async (t) => {
@@ -225,6 +233,12 @@ class LeadService {
           timelineToPurchase: data.timelineToPurchase ?? null,
           qualifiedById: data.qualifiedById ?? null,
           meetingStatus: data.meetingStatus ?? null,
+          propertyType: data.propertyType ?? null,
+          configuration: data.configuration ?? null,
+          preferredLocation: data.preferredLocation ?? null,
+          projectName: data.projectName ?? null,
+          budgetMin: data.budgetMin ?? null,
+          budgetMax: data.budgetMax ?? null,
           createdById: userId ?? null,
           modifiedById: userId ?? null,
           isConverted: false,
@@ -273,7 +287,7 @@ class LeadService {
     data = sanitizeDateFields(data, ['date', 'lastContacted', 'nextFollowUp']);
     data = sanitizeNumericFields(data, [
       'noOfEmployees', 'leadOwnerId', 'assignedToId', 'qualifiedById',
-      'latitude', 'longitude', 'value', 'score',
+      'latitude', 'longitude', 'value', 'score', 'budgetMin', 'budgetMax',
     ]);
     await validateUserReferences(data);
 
@@ -342,6 +356,12 @@ class LeadService {
         timelineToPurchase: data.timelineToPurchase !== undefined ? data.timelineToPurchase : lead.timelineToPurchase,
         qualifiedById: data.qualifiedById !== undefined ? data.qualifiedById : lead.qualifiedById,
         meetingStatus: data.meetingStatus !== undefined ? data.meetingStatus : lead.meetingStatus,
+        propertyType: data.propertyType !== undefined ? data.propertyType : lead.propertyType,
+        configuration: data.configuration !== undefined ? data.configuration : lead.configuration,
+        preferredLocation: data.preferredLocation !== undefined ? data.preferredLocation : lead.preferredLocation,
+        projectName: data.projectName !== undefined ? data.projectName : lead.projectName,
+        budgetMin: data.budgetMin !== undefined ? data.budgetMin : lead.budgetMin,
+        budgetMax: data.budgetMax !== undefined ? data.budgetMax : lead.budgetMax,
         modifiedById: userId ?? lead.modifiedById,
       };
 

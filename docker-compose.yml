@@ -132,6 +132,16 @@ services:
       - EXOTEL_CALLER_ID=${EXOTEL_CALLER_ID:-}
       - EXOTEL_SUBDOMAIN=${EXOTEL_SUBDOMAIN:-}
       - EXOTEL_TIME_LIMIT=${EXOTEL_TIME_LIMIT:-}
+      # Vi Business (Vodafone Idea) cloud calling: VOICE_PROVIDER=vi. Fill
+      # these from the API document Vi gives you (docs/real-estate-sales.md).
+      - VI_API_URL=${VI_API_URL:-}
+      - VI_API_KEY=${VI_API_KEY:-}
+      - VI_CALLER_ID=${VI_CALLER_ID:-}
+      - VI_AUTH_HEADER=${VI_AUTH_HEADER:-}
+      - VI_AUTH_SCHEME=${VI_AUTH_SCHEME:-}
+      - VI_ACCOUNT_ID=${VI_ACCOUNT_ID:-}
+      - VI_REQUEST_TEMPLATE=${VI_REQUEST_TEMPLATE:-}
+      - VI_STATUS_URL=${VI_STATUS_URL:-}
       - SUPER_ADMIN_EMAIL=${SUPER_ADMIN_EMAIL:-admin@crmpro.com}
       - SUPER_ADMIN_PASSWORD=${SUPER_ADMIN_PASSWORD:?Set SUPER_ADMIN_PASSWORD in .env}
       # AI Assistant — free, local Ollama provider (see the `ollama` service

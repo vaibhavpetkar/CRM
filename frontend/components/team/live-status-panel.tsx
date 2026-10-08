@@ -16,7 +16,7 @@ const STATES: { key: PresenceState; label: string; dot: string; text: string }[]
   { key: 'available', label: 'Available', dot: 'bg-emerald-500', text: 'text-emerald-700' },
   { key: 'on_call', label: 'On call', dot: 'bg-amber-400', text: 'text-amber-700' },
   { key: 'after_call', label: 'After call work', dot: 'bg-blue-500', text: 'text-blue-700' },
-  { key: 'offline', label: 'Offline', dot: 'bg-slate-700', text: 'text-slate-500' },
+  { key: 'offline', label: 'Offline', dot: 'bg-red-500', text: 'text-red-600' },
 ];
 const STATE_BY_KEY = Object.fromEntries(STATES.map((s) => [s.key, s])) as Record<PresenceState, (typeof STATES)[number]>;
 

@@ -1,10 +1,12 @@
 import { ExotelProvider } from './exotel';
 import { MockProvider } from './mock';
+import { ViProvider } from './vi';
 import type { VoiceProvider } from './types';
 
 // Registered providers, by VOICE_PROVIDER value. Exotel is the default.
 const PROVIDERS: Record<string, () => VoiceProvider> = {
   exotel: () => new ExotelProvider(),
+  vi: () => new ViProvider(),
   mock: () => new MockProvider(),
 };
 

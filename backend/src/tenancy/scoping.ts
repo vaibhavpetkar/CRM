@@ -39,6 +39,7 @@ import MetaPage from '../models/MetaPage';
 import MetaLeadEvent from '../models/MetaLeadEvent';
 import Call from '../models/Call';
 import CallerNumber from '../models/CallerNumber';
+import SiteVisit from '../models/SiteVisit';
 
 /**
  * Multi-company data isolation.
@@ -94,6 +95,7 @@ export const TENANT_MODELS: ModelStatic<Model>[] = [
   MetaLeadEvent,
   Call,
   CallerNumber,
+  SiteVisit,
 ];
 
 export const TENANT_FIELD = 'companyId';

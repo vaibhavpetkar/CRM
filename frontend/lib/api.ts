@@ -317,14 +317,33 @@ export async function fetchAllPages<R extends { pages?: number }, T>(
 
 // ─── Leads API ────────────────────────────────────────────────────────────────
 
+/** Leads page search box and filters (see backend LeadRepository.buildWhere). */
+export interface LeadListParams {
+  search?: string; // name, number, area, "2bhk", Series ID, company
+  status?: string;
+  territory?: string;
+  leadSource?: string; // comma separated for several
+  assignedToId?: string; // a user id, or 'unassigned'
+  configuration?: string; // comma separated, e.g. "2 BHK,3 BHK"
+  propertyType?: string;
+  location?: string; // area / locality / city
+  budgetFrom?: number | string;
+  budgetTo?: number | string;
+  dateFrom?: string; // YYYY-MM-DD
+  dateTo?: string;
+}
+
 export const leadsApi = {
-  getLeads: async (params: { page?: number; limit?: number; search?: string; status?: string; territory?: string } = {}) => {
+  getLeads: async (params: LeadListParams & { page?: number; limit?: number } = {}) => {
     const query = new URLSearchParams();
     if (params.page) query.append('page', String(params.page));
     if (params.limit) query.append('limit', String(params.limit));
-    if (params.search) query.append('search', params.search);
-    if (params.status && params.status !== 'all') query.append('status', params.status);
-    if (params.territory && params.territory !== 'all') query.append('territory', params.territory);
+    // 'all' / empty means "no filter" for every select on the Leads page.
+    for (const [key, value] of Object.entries(params)) {
+      if (key === 'page' || key === 'limit' || value === undefined || value === null) continue;
+      const v = String(value).trim();
+      if (v && v !== 'all') query.append(key, v);
+    }
 
     const qString = query.toString();
     return request<{ leads: any[]; total: number; page: number; pages: number }>(
@@ -333,7 +352,7 @@ export const leadsApi = {
   },
 
   /** Every lead matching the filters, across all backend pages. */
-  getAllLeads: async (params: { search?: string; status?: string; territory?: string } = {}) =>
+  getAllLeads: async (params: LeadListParams = {}) =>
     fetchAllPages((page, limit) => leadsApi.getLeads({ ...params, page, limit }), (res) => res.leads),
 
   getLead: async (id: string | number) => {
@@ -1136,6 +1155,138 @@ export const callsApi = {
   updateNumber: async (id: number, payload: { label?: string; userId?: number | null; isActive?: boolean }) =>
     request<CallerNumberRow[]>(`/calls/numbers/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
   removeNumber: async (id: number) => request<CallerNumberRow[]>(`/calls/numbers/${id}`, { method: 'DELETE' }),
+};
+
+// ─── Real-estate sales team ───────────────────────────────────────────────────
+
+export interface SalesAgentActivity {
+  userId: number;
+  name: string;
+  department: string | null;
+  position: string | null;
+  state: PresenceState;
+  stateSince: string | null;
+  onCallWith: string | null;
+  calls: number;
+  connected: number;
+  missed: number;
+  talkSeconds: number;
+  avgTalkSeconds: number;
+  visitsScheduled: number;
+  visitsCompleted: number;
+  visitsCancelled: number;
+  leadsAssigned: number;
+}
+
+export interface SalesActivity {
+  from: string;
+  to: string;
+  canSeeTeam: boolean;
+  totals: { calls: number; connected: number; missed: number; talkSeconds: number; visitsScheduled: number; visitsCompleted: number; leadsAssigned: number; onCall: number; online: number };
+  agents: SalesAgentActivity[];
+  daily: { date: string; calls: number; connected: number; visits: number }[];
+}
+
+export interface LeadSourceRow {
+  source: string;
+  total: number;
+  qualified: number;
+  converted: number;
+  lost: number;
+  unassigned: number;
+  share: number;
+  conversionRate: number;
+  daily: number[];
+}
+
+export interface LeadSourceReport {
+  from: string;
+  to: string;
+  total: number;
+  days: string[];
+  bySource: LeadSourceRow[];
+  daily: { date: string; leads: number }[];
+}
+
+export interface CallLogRow {
+  id: number;
+  provider: string;
+  status: CallStatus;
+  isLive: boolean;
+  userId: number;
+  agentName: string | null;
+  leadId: number | null;
+  contactId: number | null;
+  withName: string | null;
+  leadNumber: string | null;
+  requirement: string | null;
+  customerNumber: string;
+  callerId: string | null;
+  durationSeconds: number | null;
+  startedAt: string | null;
+  endedAt: string | null;
+  createdAt: string;
+  notes: string;
+  hasRecording: boolean;
+  error: string | null;
+}
+
+export type SiteVisitStatus = 'scheduled' | 'completed' | 'cancelled' | 'no-show';
+
+export interface SiteVisitRow {
+  id: number;
+  leadId: number | null;
+  leadName: string | null;
+  leadNumber: string | null;
+  leadMobile: string | null;
+  userId: number;
+  agentName: string | null;
+  scheduledAt: string;
+  status: SiteVisitStatus;
+  projectName: string | null;
+  location: string | null;
+  notes: string;
+  completedAt: string | null;
+  createdAt: string;
+}
+
+export interface RotationSettings {
+  enabled: boolean;
+  userIds: number[];
+  onlyAvailable: boolean;
+  sources: string[];
+  lastUserId: number | null;
+  routingPath: string | null;
+}
+
+const qs = (params: Record<string, unknown>) => {
+  const query = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v === undefined || v === null || v === '' || v === 'all') continue;
+    query.append(k, String(v));
+  }
+  const s = query.toString();
+  return s ? `?${s}` : '';
+};
+
+export const salesApi = {
+  getActivity: async (params: { from?: string; to?: string; userId?: number | string } = {}) =>
+    request<SalesActivity>(`/sales/activity${qs(params)}`),
+  getLeadSources: async (params: { from?: string; to?: string } = {}) =>
+    request<LeadSourceReport>(`/sales/lead-sources${qs(params)}`),
+  getCallLog: async (params: { from?: string; to?: string; userId?: number | string; status?: string; number?: string; page?: number; limit?: number } = {}) =>
+    request<{ from: string; to: string; total: number; page: number; pages: number; calls: CallLogRow[] }>(`/sales/calls${qs(params)}`),
+  listVisits: async (params: { from?: string; to?: string; userId?: number | string; status?: string; leadId?: number | string } = {}) =>
+    request<{ visits: SiteVisitRow[] }>(`/sales/visits${qs(params)}`),
+  createVisit: async (payload: { leadId: number | string; userId?: number | string | null; scheduledAt: string; status?: SiteVisitStatus; projectName?: string; location?: string; notes?: string }) =>
+    request<SiteVisitRow>('/sales/visits', { method: 'POST', body: JSON.stringify(payload) }),
+  updateVisit: async (id: number, payload: Partial<{ userId: number | string; scheduledAt: string; status: SiteVisitStatus; projectName: string; location: string; notes: string }>) =>
+    request<SiteVisitRow>(`/sales/visits/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
+  deleteVisit: async (id: number) => request<{ deleted: boolean }>(`/sales/visits/${id}`, { method: 'DELETE' }),
+  getRotation: async () => request<RotationSettings>('/sales/rotation'),
+  saveRotation: async (payload: Partial<Omit<RotationSettings, 'routingPath' | 'lastUserId'>>) =>
+    request<RotationSettings>('/sales/rotation', { method: 'PUT', body: JSON.stringify(payload) }),
+  distributeUnassigned: async () => request<{ assigned: number; byUser: Record<string, number> }>('/sales/rotation/distribute', { method: 'POST' }),
 };
 
 // ─── Document Templates API ──────────────────────────────────────────────────

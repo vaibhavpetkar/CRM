@@ -134,6 +134,19 @@ const SCHEMA_PATCHES: { name: string; sql: string }[] = [
       ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "notes" TEXT;
     `,
   },
+  {
+    // Real-estate buyer requirement on leads: searched and filtered on the
+    // Leads page (area, 1 BHK / 2 BHK, budget).
+    name: 'leads real-estate requirement',
+    sql: `
+      ALTER TABLE "leads" ADD COLUMN IF NOT EXISTS "propertyType" VARCHAR(50);
+      ALTER TABLE "leads" ADD COLUMN IF NOT EXISTS "configuration" VARCHAR(30);
+      ALTER TABLE "leads" ADD COLUMN IF NOT EXISTS "preferredLocation" VARCHAR(255);
+      ALTER TABLE "leads" ADD COLUMN IF NOT EXISTS "projectName" VARCHAR(255);
+      ALTER TABLE "leads" ADD COLUMN IF NOT EXISTS "budgetMin" DECIMAL(15,2);
+      ALTER TABLE "leads" ADD COLUMN IF NOT EXISTS "budgetMax" DECIMAL(15,2);
+    `,
+  },
 ];
 
 export const runSchemaPatches = async (sequelize: Sequelize): Promise<void> => {

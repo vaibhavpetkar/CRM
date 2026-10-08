@@ -9,6 +9,7 @@ import StatusBadge from '@/components/ui/status-badge';
 import { integrationsApi, googleMeetApi, googleBusinessApi, metaLeadsApi, IntegrationRow, MetaLeadsStatus } from '@/lib/api';
 import MetaLeadsCard from '@/components/integrations/meta-leads-card';
 import CallerNumbersCard from '@/components/integrations/caller-numbers-card';
+import LeadRotationCard from '@/components/integrations/lead-rotation-card';
 import { useToast } from '@/components/ui/toast';
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -203,6 +204,7 @@ export default function IntegrationsSettingsPage() {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <MetaLeadsCard status={metaStatus} onChange={load} />
           <CallerNumbersCard />
+          <LeadRotationCard />
 
           <RealGoogleCard
             categoryLabel="Video Meetings"

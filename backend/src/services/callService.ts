@@ -26,7 +26,7 @@ const RECORDING_RETRY_MS = 10000;
 const isTerminal = (status: string) => (TERMINAL_CALL_STATUSES as string[]).includes(status);
 
 /** Same rules as authorize(): super admins and '*' roles can do anything. */
-const userCan = (user: any, permission: string) => {
+export const userCan = (user: any, permission: string) => {
   if (user?.isSuperAdmin) return true;
   let perms: string[] = [];
   try {
@@ -64,6 +64,7 @@ export const getConfig = async (user: any) => {
   const hasNumbers = await hasCallerNumbers();
   const hasCallerId = hasNumbers || !!provider?.defaultCallerId();
   if (provider && !hasCallerId && provider.key === 'exotel') missingEnvVars.push('EXOTEL_CALLER_ID');
+  if (provider && !hasCallerId && provider.key === 'vi') missingEnvVars.push('VI_CALLER_ID');
   const agentNumber = normalizeIndianNumber(user?.phone);
   return {
     enabled: !!provider && missingEnvVars.length === 0,

@@ -44,6 +44,7 @@ import googleBusinessRoutes from './routes/googleBusinessRoutes';
 import metaLeadsRoutes from './routes/metaLeadsRoutes';
 import metaWebhookRoutes from './routes/metaWebhookRoutes';
 import callRoutes from './routes/callRoutes';
+import salesRoutes from './routes/salesRoutes';
 import voiceWebhookRoutes from './routes/voiceWebhookRoutes';
 import expenseRoutes from './routes/expenseRoutes';
 import reportRoutes from './routes/reportRoutes';
@@ -200,6 +201,7 @@ app.use('/api/expenses', expenseRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/document-templates', documentTemplateRoutes);
 app.use('/api/calls', callRoutes);
+app.use('/api/sales', salesRoutes);
 
 // Serve uploaded files (attachments, generated PDFs) statically — but only to
 // authenticated users. Nothing in the frontend loads these via raw <img>/<a>

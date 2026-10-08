@@ -455,7 +455,15 @@ export default function DashboardPage() {
           <Donut data={statusSlices} total={stats.totalLeads} />
         </Panel>
 
-        <Panel className="lg:col-span-4" title="Leads by Source">
+        <Panel
+          className="lg:col-span-4"
+          title="Leads by Source"
+          action={
+            <Link href="/lead-sources" className="text-xs font-semibold text-[var(--primary)] hover:underline">
+              View report
+            </Link>
+          }
+        >
           <Donut data={sourceSlices} total={stats.totalLeads} />
         </Panel>
       </div>

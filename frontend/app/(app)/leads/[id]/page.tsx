@@ -5,7 +5,7 @@ import type { FormEvent } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { leadsApi, contactsApi, usersApi, quotesApi, itemsApi, aiApi, getStoredUser } from '@/lib/api';
 import { hasPermission } from '@/lib/permissions';
-import { ANNUAL_TURNOVER_OPTIONS, INDUSTRY_OPTIONS, DESIGNATION_OPTIONS, TERRITORY_OPTIONS } from '@/lib/lead-options';
+import { ANNUAL_TURNOVER_OPTIONS, INDUSTRY_OPTIONS, DESIGNATION_OPTIONS, TERRITORY_OPTIONS, LEAD_SOURCE_OPTIONS, CONFIGURATION_OPTIONS, PROPERTY_TYPE_OPTIONS, leadSourceLabel, budgetRange } from '@/lib/lead-options';
 import Button from '@/components/ui/button';
 import Card from '@/components/ui/card';
 import DataTable from '@/components/ui/data-table';
@@ -19,6 +19,7 @@ import { useToast } from '@/components/ui/toast';
 import { useKeyboardShortcuts } from '@/lib/hooks/useKeyboardShortcuts';
 import CallButton from '@/components/calls/call-button';
 import CallHistory from '@/components/calls/call-history';
+import SiteVisitsCard from '@/components/sales/site-visits-card';
 
 export default function LeadDetailsPage() {
   const toast = useToast();
@@ -330,6 +331,14 @@ export default function LeadDetailsPage() {
           Activity
         </button>
         <button
+          onClick={() => setActiveTab('visits')}
+          className={`px-4 py-2 text-sm font-medium border-b-2 ${
+            activeTab === 'visits' ? 'border-[var(--primary)] text-[var(--primary)]' : 'border-transparent text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          Site Visits
+        </button>
+        <button
           onClick={() => setActiveTab('calls')}
           className={`px-4 py-2 text-sm font-medium border-b-2 ${
             activeTab === 'calls' ? 'border-[var(--primary)] text-[var(--primary)]' : 'border-transparent text-slate-500 hover:text-slate-700'
@@ -377,6 +386,52 @@ export default function LeadDetailsPage() {
                   <option value="converted">Converted</option>
                   <option value="lost">Lost</option>
                 </select>
+              </div>
+            </div>
+
+            {/* Property Requirement (real estate) */}
+            <div>
+              <h4 className="mb-3 flex items-center justify-between border-b border-slate-100 pb-2 text-sm font-semibold text-slate-900">
+                Property Requirement
+                {budgetRange(formData.budgetMin, formData.budgetMax) && (
+                  <span className="text-xs font-medium text-slate-500">{budgetRange(formData.budgetMin, formData.budgetMax)}</span>
+                )}
+              </h4>
+              <div className="grid grid-cols-3 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">Configuration</label>
+                  <select value={formData.configuration || ''} onChange={(e) => setFormData({ ...formData, configuration: e.target.value || null })} className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none">
+                    <option value="">— Select —</option>
+                    {CONFIGURATION_OPTIONS.map((opt) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">Property Type</label>
+                  <select value={formData.propertyType || ''} onChange={(e) => setFormData({ ...formData, propertyType: e.target.value || null })} className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none">
+                    <option value="">— Select —</option>
+                    {PROPERTY_TYPE_OPTIONS.map((opt) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">Preferred Area</label>
+                  <input type="text" value={formData.preferredLocation || ''} onChange={(e) => setFormData({ ...formData, preferredLocation: e.target.value })} placeholder="e.g. Baner, Pune" className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">Project / Listing</label>
+                  <input type="text" value={formData.projectName || ''} onChange={(e) => setFormData({ ...formData, projectName: e.target.value })} className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">Budget From (₹)</label>
+                  <input type="number" min={0} step={100000} value={formData.budgetMin ?? ''} onChange={(e) => setFormData({ ...formData, budgetMin: e.target.value })} className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">Budget To (₹)</label>
+                  <input type="number" min={0} step={100000} value={formData.budgetMax ?? ''} onChange={(e) => setFormData({ ...formData, budgetMax: e.target.value })} className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none" />
+                </div>
               </div>
             </div>
 
@@ -429,16 +484,12 @@ export default function LeadDetailsPage() {
                     onChange={(e) => setFormData({ ...formData, leadSource: e.target.value })}
                     className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                   >
-                    <option value="website">Website</option>
-                    <option value="linkedin">LinkedIn</option>
-                    <option value="facebook">Facebook</option>
-                    <option value="instagram">Instagram</option>
-                    <option value="referral">Referral</option>
-                    <option value="event">Event</option>
-                    <option value="social-media">Social Media</option>
-                    <option value="cold-call">Cold Call</option>
-                    <option value="email">Email</option>
-                    <option value="other">Other</option>
+                    {formData.leadSource && !LEAD_SOURCE_OPTIONS.some((o) => o.value === formData.leadSource) && (
+                      <option value={formData.leadSource}>{leadSourceLabel(formData.leadSource)}</option>
+                    )}
+                    {LEAD_SOURCE_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
                   </select>
                 </div>
                 <div>
@@ -796,6 +847,12 @@ export default function LeadDetailsPage() {
         <Card title="Calls">
           <CallHistory leadId={leadId} />
         </Card>
+      )}
+
+      {activeTab === 'visits' && (
+        <SiteVisitsCard
+          lead={{ id: Number(leadId), name: leadName, projectName: lead.projectName, preferredLocation: lead.preferredLocation }}
+        />
       )}
     </div>
   );
