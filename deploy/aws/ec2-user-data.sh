@@ -32,7 +32,7 @@ fi
 
 mkdir -p /var/www/certbot
 if [ ! -d /var/www/crm/.git ]; then
-  git clone https://github.com/vaibhavpetkar/CRM.git /var/www/crm
+  git clone -b real-estate https://github.com/vaibhavpetkar/CRM.git /var/www/crm
   cp /var/www/crm/.env.example /var/www/crm/.env
   chmod 600 /var/www/crm/.env
   chown -R ubuntu:ubuntu /var/www/crm
