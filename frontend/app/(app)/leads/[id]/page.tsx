@@ -308,7 +308,7 @@ export default function LeadDetailsPage() {
         <button
           onClick={() => setActiveTab('lead-form')}
           className={`px-4 py-2 text-sm font-medium border-b-2 ${
-            activeTab === 'lead-form' ? 'border-[#168eea] text-[#168eea]' : 'border-transparent text-slate-500 hover:text-slate-700'
+            activeTab === 'lead-form' ? 'border-[var(--primary)] text-[var(--primary)]' : 'border-transparent text-slate-500 hover:text-slate-700'
           }`}
         >
           Lead Form
@@ -316,7 +316,7 @@ export default function LeadDetailsPage() {
         <button
           onClick={() => setActiveTab('rfq')}
           className={`px-4 py-2 text-sm font-medium border-b-2 ${
-            activeTab === 'rfq' ? 'border-[#168eea] text-[#168eea]' : 'border-transparent text-slate-500 hover:text-slate-700'
+            activeTab === 'rfq' ? 'border-[var(--primary)] text-[var(--primary)]' : 'border-transparent text-slate-500 hover:text-slate-700'
           }`}
         >
           RFQ Details
@@ -324,7 +324,7 @@ export default function LeadDetailsPage() {
         <button
           onClick={() => setActiveTab('activity')}
           className={`px-4 py-2 text-sm font-medium border-b-2 ${
-            activeTab === 'activity' ? 'border-[#168eea] text-[#168eea]' : 'border-transparent text-slate-500 hover:text-slate-700'
+            activeTab === 'activity' ? 'border-[var(--primary)] text-[var(--primary)]' : 'border-transparent text-slate-500 hover:text-slate-700'
           }`}
         >
           Activity
@@ -332,7 +332,7 @@ export default function LeadDetailsPage() {
         <button
           onClick={() => setActiveTab('calls')}
           className={`px-4 py-2 text-sm font-medium border-b-2 ${
-            activeTab === 'calls' ? 'border-[#168eea] text-[#168eea]' : 'border-transparent text-slate-500 hover:text-slate-700'
+            activeTab === 'calls' ? 'border-[var(--primary)] text-[var(--primary)]' : 'border-transparent text-slate-500 hover:text-slate-700'
           }`}
         >
           Calls
@@ -350,7 +350,7 @@ export default function LeadDetailsPage() {
                   type="date"
                   value={formData.date ? String(formData.date).slice(0, 10) : ''}
                   onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                  className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                  className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                 />
               </div>
               <div>
@@ -359,7 +359,7 @@ export default function LeadDetailsPage() {
                   type="text"
                   readOnly
                   value={formData.leadNumber || ''}
-                  className="mt-1 w-full rounded-md border border-slate-200 bg-slate-50 p-2 text-sm text-slate-500"
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 p-2 text-sm text-slate-500"
                 />
               </div>
               <div>
@@ -367,7 +367,7 @@ export default function LeadDetailsPage() {
                 <select
                   value={formData.status || ''}
                   onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                  className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                  className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                 >
                   <option value="new">New</option>
                   <option value="contacted">Contacted</option>
@@ -388,7 +388,7 @@ export default function LeadDetailsPage() {
                   <label className="flex items-center justify-between text-sm font-medium text-slate-700">
                     Company Name
                     {formData.company && (
-                      <Link href={companyHref(formData.company)} className="text-xs font-medium text-[#168eea] hover:underline">
+                      <Link href={companyHref(formData.company)} className="text-xs font-medium text-[var(--primary)] hover:underline">
                         View company →
                       </Link>
                     )}
@@ -406,7 +406,7 @@ export default function LeadDetailsPage() {
                     type="text"
                     value={formData.website || ''}
                     onChange={(e) => setFormData({ ...formData, website: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                   />
                 </div>
                 <div>
@@ -414,7 +414,7 @@ export default function LeadDetailsPage() {
                   <select
                     value={formData.annualRevenue || ''}
                     onChange={(e) => setFormData({ ...formData, annualRevenue: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                   >
                     <option value="">— Select —</option>
                     {ANNUAL_TURNOVER_OPTIONS.map((opt) => (
@@ -427,7 +427,7 @@ export default function LeadDetailsPage() {
                   <select
                     value={formData.leadSource || ''}
                     onChange={(e) => setFormData({ ...formData, leadSource: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                   >
                     <option value="website">Website</option>
                     <option value="linkedin">LinkedIn</option>
@@ -446,7 +446,7 @@ export default function LeadDetailsPage() {
                   <select
                     value={formData.industry || ''}
                     onChange={(e) => setFormData({ ...formData, industry: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                   >
                     <option value="">— Select —</option>
                     {INDUSTRY_OPTIONS.map((opt) => (
@@ -460,7 +460,7 @@ export default function LeadDetailsPage() {
                     type="date"
                     value={formData.nextFollowUp ? String(formData.nextFollowUp).slice(0, 10) : ''}
                     onChange={(e) => setFormData({ ...formData, nextFollowUp: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                   />
                   <p className="mt-1 text-[11px] text-slate-400">Saving a new date auto-creates a follow-up task for the lead owner.</p>
                 </div>
@@ -486,7 +486,7 @@ export default function LeadDetailsPage() {
                   <select
                     value={formData.prefix || ''}
                     onChange={(e) => setFormData({ ...formData, prefix: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                   >
                     <option value="">—</option>
                     <option value="Mr.">Mr.</option>
@@ -503,7 +503,7 @@ export default function LeadDetailsPage() {
                     type="text"
                     value={formData.firstName || ''}
                     onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                   />
                 </div>
                 <div>
@@ -512,7 +512,7 @@ export default function LeadDetailsPage() {
                     type="text"
                     value={formData.lastName || ''}
                     onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                   />
                 </div>
                 <div>
@@ -521,7 +521,7 @@ export default function LeadDetailsPage() {
                     type="email"
                     value={formData.email || ''}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                   />
                 </div>
                 <div>
@@ -529,7 +529,7 @@ export default function LeadDetailsPage() {
                   <select
                     value={formData.jobTitle || ''}
                     onChange={(e) => setFormData({ ...formData, jobTitle: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                   >
                     <option value="">— Select —</option>
                     {DESIGNATION_OPTIONS.map((opt) => (
@@ -544,7 +544,7 @@ export default function LeadDetailsPage() {
                       type="tel"
                       value={formData.phone || ''}
                       onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                      className="w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                      className="w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                     />
                     <CallButton number={lead?.phone || ''} leadId={lead?.id} name={leadName} />
                   </div>
@@ -559,7 +559,7 @@ export default function LeadDetailsPage() {
                           value={formData.mobile || ''}
                           onChange={(e) => setFormData({ ...formData, mobile: e.target.value.replace(/\D/g, '') })}
                           placeholder="10-digit number"
-                          className="w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                          className="w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                         />
                         <CallButton number={lead?.mobile || ''} leadId={lead?.id} name={leadName} />
                       </div>
@@ -573,7 +573,7 @@ export default function LeadDetailsPage() {
                           value={formData.alternateMobile || ''}
                           onChange={(e) => setFormData({ ...formData, alternateMobile: e.target.value.replace(/\D/g, '') })}
                           placeholder="10-digit number"
-                          className="w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                          className="w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                         />
                         <CallButton number={lead?.alternateMobile || ''} leadId={lead?.id} name={leadName} />
                       </div>
@@ -595,7 +595,7 @@ export default function LeadDetailsPage() {
                     value={formData.street || ''}
                     onChange={(e) => setFormData({ ...formData, street: e.target.value })}
                     rows={2}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                   />
                 </div>
                 <div>
@@ -604,7 +604,7 @@ export default function LeadDetailsPage() {
                     type="text"
                     value={formData.city || ''}
                     onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                   />
                 </div>
                 <div>
@@ -613,7 +613,7 @@ export default function LeadDetailsPage() {
                     type="text"
                     value={formData.state || ''}
                     onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                   />
                 </div>
                 <div>
@@ -622,7 +622,7 @@ export default function LeadDetailsPage() {
                     type="text"
                     value={formData.zipCode || ''}
                     onChange={(e) => setFormData({ ...formData, zipCode: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                   />
                 </div>
                 <div>
@@ -631,7 +631,7 @@ export default function LeadDetailsPage() {
                     type="text"
                     value={formData.country || ''}
                     onChange={(e) => setFormData({ ...formData, country: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                   />
                 </div>
               </div>
@@ -657,7 +657,7 @@ export default function LeadDetailsPage() {
                   value={formData.interestedInServices || ''}
                   onChange={(e) => setFormData({ ...formData, interestedInServices: e.target.value })}
                   placeholder="e.g. Implementation, Support, Consulting"
-                  className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                  className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                 />
               </div>
               <div>
@@ -667,7 +667,7 @@ export default function LeadDetailsPage() {
                   value={formData.interestedInProducts || ''}
                   onChange={(e) => setFormData({ ...formData, interestedInProducts: e.target.value })}
                   placeholder="e.g. Product names or SKUs"
-                  className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                  className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                 />
               </div>
               <div>
@@ -675,7 +675,7 @@ export default function LeadDetailsPage() {
                 <select
                   value={formData.timelineToPurchase || ''}
                   onChange={(e) => setFormData({ ...formData, timelineToPurchase: e.target.value })}
-                  className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                  className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                 >
                   <option value="">—</option>
                   <option value="immediate">Immediate</option>
@@ -700,7 +700,7 @@ export default function LeadDetailsPage() {
                 <select
                   value={formData.meetingStatus || ''}
                   onChange={(e) => setFormData({ ...formData, meetingStatus: e.target.value })}
-                  className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                  className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                 >
                   <option value="">—</option>
                   <option value="unassigned">Default / Unassigned</option>
@@ -718,7 +718,7 @@ export default function LeadDetailsPage() {
                   value={formData.notes || ''}
                   onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                   rows={4}
-                  className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                  className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                 />
               </div>
             </div>
@@ -748,7 +748,7 @@ export default function LeadDetailsPage() {
             <div className="space-y-4">
               {[...timeline].reverse().map((entry) => (
                 <div key={entry.id} className="flex gap-3 border-b border-slate-100 pb-4 last:border-0">
-                  <div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-[#168eea]" />
+                  <div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-[var(--primary)]" />
                   <div className="flex-1">
                     <div className="flex items-center justify-between">
                       <p className="text-sm font-medium capitalize text-slate-900">{entry.action.replace(/_/g, ' ')}</p>
@@ -756,7 +756,7 @@ export default function LeadDetailsPage() {
                     </div>
                     <p className="mt-0.5 text-sm text-slate-600">{entry.details}</p>
                     {entry.changes && Object.keys(entry.changes).length > 0 && (
-                      <div className="mt-2 rounded-md bg-slate-50 p-2 text-xs">
+                      <div className="mt-2 rounded-lg bg-slate-50 p-2 text-xs">
                         {Object.entries(entry.changes as Record<string, { before: any; after: any }>).map(([field, diff]) => (
                           <div key={field} className="flex gap-2">
                             <span className="font-medium text-slate-500">{field}:</span>
@@ -776,7 +776,7 @@ export default function LeadDetailsPage() {
                           <button
                             onClick={() => handleRevert(entry.id)}
                             disabled={revertingId === entry.id}
-                            className="text-xs font-medium text-[#168eea] hover:underline disabled:opacity-50"
+                            className="text-xs font-medium text-[var(--primary)] hover:underline disabled:opacity-50"
                           >
                             {revertingId === entry.id ? 'Reverting...' : 'Revert this change'}
                           </button>

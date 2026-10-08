@@ -47,7 +47,7 @@ export default function MarketingAnalyticsPage() {
             <select
               value={dateRange}
               onChange={(e) => setDateRange(e.target.value)}
-              className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea]"
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
             >
               <option value="this-week">This Week</option>
               <option value="this-month">This Month</option>
@@ -59,7 +59,7 @@ export default function MarketingAnalyticsPage() {
         }
       />
 
-      {error && <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
+      {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
 
       {loading ? (
         <div className="flex h-48 items-center justify-center"><LoadingSpinner size="md" /></div>
@@ -89,7 +89,7 @@ export default function MarketingAnalyticsPage() {
                             <span className="text-slate-500">{openRate}% open rate</span>
                           </div>
                           <div className="h-2 rounded-full bg-slate-100">
-                            <div className="h-2 rounded-full bg-[#168eea]" style={{ width: `${openRate}%` }} />
+                            <div className="h-2 rounded-full bg-[var(--primary)]" style={{ width: `${openRate}%` }} />
                           </div>
                         </div>
                       );
@@ -110,7 +110,7 @@ export default function MarketingAnalyticsPage() {
                         <span className="text-slate-500">{channelCampaigns.length} campaign{channelCampaigns.length === 1 ? '' : 's'} &middot; {percentage}%</span>
                       </div>
                       <div className="h-2 rounded-full bg-slate-100">
-                        <div className={`h-2 rounded-full ${channel === 'email' ? 'bg-[#168eea]' : 'bg-emerald-500'}`} style={{ width: `${percentage}%` }} />
+                        <div className={`h-2 rounded-full ${channel === 'email' ? 'bg-[var(--primary)]' : 'bg-emerald-500'}`} style={{ width: `${percentage}%` }} />
                       </div>
                     </div>
                   );

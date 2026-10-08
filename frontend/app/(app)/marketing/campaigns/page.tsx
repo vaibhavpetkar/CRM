@@ -121,7 +121,7 @@ export default function CampaignsPage() {
           <button
             key={status}
             onClick={() => setFilter(status)}
-            className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+            className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
               filter === status ? 'bg-[var(--primary)] text-white border border-transparent' : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
             }`}
           >
@@ -130,7 +130,7 @@ export default function CampaignsPage() {
         ))}
       </div>
 
-      {error && <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
+      {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
 
       <Card>
         <DataTable

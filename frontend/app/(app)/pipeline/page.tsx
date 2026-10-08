@@ -83,7 +83,7 @@ export default function PipelinePage() {
     <>
       <PageHeader title="Pipeline" description="Visual kanban view of your sales pipeline" />
 
-      {error && <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
+      {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
 
       {loading ? (
         <div className="flex h-48 items-center justify-center"><LoadingSpinner size="md" /></div>
@@ -120,7 +120,7 @@ export default function PipelinePage() {
                 </div>
                 <div
                   className={`space-y-3 rounded-lg p-1 transition-colors ${
-                    dragOverStage === stage ? 'bg-blue-50 ring-2 ring-[#168eea]/30' : ''
+                    dragOverStage === stage ? 'bg-blue-50 ring-2 ring-[var(--primary)]/30' : ''
                   }`}
                 >
                   {(dealsByStage[stage] || []).map((deal) => (
@@ -139,7 +139,7 @@ export default function PipelinePage() {
                       <p className="text-sm font-medium text-slate-900">{deal.title}</p>
                       <p className="mt-1 text-xs text-slate-500">{deal.client}</p>
                       <div className="mt-3 flex items-center justify-between">
-                        <span className="text-sm font-semibold text-[#168eea]">{formatCurrency(deal.value)}</span>
+                        <span className="text-sm font-semibold text-[var(--primary)]">{formatCurrency(deal.value)}</span>
                         <span className="text-xs text-slate-400">{deal.probability}%</span>
                       </div>
                       <p className="mt-2 text-xs text-slate-400">{deal.assignedTo || 'Unassigned'}</p>

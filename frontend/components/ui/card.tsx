@@ -18,11 +18,11 @@ export default function Card({ children, className, title, action, onClick, drag
       draggable={draggable}
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
-      className={cn('rounded-xl border border-slate-200/60 bg-white shadow-[0_2px_8px_rgb(0,0,0,0.04)]', className)}
+      className={cn('rounded-2xl border border-slate-200/80 bg-white shadow-xs', className)}
     >
       {(title || action) && (
-        <div className="flex items-center justify-between border-b border-slate-100/80 px-6 py-4">
-          {title && <h2 className="text-[15px] font-semibold text-slate-900 tracking-tight">{title}</h2>}
+        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+          {title && <h2 className="text-base font-bold tracking-tight text-slate-900">{title}</h2>}
           {action}
         </div>
       )}

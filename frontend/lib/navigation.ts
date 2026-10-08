@@ -25,6 +25,7 @@ import {
   TagIcon,
   ReceiptRefundIcon,
   PuzzlePieceIcon,
+  BriefcaseIcon,
 } from '@heroicons/react/24/outline';
 
 export type NavItem = {
@@ -53,6 +54,7 @@ export const navigation: NavSection[] = [
     title: 'Sales',
     items: [
       { name: 'Leads', href: '/leads', icon: ClipboardDocumentListIcon, permission: 'leads:read' },
+      { name: 'Deals', href: '/deals', icon: BriefcaseIcon, permission: 'deals:read' },
       { name: 'Quotes', href: '/quotes', icon: DocumentTextIcon, permission: 'quotes:view' },
       { name: 'Tasks', href: '/tasks', icon: CheckCircleIcon, permission: 'tasks:view' },
       { name: 'Meetings', href: '/meetings', icon: CalendarDaysIcon, permission: 'meetings:view' },

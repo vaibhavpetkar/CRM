@@ -130,8 +130,10 @@ git clone https://github.com/vaibhavpetkar/CRM.git
 cd CRM
 ```
 
-### 2. (Optional) Configure Environment
-Create a `.env` file in the root directory to override defaults:
+### 2. Configure Environment
+Copy `.env.example` to `.env` in the root directory. `DB_PASSWORD`,
+`JWT_SECRET` and `SUPER_ADMIN_PASSWORD` are required; Compose refuses to
+start without them. For example:
 ```env
 # Database
 DB_NAME=crm_db
@@ -178,6 +180,9 @@ docker compose up --build
 ---
 
 ## 🌐 Production Deployment (VPS)
+
+> For a fresh cloud server (AWS, GCP, Azure, DigitalOcean, any Linux VM) with
+> HTTPS handled by an nginx container, follow [docs/deployment.md](./docs/deployment.md).
 
 ### Prerequisites on VPS
 - Ubuntu 20.04+ or similar Linux

@@ -246,9 +246,9 @@ export default function TasksPage() {
           <button
             key={status}
             onClick={() => setFilter(status)}
-            className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+            className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
               filter === status
-                ? 'bg-[#168eea] text-white'
+                ? 'bg-[var(--primary)] text-white'
                 : 'bg-white text-slate-600 hover:bg-slate-50 border-2 border-slate-200'
             }`}
           >
@@ -257,7 +257,7 @@ export default function TasksPage() {
         ))}
       </div>
 
-      {error && <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
+      {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
 
       {loading ? (
         <div className="flex h-48 items-center justify-center"><LoadingSpinner size="md" /></div>
@@ -281,7 +281,7 @@ export default function TasksPage() {
                         <a
                           href={`/leads/${task.leadId}`}
                           onClick={(e) => e.stopPropagation()}
-                          className="text-[#168eea] hover:underline"
+                          className="text-[var(--primary)] hover:underline"
                           title="Linked Lead — opens Lead record"
                         >
                           🔗 {task.lead.company || `${task.lead.firstName || ''} ${task.lead.lastName || ''}`.trim()}
@@ -314,7 +314,7 @@ export default function TasksPage() {
                     {openMenuId === task.id && (
                       <div
                         onClick={(e) => e.stopPropagation()}
-                        className="absolute right-0 top-7 z-10 w-44 rounded-md border border-slate-200 bg-white py-1 text-sm shadow-lg"
+                        className="absolute right-0 top-7 z-10 w-44 rounded-lg border border-slate-200 bg-white py-1 text-sm shadow-lg"
                       >
                         <button onClick={() => applyAction(task, 'done')} className="block w-full px-3 py-1.5 text-left hover:bg-slate-50">Done</button>
                         <button onClick={() => applyAction(task, 'in-progress')} className="block w-full px-3 py-1.5 text-left hover:bg-slate-50">In Progress</button>
@@ -351,13 +351,13 @@ export default function TasksPage() {
                   required
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                  className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                 />
               </div>
 
               <div>
                 <label className="block text-xs font-medium text-slate-700">
-                  Client {formData.leadId && <span className="font-normal text-[#168eea]">(linked to Lead — details auto-filled)</span>}
+                  Client {formData.leadId && <span className="font-normal text-[var(--primary)]">(linked to Lead — details auto-filled)</span>}
                 </label>
                 <CompanyAutocomplete
                   value={formData.relatedTo}
@@ -378,7 +378,7 @@ export default function TasksPage() {
                   <select
                     value={formData.type}
                     onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                   >
                     {TASK_TYPES.map((t) => (
                       <option key={t.value} value={t.value}>{t.label}</option>
@@ -390,7 +390,7 @@ export default function TasksPage() {
                   <select
                     value={formData.priority}
                     onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                   >
                     <option value="low">Low</option>
                     <option value="medium">Medium</option>
@@ -406,7 +406,7 @@ export default function TasksPage() {
                     type="date"
                     value={formData.dueDate}
                     onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                   />
                 </div>
                 <div>
@@ -415,7 +415,7 @@ export default function TasksPage() {
                     type="time"
                     value={formData.dueTime}
                     onChange={(e) => setFormData({ ...formData, dueTime: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                   />
                 </div>
               </div>
@@ -443,7 +443,7 @@ export default function TasksPage() {
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   rows={3}
-                  className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                  className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                 />
               </div>
 

@@ -208,7 +208,7 @@ export default function DealsPage() {
         <div>
           <span className="text-slate-600">{deal.client}</span>
           {deal.leadId && (
-            <Link href={`/leads/${deal.leadId}`} onClick={(e) => e.stopPropagation()} className="block text-[11px] font-medium text-[#168eea] hover:underline">
+            <Link href={`/leads/${deal.leadId}`} onClick={(e) => e.stopPropagation()} className="block text-[11px] font-medium text-[var(--primary)] hover:underline">
               {deal.leadNumber || 'View lead'} →
             </Link>
           )}
@@ -272,12 +272,12 @@ export default function DealsPage() {
         <StatCard label="Avg. Deal Size" value={formatCurrency(deals.length ? Math.round(totalPipeline / deals.length) : 0)} />
       </div>
 
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+      <div className="mb-4 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs flex flex-col gap-3 sm:flex-row sm:items-center">
         <SearchInput value={search} onChange={setSearch} placeholder="Search deals..." className="sm:max-w-xs" />
         <select
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea]"
+          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
         >
           <option value="all">All Stages</option>
           <option value="prospecting">Prospecting</option>
@@ -290,7 +290,7 @@ export default function DealsPage() {
         <span className="text-sm text-slate-500">{deals.length} deal{deals.length === 1 ? '' : 's'}</span>
       </div>
 
-      {error && <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
+      {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
 
       <Card>
         <DataTable
@@ -311,7 +311,7 @@ export default function DealsPage() {
           emptyMessage='No deals found. Click "Add Deal" to create one.'
           actions={(deal) => (
             <div className="flex justify-end gap-3">
-              <button onClick={() => openEdit(deal)} className="text-slate-400 hover:text-[#168eea]" aria-label="Edit">
+              <button onClick={() => openEdit(deal)} className="text-slate-400 hover:text-[var(--primary)]" aria-label="Edit">
                 <PencilSquareIcon className="h-4 w-4" />
               </button>
               <button onClick={() => handleDelete(deal)} className="text-slate-400 hover:text-red-600" aria-label="Delete">
@@ -341,7 +341,7 @@ export default function DealsPage() {
                   placeholder="e.g. Enterprise License - TechCorp"
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                  className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                 />
               </div>
 
@@ -359,7 +359,7 @@ export default function DealsPage() {
                   className="mt-1"
                 />
                 {formData.leadId ? (
-                  <Link href={`/leads/${formData.leadId}`} className="mt-1 inline-block text-[11px] font-medium text-[#168eea] hover:underline">
+                  <Link href={`/leads/${formData.leadId}`} className="mt-1 inline-block text-[11px] font-medium text-[var(--primary)] hover:underline">
                     Linked to lead {leadOptions.find((l) => l.id === formData.leadId)?.leadNumber || `#${formData.leadId}`} →
                   </Link>
                 ) : (
@@ -375,7 +375,7 @@ export default function DealsPage() {
                     required
                     value={formData.value}
                     onChange={(e) => setFormData({ ...formData, value: Number(e.target.value) })}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                   />
                 </div>
                 <div>
@@ -386,7 +386,7 @@ export default function DealsPage() {
                     max={100}
                     value={formData.probability}
                     onChange={(e) => setFormData({ ...formData, probability: Number(e.target.value) })}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                   />
                 </div>
               </div>
@@ -397,7 +397,7 @@ export default function DealsPage() {
                   <select
                     value={formData.stage}
                     onChange={(e) => setFormData({ ...formData, stage: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                   >
                     <option value="prospecting">Prospecting</option>
                     <option value="qualification">Qualification</option>
@@ -414,7 +414,7 @@ export default function DealsPage() {
                     type="date"
                     value={formData.expectedClose}
                     onChange={(e) => setFormData({ ...formData, expectedClose: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                   />
                 </div>
               </div>

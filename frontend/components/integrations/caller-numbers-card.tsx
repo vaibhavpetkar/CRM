@@ -95,10 +95,10 @@ export default function CallerNumbersCard() {
         from the number they saw before. Add each number in your calling provider first (an ExoPhone in Exotel).
       </p>
 
-      {error && <p className="mt-3 rounded-md bg-red-50 p-2 text-xs text-red-600">{error}</p>}
+      {error && <p className="mt-3 rounded-lg bg-red-50 p-2 text-xs text-red-600">{error}</p>}
 
       {rows && rows.length === 0 && (
-        <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-2.5 text-[11px] text-amber-700">
+        <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-[11px] text-amber-700">
           No numbers added yet, so every call uses the single number set on the server (EXOTEL_CALLER_ID).
         </p>
       )}
@@ -129,7 +129,7 @@ export default function CallerNumbersCard() {
                       onChange={(e) =>
                         run(`user-${r.id}`, () => callsApi.updateNumber(r.id, { userId: e.target.value ? Number(e.target.value) : null }))
                       }
-                      className="w-full max-w-[12rem] rounded-md border border-slate-200 p-1 text-xs"
+                      className="w-full max-w-[12rem] rounded-lg border border-slate-200 p-1 text-xs"
                     >
                       <option value="">Shared pool</option>
                       {users.map((u) => (
@@ -185,15 +185,15 @@ export default function CallerNumbersCard() {
           value={number}
           onChange={(e) => setNumber(e.target.value)}
           placeholder="Number, e.g. 080 4711 2345"
-          className="min-w-[10rem] flex-1 rounded-md border border-slate-200 p-2 text-xs focus:border-[#168eea] focus:outline-none"
+          className="min-w-[10rem] flex-1 rounded-lg border border-slate-200 p-2 text-xs focus:border-[var(--primary)] focus:outline-none"
         />
         <input
           value={label}
           onChange={(e) => setLabel(e.target.value)}
           placeholder="Label (optional)"
-          className="min-w-[8rem] flex-1 rounded-md border border-slate-200 p-2 text-xs focus:border-[#168eea] focus:outline-none"
+          className="min-w-[8rem] flex-1 rounded-lg border border-slate-200 p-2 text-xs focus:border-[var(--primary)] focus:outline-none"
         />
-        <select value={userId} onChange={(e) => setUserId(e.target.value)} className="rounded-md border border-slate-200 p-2 text-xs">
+        <select value={userId} onChange={(e) => setUserId(e.target.value)} className="rounded-lg border border-slate-200 p-2 text-xs">
           <option value="">Shared pool</option>
           {users.map((u) => (
             <option key={u.id} value={u.id}>

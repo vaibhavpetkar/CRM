@@ -35,7 +35,7 @@ export default function CallHistory({ leadId, contactId, compact = false }: { le
   return (
     <div className={compact ? 'space-y-2' : 'space-y-3'}>
       {calls.map((c) => (
-        <div key={c.id} className="rounded-md border border-slate-100 p-3 text-sm">
+        <div key={c.id} className="rounded-lg border border-slate-100 p-3 text-sm">
           <div className="flex flex-wrap items-center gap-2">
             <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${CALL_STATUS_CLASS[c.status]}`}>{CALL_STATUS_LABEL[c.status]}</span>
             <span className="text-xs text-slate-600">{c.customerNumber}</span>

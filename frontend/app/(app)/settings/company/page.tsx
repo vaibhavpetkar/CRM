@@ -106,7 +106,7 @@ export default function CompanySettingsPage() {
     <>
       <PageHeader title="Company Settings" description="Manage your organization details" />
 
-      {error && <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
+      {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
 
       <Card title="Company Information">
         {loading ? (
@@ -115,7 +115,7 @@ export default function CompanySettingsPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             {message && (
               <div
-                className={`rounded-md border p-3 text-sm ${
+                className={`rounded-lg border p-3 text-sm ${
                   message.type === 'success'
                     ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
                     : 'border-red-200 bg-red-50 text-red-600'
@@ -132,7 +132,7 @@ export default function CompanySettingsPage() {
                   required
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea]"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
                 />
               </div>
               <div>
@@ -141,7 +141,7 @@ export default function CompanySettingsPage() {
                   required
                   value={formData.code}
                   onChange={(e) => setFormData({ ...formData, code: e.target.value.toLowerCase() })}
-                  className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea]"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
                 />
                 <p className="mt-1 text-xs text-slate-500">Your team types this on the login screen (web and mobile app). If you change it, tell them the new code.</p>
               </div>
@@ -150,7 +150,7 @@ export default function CompanySettingsPage() {
                 <input
                   value={formData.industry}
                   onChange={(e) => setFormData({ ...formData, industry: e.target.value })}
-                  className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea]"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
                 />
               </div>
               <div>
@@ -159,7 +159,7 @@ export default function CompanySettingsPage() {
                   type="email"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea]"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
                 />
               </div>
               <div>
@@ -167,7 +167,7 @@ export default function CompanySettingsPage() {
                 <input
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea]"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
                 />
               </div>
               <div className="sm:col-span-2">
@@ -175,7 +175,7 @@ export default function CompanySettingsPage() {
                 <input
                   value={formData.address}
                   onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea]"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
                 />
               </div>
               <div>
@@ -183,7 +183,7 @@ export default function CompanySettingsPage() {
                 <input
                   value={formData.website}
                   onChange={(e) => setFormData({ ...formData, website: e.target.value })}
-                  className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea]"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
                 />
               </div>
               <div>
@@ -191,7 +191,7 @@ export default function CompanySettingsPage() {
                 <select
                   value={formData.employeeCount}
                   onChange={(e) => setFormData({ ...formData, employeeCount: e.target.value })}
-                  className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea]"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
                 >
                   <option>1-10</option>
                   <option>11-50</option>
@@ -205,7 +205,7 @@ export default function CompanySettingsPage() {
                 <select
                   value={formData.currency}
                   onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
-                  className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea]"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
                 >
                   {CURRENCIES.map((c) => (
                     <option key={c.code} value={c.code}>{c.label}</option>
@@ -235,7 +235,7 @@ export default function CompanySettingsPage() {
                     value={formData.whatsapp}
                     onChange={(e) => setFormData({ ...formData, whatsapp: e.target.value })}
                     placeholder="e.g. 919876543210 (with country code, no +)"
-                    className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea]"
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
                   />
                 </div>
                 <div>
@@ -244,7 +244,7 @@ export default function CompanySettingsPage() {
                     value={formData.instagram}
                     onChange={(e) => setFormData({ ...formData, instagram: e.target.value })}
                     placeholder="https://instagram.com/yourhandle"
-                    className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea]"
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
                   />
                 </div>
                 <div>
@@ -253,7 +253,7 @@ export default function CompanySettingsPage() {
                     value={formData.facebook}
                     onChange={(e) => setFormData({ ...formData, facebook: e.target.value })}
                     placeholder="https://facebook.com/yourpage"
-                    className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea]"
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
                   />
                 </div>
                 <div>
@@ -262,7 +262,7 @@ export default function CompanySettingsPage() {
                     value={formData.linkedin}
                     onChange={(e) => setFormData({ ...formData, linkedin: e.target.value })}
                     placeholder="https://linkedin.com/company/yourcompany"
-                    className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea]"
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
                   />
                 </div>
                 <div>
@@ -271,7 +271,7 @@ export default function CompanySettingsPage() {
                     value={formData.youtube}
                     onChange={(e) => setFormData({ ...formData, youtube: e.target.value })}
                     placeholder="https://youtube.com/@yourchannel"
-                    className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea]"
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
                   />
                 </div>
                 <div>
@@ -280,7 +280,7 @@ export default function CompanySettingsPage() {
                     value={formData.twitter}
                     onChange={(e) => setFormData({ ...formData, twitter: e.target.value })}
                     placeholder="https://x.com/yourhandle"
-                    className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea]"
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
                   />
                 </div>
               </div>
@@ -306,7 +306,7 @@ export default function CompanySettingsPage() {
                 value={formData.quoteMessageTemplate}
                 onChange={(e) => setFormData({ ...formData, quoteMessageTemplate: e.target.value })}
                 placeholder={DEFAULT_TEMPLATE_PLACEHOLDER}
-                className="w-full rounded-md border border-slate-200 px-3 py-2 font-mono text-sm focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea]"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 font-mono text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
               />
               <div className="flex justify-end pt-2">
                 <Button type="submit" disabled={saving}>{saving ? 'Saving...' : 'Save Message Template'}</Button>

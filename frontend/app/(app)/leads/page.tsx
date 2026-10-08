@@ -402,7 +402,7 @@ export default function LeadsPage() {
       accessor: (lead) => (
         <Link
           href={`/leads/${lead.id}`}
-          className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-mono text-slate-600 hover:text-[#168eea] hover:underline"
+          className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-mono text-slate-600 hover:text-[var(--primary)] hover:underline"
         >
           {lead.leadNumber || `#${lead.id}`}
         </Link>
@@ -419,7 +419,7 @@ export default function LeadsPage() {
       accessor: (lead) => {
         const leadName = lead.name || `${lead.firstName || ''} ${lead.lastName || ''}`.trim() || 'Unnamed';
         return (
-          <Link href={`/leads/${lead.id}`} className="text-slate-600 hover:text-[#168eea] hover:underline">
+          <Link href={`/leads/${lead.id}`} className="text-slate-600 hover:text-[var(--primary)] hover:underline">
             {leadName}
           </Link>
         );
@@ -508,13 +508,13 @@ export default function LeadsPage() {
         }
       />
 
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+      <div className="mb-4 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs flex flex-col gap-3 sm:flex-row sm:items-center">
         <SearchInput value={search} onChange={setSearch} placeholder="Search by Series ID or Company Name..." className="sm:max-w-xs" />
         <div className="flex items-center gap-2">
           <select
             value={territoryFilter}
             onChange={(e) => setTerritoryFilter(e.target.value)}
-            className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea]"
+            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
           >
             <option value="all">All Territories</option>
             {TERRITORY_OPTIONS.map((opt) => (
@@ -527,7 +527,7 @@ export default function LeadsPage() {
           <select
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea]"
+            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
           >
             <option value="all">All Statuses</option>
             <option value="new">New</option>
@@ -540,11 +540,11 @@ export default function LeadsPage() {
           </select>
         </div>
         <span className="text-sm text-slate-500">{leads.length} lead{leads.length === 1 ? '' : 's'}</span>
-        <div className="ml-auto flex items-center gap-1 rounded-md border border-slate-200 bg-white p-1">
+        <div className="ml-auto flex items-center gap-1 rounded-lg border border-slate-200 bg-white p-1">
           <button
             onClick={() => setView('list')}
             className={`flex items-center gap-1 rounded px-2 py-1 text-xs font-medium ${
-              view === 'list' ? 'bg-[#168eea] text-white' : 'text-slate-500 hover:text-slate-700'
+              view === 'list' ? 'bg-[var(--primary)] text-white' : 'text-slate-500 hover:text-slate-700'
             }`}
           >
             <ListBulletIcon className="h-4 w-4" /> List
@@ -552,7 +552,7 @@ export default function LeadsPage() {
           <button
             onClick={() => setView('kanban')}
             className={`flex items-center gap-1 rounded px-2 py-1 text-xs font-medium ${
-              view === 'kanban' ? 'bg-[#168eea] text-white' : 'text-slate-500 hover:text-slate-700'
+              view === 'kanban' ? 'bg-[var(--primary)] text-white' : 'text-slate-500 hover:text-slate-700'
             }`}
           >
             <Squares2X2Icon className="h-4 w-4" /> Kanban
@@ -560,7 +560,7 @@ export default function LeadsPage() {
         </div>
       </div>
 
-      {error && <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
+      {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
 
       {view === 'kanban' ? (
         <LeadsKanban
@@ -604,10 +604,10 @@ export default function LeadsPage() {
           onRowClick={(lead) => router.push(`/leads/${lead.id}`)}
           actions={(lead) => (
             <div className="flex justify-end gap-3">
-              <button onClick={() => router.push(`/leads/${lead.id}`)} className="text-slate-400 hover:text-[#168eea]" aria-label="View Details">
+              <button onClick={() => router.push(`/leads/${lead.id}`)} className="text-slate-400 hover:text-[var(--primary)]" aria-label="View Details">
                 <EyeIcon className="h-4 w-4" />
               </button>
-              <button onClick={() => openEdit(lead)} className="text-slate-400 hover:text-[#168eea]" aria-label="Edit">
+              <button onClick={() => openEdit(lead)} className="text-slate-400 hover:text-[var(--primary)]" aria-label="Edit">
                 <PencilSquareIcon className="h-4 w-4" />
               </button>
               <button onClick={() => handleDelete(lead)} className="text-slate-400 hover:text-red-600" aria-label="Delete">
@@ -639,7 +639,7 @@ export default function LeadsPage() {
                     <input
                       type="text"
                       {...register('firstName')}
-                      className={`mt-1 w-full rounded-md border-0 bg-slate-100/50 p-2 text-sm focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)] ${errors.firstName ? 'ring-1 ring-red-500 bg-red-50' : ''}`}
+                      className={`mt-1 w-full rounded-lg border-0 bg-slate-100/50 p-2 text-sm focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)] ${errors.firstName ? 'ring-1 ring-red-500 bg-red-50' : ''}`}
                     />
                     {errors.firstName && <p className="mt-1 text-[10px] text-red-500">{errors.firstName.message}</p>}
                   </div>
@@ -648,7 +648,7 @@ export default function LeadsPage() {
                     <input
                       type="text"
                       {...register('lastName')}
-                      className={`mt-1 w-full rounded-md border-0 bg-slate-100/50 p-2 text-sm focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)] ${errors.lastName ? 'ring-1 ring-red-500 bg-red-50' : ''}`}
+                      className={`mt-1 w-full rounded-lg border-0 bg-slate-100/50 p-2 text-sm focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)] ${errors.lastName ? 'ring-1 ring-red-500 bg-red-50' : ''}`}
                     />
                     {errors.lastName && <p className="mt-1 text-[10px] text-red-500">{errors.lastName.message}</p>}
                   </div>
@@ -657,7 +657,7 @@ export default function LeadsPage() {
                     <input
                       type="email"
                       {...register('email')}
-                      className={`mt-1 w-full rounded-md border-0 bg-slate-100/50 p-2 text-sm focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)] ${errors.email ? 'ring-1 ring-red-500 bg-red-50' : ''}`}
+                      className={`mt-1 w-full rounded-lg border-0 bg-slate-100/50 p-2 text-sm focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)] ${errors.email ? 'ring-1 ring-red-500 bg-red-50' : ''}`}
                     />
                     {errors.email && <p className="mt-1 text-[10px] text-red-500">{errors.email.message}</p>}
                   </div>
@@ -667,7 +667,7 @@ export default function LeadsPage() {
                       type="tel"
                       {...register('mobile')}
                       placeholder="10-digit number"
-                      className={`mt-1 w-full rounded-md border-0 bg-slate-100/50 p-2 text-sm focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)] ${errors.mobile ? 'ring-1 ring-red-500 bg-red-50' : ''}`}
+                      className={`mt-1 w-full rounded-lg border-0 bg-slate-100/50 p-2 text-sm focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)] ${errors.mobile ? 'ring-1 ring-red-500 bg-red-50' : ''}`}
                     />
                     {errors.mobile && <p className="mt-1 text-[10px] text-red-500">{errors.mobile.message}</p>}
                   </div>
@@ -684,7 +684,7 @@ export default function LeadsPage() {
                     <label className="block text-xs font-medium text-slate-700">Lead Source</label>
                     <select
                       {...register('leadSource')}
-                      className="mt-1 w-full rounded-md border-0 bg-slate-100/50 p-2 text-sm focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
+                      className="mt-1 w-full rounded-lg border-0 bg-slate-100/50 p-2 text-sm focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
                     >
                       <option value="Website">Website</option>
                       <option value="LinkedIn">LinkedIn</option>
@@ -734,7 +734,7 @@ export default function LeadsPage() {
                     <label className="block text-xs font-medium text-slate-700">Schedule Meeting</label>
                     <select
                       {...register('meetingStatus')}
-                      className="mt-1 w-full rounded-md border-0 bg-slate-100/50 p-2 text-sm focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
+                      className="mt-1 w-full rounded-lg border-0 bg-slate-100/50 p-2 text-sm focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
                     >
                       <option value="">None</option>
                       <option value="pending">Pending</option>
@@ -751,7 +751,7 @@ export default function LeadsPage() {
                       type="tel"
                       {...register('alternateMobile')}
                       placeholder="10-digit number"
-                      className={`mt-1 w-full rounded-md border-0 bg-slate-100/50 p-2 text-sm focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)] ${errors.alternateMobile ? 'ring-1 ring-red-500 bg-red-50' : ''}`}
+                      className={`mt-1 w-full rounded-lg border-0 bg-slate-100/50 p-2 text-sm focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)] ${errors.alternateMobile ? 'ring-1 ring-red-500 bg-red-50' : ''}`}
                     />
                     {errors.alternateMobile && <p className="mt-1 text-[10px] text-red-500">{errors.alternateMobile.message}</p>}
                   </div>
@@ -778,7 +778,7 @@ export default function LeadsPage() {
             <p className="mt-2 text-sm text-slate-600">
               A lead with this email address or mobile number already exists.
             </p>
-            <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm">
+            <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
               <p className="font-medium text-slate-800">
                 {duplicateMatch.name || `${duplicateMatch.firstName || ''} ${duplicateMatch.lastName || ''}`.trim()}
               </p>
@@ -853,7 +853,7 @@ function LeadsKanban({
           </div>
           <div
             className={`min-h-[80px] space-y-3 rounded-lg p-1 transition-colors ${
-              dragOverStatus === status ? 'bg-blue-50 ring-2 ring-[#168eea]/30' : ''
+              dragOverStatus === status ? 'bg-blue-50 ring-2 ring-[var(--primary)]/30' : ''
             }`}
           >
             {(leadsByStatus[status] || []).map((lead) => {
@@ -872,7 +872,7 @@ function LeadsKanban({
                   <p className="text-sm font-medium text-slate-900">{leadName}</p>
                   <p className="mt-1 text-xs text-slate-500">{lead.company || 'No company'}</p>
                   <div className="mt-3 flex items-center justify-between">
-                    <span className="text-sm font-semibold text-[#168eea]">{formatCurrency(lead.value || 0)}</span>
+                    <span className="text-sm font-semibold text-[var(--primary)]">{formatCurrency(lead.value || 0)}</span>
                     <span className="text-xs text-slate-400">Score {lead.score || 0}</span>
                   </div>
                   <p className="mt-2 text-xs text-slate-400">{lead.assignedTo || 'Unassigned'}</p>

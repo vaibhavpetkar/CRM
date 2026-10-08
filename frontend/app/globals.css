@@ -1,15 +1,21 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f8fafc;
+  /* Inveon One palette: navy sidebar, bright blue accent, cool grey canvas. */
+  --background: #f4f7fc;
   --foreground: #0f172a;
-  --sidebar-bg: #ffffff;
-  --sidebar-hover: #f1f5f9;
-  --sidebar-active-bg: #e0f2fe;
-  --sidebar-active-text: #168eea;
-  --sidebar-collapsed-bg: #eaf6ff;
-  --primary: #168eea;
-  --primary-hover: #1278cc;
+  --sidebar-bg: #071533;
+  --sidebar-footer-bg: #051027;
+  --sidebar-border: rgba(30, 41, 59, 0.6);
+  --sidebar-text: #94a3b8;
+  --sidebar-section: #64748b;
+  --sidebar-hover: rgba(30, 41, 59, 0.6);
+  --sidebar-active-bg: #e6f0ff;
+  --sidebar-active-text: #0066ff;
+  --sidebar-collapsed-bg: #071533;
+  --primary: #0066ff;
+  --primary-hover: #0052cc;
+  --navy: #0a2540;
   --card-bg: #ffffff;
   --border: #e2e8f0;
   --muted: #64748b;
@@ -34,6 +40,7 @@
   --color-sidebar-active-bg: var(--sidebar-active-bg);
   --color-sidebar-active-text: var(--sidebar-active-text);
   --color-sidebar-collapsed-bg: var(--sidebar-collapsed-bg);
+  --color-navy: var(--navy);
   --color-border: var(--border);
   --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --font-mono: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
@@ -91,11 +98,15 @@ body {
   color-scheme: dark;
   --background: #0b1220;
   --foreground: #e2e8f0;
-  --sidebar-bg: #111a2b;
-  --sidebar-hover: #1e293b;
-  --sidebar-active-bg: rgba(22, 142, 234, 0.18);
-  --sidebar-active-text: #4fb0f5;
-  --sidebar-collapsed-bg: #0f2236;
+  --sidebar-bg: #060f24;
+  --sidebar-footer-bg: #040b1b;
+  --sidebar-border: rgba(39, 52, 73, 0.8);
+  --sidebar-active-bg: rgba(0, 102, 255, 0.18);
+  --sidebar-active-text: #5c9dff;
+  --sidebar-collapsed-bg: #060f24;
+  --primary: #2f7dff;
+  --primary-hover: #1f6cf0;
+  --navy: #1e3a5f;
   --card-bg: #111a2b;
   --border: #273449;
   --muted: #94a3b8;
@@ -202,6 +213,13 @@ body {
   --color-rose-700: #fda4af;
   --color-rose-800: #fda4af;
   --color-rose-900: #fda4af;
+}
+
+/* Chart tooltips (recharts) draw their own white box; match the dark cards. */
+.dark .recharts-default-tooltip {
+  background-color: var(--card-bg) !important;
+  border-color: var(--border) !important;
+  color: var(--foreground);
 }
 
 .dark * {

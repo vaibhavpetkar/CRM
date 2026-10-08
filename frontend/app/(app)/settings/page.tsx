@@ -153,7 +153,7 @@ export default function SettingsPage() {
             }}
             className={`px-4 py-2.5 text-sm font-medium transition-colors flex items-center gap-1.5 ${
               activeTab === tab.id || (tab.id === 'developer' && window.location.pathname === '/settings/developer')
-                ? 'border-b-2 border-[#168eea] text-[#168eea]'
+                ? 'border-b-2 border-[var(--primary)] text-[var(--primary)]'
                 : 'text-slate-500 hover:text-slate-700'
             }`}
           >
@@ -171,7 +171,7 @@ export default function SettingsPage() {
               <input
                 readOnly
                 value={user?.firstName || ''}
-                className="w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600"
+                className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600"
               />
             </div>
             <div>
@@ -179,7 +179,7 @@ export default function SettingsPage() {
               <input
                 readOnly
                 value={user?.lastName || ''}
-                className="w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600"
+                className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600"
               />
             </div>
             <div>
@@ -187,7 +187,7 @@ export default function SettingsPage() {
               <input
                 readOnly
                 value={user?.email || ''}
-                className="w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600"
+                className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600"
               />
             </div>
             <div>
@@ -195,7 +195,7 @@ export default function SettingsPage() {
               <input
                 readOnly
                 value={user?.isSuperAdmin ? 'Administrator (Super Admin)' : user?.role?.name || 'No role assigned'}
-                className="w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600"
+                className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600"
               />
             </div>
           </div>
@@ -215,7 +215,7 @@ export default function SettingsPage() {
           {gTasksLoading ? (
             <p className="text-sm text-slate-500">Loading...</p>
           ) : !gTasksStatus?.configured ? (
-            <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700">
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700">
               Not available yet — an admin needs to set <code className="rounded bg-white/60 px-1 py-0.5">GOOGLE_CLIENT_ID</code> and{' '}
               <code className="rounded bg-white/60 px-1 py-0.5">GOOGLE_CLIENT_SECRET</code> on the server first.
             </div>
@@ -239,7 +239,7 @@ export default function SettingsPage() {
                 </p>
               )}
               {gTasksStatus.lastError && (
-                <div className="mt-3 rounded-md border border-red-200 bg-red-50 p-2.5 text-[11px] text-red-700">{gTasksStatus.lastError}</div>
+                <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-2.5 text-[11px] text-red-700">{gTasksStatus.lastError}</div>
               )}
             </>
           )}
@@ -250,7 +250,7 @@ export default function SettingsPage() {
         <Card title="Change Password">
           {pwMessage && (
             <div
-              className={`mb-4 rounded-md border p-3 text-sm ${
+              className={`mb-4 rounded-lg border p-3 text-sm ${
                 pwMessage.type === 'success'
                   ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
                   : 'border-red-200 bg-red-50 text-red-600'
@@ -266,7 +266,7 @@ export default function SettingsPage() {
                 required
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
-                className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea]"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
               />
             </div>
             <div>
@@ -276,7 +276,7 @@ export default function SettingsPage() {
                 minLength={6}
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea]"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
               />
             </div>
             <div>
@@ -286,7 +286,7 @@ export default function SettingsPage() {
                 minLength={6}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea]"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
               />
             </div>
             <Button type="submit" disabled={pwSubmitting}>
@@ -305,12 +305,12 @@ export default function SettingsPage() {
               { id: 'sms', label: 'SMS Notifications', desc: 'Critical alerts via text message' },
               { id: 'activity', label: 'Activity Reminders', desc: 'Reminders for tasks and meetings' },
             ].map((item) => (
-              <div key={item.id} className="flex items-center justify-between rounded-md border border-slate-100 p-4">
+              <div key={item.id} className="flex items-center justify-between rounded-lg border border-slate-100 p-4">
                 <div>
                   <p className="text-sm font-medium text-slate-900">{item.label}</p>
                   <p className="text-xs text-slate-500">{item.desc}</p>
                 </div>
-                <input type="checkbox" defaultChecked={item.id !== 'sms'} className="h-4 w-4 rounded border-slate-300 text-[#168eea]" />
+                <input type="checkbox" defaultChecked={item.id !== 'sms'} className="h-4 w-4 rounded border-slate-300 text-[var(--primary)]" />
               </div>
             ))}
           </div>
@@ -328,7 +328,7 @@ export default function SettingsPage() {
             ].map((pref) => (
               <div key={pref.label}>
                 <label className="mb-1.5 block text-sm font-medium text-slate-700">{pref.label}</label>
-                <select className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea]">
+                <select className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]">
                   {pref.options.map((opt) => <option key={opt}>{opt}</option>)}
                 </select>
               </div>
@@ -336,7 +336,7 @@ export default function SettingsPage() {
           </div>
           <p className="mt-3 text-xs text-slate-400">
             Currency is an organization-wide setting, not a personal preference — manage it under{' '}
-            <Link href="/settings/company" className="font-medium text-[#168eea] hover:underline">Company Settings</Link>.
+            <Link href="/settings/company" className="font-medium text-[var(--primary)] hover:underline">Company Settings</Link>.
           </p>
         </Card>
       )}

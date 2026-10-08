@@ -1,20 +1,36 @@
-version: '3.8'
+# Production override for a fresh cloud server that has nothing else on
+# ports 80/443. Adds an nginx container that terminates HTTPS for
+# ${CRM_DOMAIN} and proxies to the frontend and backend containers.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# Get the certificate once before the first start (see docs/deployment.md).
+# The existing VPS deploy (.github/workflows/deploy.yml) does not use this
+# file: there a separate nginx container already owns 80/443.
 
 services:
   nginx:
+    image: nginx:1.27-alpine
+    container_name: crm_nginx
+    restart: always
+    depends_on:
+      - frontend
+      - backend
+    environment:
+      - CRM_DOMAIN=${CRM_DOMAIN:-crm.eleviq.buzz}
     ports:
       - "80:80"
       - "443:443"
     volumes:
-      - ./nginx/crm.eleviq.buzz.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/templates:/etc/nginx/templates:ro
       - /etc/letsencrypt:/etc/letsencrypt:ro
-      - backend_uploads:/usr/src/app/uploads:ro
+      - /var/www/certbot:/var/www/certbot:ro
+    networks:
+      - crm_network
 
   backend:
     environment:
-      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
-      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
-      - GOOGLE_BUSINESS_CLIENT_ID=${GOOGLE_BUSINESS_CLIENT_ID}
-      - GOOGLE_BUSINESS_CLIENT_SECRET=${GOOGLE_BUSINESS_CLIENT_SECRET}
-      - GOOGLE_MEET_CLIENT_ID=${GOOGLE_MEET_CLIENT_ID}
-      - GOOGLE_MEET_CLIENT_SECRET=${GOOGLE_MEET_CLIENT_SECRET}
+      - GOOGLE_BUSINESS_CLIENT_ID=${GOOGLE_BUSINESS_CLIENT_ID:-}
+      - GOOGLE_BUSINESS_CLIENT_SECRET=${GOOGLE_BUSINESS_CLIENT_SECRET:-}
+      - GOOGLE_MEET_CLIENT_ID=${GOOGLE_MEET_CLIENT_ID:-}
+      - GOOGLE_MEET_CLIENT_SECRET=${GOOGLE_MEET_CLIENT_SECRET:-}

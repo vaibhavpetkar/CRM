@@ -170,7 +170,7 @@ export default function RolesPage() {
                     <p className="mt-1 text-sm text-slate-500">{role.description || 'No description'}</p>
                     <div className="mt-3 flex flex-wrap gap-1.5">
                       {rolePerms.includes('*') ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-[#168eea]">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-[var(--primary)]">
                           <ShieldCheckIcon className="h-3.5 w-3.5" /> Full system access
                         </span>
                       ) : rolePerms.length === 0 ? (
@@ -187,14 +187,14 @@ export default function RolesPage() {
                   <div className="flex shrink-0 items-center gap-1">
                     <button
                       onClick={() => openEdit(role)}
-                      className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-[#168eea]"
+                      className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-[var(--primary)]"
                       title="Edit role"
                     >
                       <PencilSquareIcon className="h-4 w-4" />
                     </button>
                     <button
                       onClick={() => handleDelete(role)}
-                      className="rounded-md p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                      className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
                       title="Delete role"
                     >
                       <TrashIcon className="h-4 w-4" />
@@ -219,7 +219,7 @@ export default function RolesPage() {
             </div>
 
             {formError && (
-              <div className="mt-3 rounded-md border border-red-200 bg-red-50 p-2.5 text-sm text-red-600">
+              <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-2.5 text-sm text-red-600">
                 {formError}
               </div>
             )}
@@ -233,7 +233,7 @@ export default function RolesPage() {
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
                   placeholder="e.g. Support Agent"
-                  className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                  className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                 />
               </div>
 
@@ -244,19 +244,19 @@ export default function RolesPage() {
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
                   placeholder="What can people with this role do?"
                   rows={2}
-                  className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                  className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="flex items-center gap-2 rounded-md border border-blue-100 bg-blue-50/60 p-3 text-sm font-medium text-slate-800">
+                <label className="flex items-center gap-2 rounded-lg border border-blue-100 bg-blue-50/60 p-3 text-sm font-medium text-slate-800">
                   <input
                     type="checkbox"
                     checked={isFullAccess}
                     onChange={toggleFullAccess}
-                    className="h-4 w-4 rounded border-slate-300 text-[#168eea] focus:ring-[#168eea]"
+                    className="h-4 w-4 rounded border-slate-300 text-[var(--primary)] focus:ring-[var(--primary)]"
                   />
-                  <ShieldCheckIcon className="h-4 w-4 text-[#168eea]" />
+                  <ShieldCheckIcon className="h-4 w-4 text-[var(--primary)]" />
                   Full system access (all current and future permissions)
                 </label>
               </div>
@@ -265,7 +265,7 @@ export default function RolesPage() {
                 <div className="space-y-3">
                   <p className="text-xs font-medium uppercase tracking-wider text-slate-500">Permissions</p>
                   {groups.map((group) => (
-                    <div key={group.module} className="rounded-md border border-slate-200 p-3">
+                    <div key={group.module} className="rounded-lg border border-slate-200 p-3">
                       <p className="text-sm font-semibold text-slate-800">{group.label}</p>
                       <div className="mt-2 grid grid-cols-2 gap-2">
                         {group.permissions.map((perm) => (
@@ -274,7 +274,7 @@ export default function RolesPage() {
                               type="checkbox"
                               checked={form.permissions.includes(perm.key)}
                               onChange={() => togglePermission(perm.key)}
-                              className="h-4 w-4 rounded border-slate-300 text-[#168eea] focus:ring-[#168eea]"
+                              className="h-4 w-4 rounded border-slate-300 text-[var(--primary)] focus:ring-[var(--primary)]"
                             />
                             {perm.label}
                           </label>

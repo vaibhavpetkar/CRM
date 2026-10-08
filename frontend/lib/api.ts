@@ -448,6 +448,8 @@ export const dealsApi = {
       totalValue: number;
       averageValue: number;
       winRate: number;
+      wonDeals: number;
+      lostDeals: number;
     }>('/deals/stats');
   },
 };

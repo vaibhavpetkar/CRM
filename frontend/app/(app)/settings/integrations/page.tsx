@@ -54,19 +54,19 @@ function RealGoogleCard({
       <p className="mt-3 text-xs text-slate-500">{description}</p>
 
       {status && !status.configured && (
-        <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-2.5 text-[11px] text-amber-700">
+        <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-[11px] text-amber-700">
           Needs backend credentials — set them under Settings &gt; Developer, then restart the app.
         </div>
       )}
 
       {status?.lastError && (
-        <div className="mt-3 rounded-md border border-red-200 bg-red-50 p-2.5 text-[11px] text-red-700">{status.lastError}</div>
+        <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-2.5 text-[11px] text-red-700">{status.lastError}</div>
       )}
 
       <div className="mt-3 flex items-center justify-between text-[11px] text-slate-400">
         <span>Last sync: {status?.lastSyncAt ? new Date(status.lastSyncAt).toLocaleString() : '—'}</span>
         {docsUrl && (
-          <a href={docsUrl} target="_blank" rel="noreferrer" className="text-[#168eea] hover:underline">
+          <a href={docsUrl} target="_blank" rel="noreferrer" className="text-[var(--primary)] hover:underline">
             Docs
           </a>
         )}
@@ -195,7 +195,7 @@ export default function IntegrationsSettingsPage() {
         description="Connect the CRM to the tools your business already uses. Nothing here is faked — an integration only shows as connected once it actually is."
       />
 
-      {error && <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
+      {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
 
       {loading ? (
         <p className="text-sm text-slate-500">Loading...</p>
@@ -241,14 +241,14 @@ export default function IntegrationsSettingsPage() {
               <p className="mt-3 text-xs text-slate-500">{integration.description}</p>
 
               {!integration.credentialsConfigured && (
-                <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-2.5 text-[11px] text-amber-700">
+                <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-[11px] text-amber-700">
                   Needs backend credentials:{' '}
                   <code className="rounded bg-white/60 px-1 py-0.5 font-mono">{integration.missingEnvVars.join(', ')}</code>
                 </div>
               )}
 
               {integration.lastError && (
-                <div className="mt-3 rounded-md border border-red-200 bg-red-50 p-2.5 text-[11px] text-red-700">
+                <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-2.5 text-[11px] text-red-700">
                   {integration.lastError}
                 </div>
               )}
@@ -256,7 +256,7 @@ export default function IntegrationsSettingsPage() {
               <div className="mt-3 flex items-center justify-between text-[11px] text-slate-400">
                 <span>Last sync: {integration.lastSyncAt ? new Date(integration.lastSyncAt).toLocaleString() : '—'}</span>
                 {integration.docsUrl && (
-                  <a href={integration.docsUrl} target="_blank" rel="noreferrer" className="text-[#168eea] hover:underline">
+                  <a href={integration.docsUrl} target="_blank" rel="noreferrer" className="text-[var(--primary)] hover:underline">
                     Docs
                   </a>
                 )}

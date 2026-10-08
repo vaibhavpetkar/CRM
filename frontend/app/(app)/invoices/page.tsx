@@ -71,7 +71,7 @@ export default function InvoicesPage() {
   };
 
   const columns: DataTableColumn<any>[] = [
-    { header: 'Invoice #', accessor: (i) => <Link href={`/invoices/${i.id}`} className="font-medium text-[#168eea] hover:underline">{i.invoiceNumber}</Link> },
+    { header: 'Invoice #', accessor: (i) => <Link href={`/invoices/${i.id}`} className="font-medium text-[var(--primary)] hover:underline">{i.invoiceNumber}</Link> },
     { header: 'Client', accessor: (i) => <span className="text-slate-900">{i.client}</span> },
     { header: 'Amount', accessor: (i) => <span className="font-medium text-slate-900">{formatCurrency(i.amount)}</span> },
     { header: 'Status', accessor: (i) => <StatusBadge status={i.status} /> },
@@ -112,10 +112,10 @@ export default function InvoicesPage() {
         <StatCard label="Overdue" value={formatCurrency(totalOverdue)} changeType="negative" />
       </div>
 
-      {error && <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
+      {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
 
       {/* Search and Filters */}
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+      <div className="mb-4 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs flex flex-col gap-3 sm:flex-row sm:items-center">
         <SearchInput 
           value={search} 
           onChange={setSearch} 
@@ -126,7 +126,7 @@ export default function InvoicesPage() {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea]"
+            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
           >
             {INVOICE_STATUSES.map((s) => (
               <option key={s.value} value={s.value}>{s.label}</option>
@@ -155,7 +155,7 @@ export default function InvoicesPage() {
             <div className="flex justify-end gap-3">
               {/* Prints with the invoice's print format (Document Templates > Print Format) */}
               <PrintButton docType="invoice" id={invoice.id} variant="icon" />
-              <Link href={`/invoices/${invoice.id}`} className="text-slate-400 hover:text-[#168eea]" aria-label="Edit">
+              <Link href={`/invoices/${invoice.id}`} className="text-slate-400 hover:text-[var(--primary)]" aria-label="Edit">
                 <PencilSquareIcon className="h-4 w-4" />
               </Link>
               <button onClick={() => handleDelete(invoice)} className="text-slate-400 hover:text-red-600" aria-label="Delete">
