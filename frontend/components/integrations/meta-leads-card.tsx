@@ -27,7 +27,9 @@ const when = (value: string | null) => (value ? new Date(value).toLocaleString()
  * Facebook / Instagram Lead Ads: connect with Facebook, pick which Pages send
  * their lead form submissions into the CRM, and see the latest ones arrive.
  */
-export default function MetaLeadsCard({ status, onChange }: { status: MetaLeadsStatus | null; onChange: () => void }) {
+export default function MetaLeadsCard({ status, onChange, bare = false }: { status: MetaLeadsStatus | null; onChange: () => void; bare?: boolean }) {
+  // Inside Settings > Integrations' detail view the card's frame is dropped.
+  const Box = bare ? 'div' : Card;
   const toast = useToast();
   const [acting, setActing] = useState<string | null>(null);
 
@@ -83,7 +85,7 @@ export default function MetaLeadsCard({ status, onChange }: { status: MetaLeadsS
   const connected = !!status?.connected;
 
   return (
-    <Card className="sm:col-span-2 lg:col-span-3">
+    <Box className={bare ? "" : "sm:col-span-2 lg:col-span-3"}>
       <div className="flex items-start justify-between gap-2">
         <div>
           <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">Social &amp; Messaging</p>
@@ -226,6 +228,6 @@ export default function MetaLeadsCard({ status, onChange }: { status: MetaLeadsS
           </Button>
         )}
       </div>
-    </Card>
+    </Box>
   );
 }

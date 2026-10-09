@@ -22,6 +22,7 @@ export interface PropertyLead {
   budgetMax: number | null;
   message: string | null;
   receivedAt: Date | null;
+  subSource: string | null; // campaign / form / product / category it came from
   extras: [key: string, value: string][];
 }
 
@@ -33,22 +34,23 @@ const norm = (k: string) =>
     .replace(/^_|_$/g, '');
 
 const KEYS: Record<string, string[]> = {
-  externalId: ['lead_id', 'leadid', 'enquiry_id', 'enquiryid', 'query_id', 'queryid', 'qry_id', 'response_id', 'responseid', 'inquiry_id', 'id', 'uid', 'leadgen_id'],
+  externalId: ['unique_query_id', 'lead_id', 'leadid', 'enquiry_id', 'enquiryid', 'query_id', 'queryid', 'qry_id', 'response_id', 'responseid', 'inquiry_id', 'id', 'uid', 'leadgen_id'],
   fullName: ['name', 'full_name', 'fullname', 'contact_name', 'lead_name', 'buyer_name', 'client_name', 'customer_name', 'sender_name', 'user_name', 'contact_person'],
   firstName: ['first_name', 'firstname', 'fname'],
   lastName: ['last_name', 'lastname', 'lname', 'surname'],
-  mobile: ['mobile', 'mobile_no', 'mobile_number', 'mobileno', 'phone', 'phone_no', 'phone_number', 'phoneno', 'contact', 'contact_no', 'contact_number', 'contactno', 'sender_mobile', 'buyer_mobile', 'customer_mobile', 'whatsapp_number', 'cell', 'telephone'],
+  mobile: ['mobile', 'mobile_no', 'mobile_number', 'mobileno', 'phone', 'phone_no', 'phone_number', 'phoneno', 'contact', 'contact_no', 'contact_number', 'contactno', 'sender_mobile', 'sender_mobile_alt', 'buyer_mobile', 'customer_mobile', 'whatsapp_number', 'cell', 'telephone'],
   email: ['email', 'email_id', 'emailid', 'email_address', 'sender_email', 'buyer_email', 'customer_email', 'mail'],
   projectName: ['project', 'project_name', 'projectname', 'property_name', 'propertyname', 'prop_name', 'listing', 'listing_name', 'society', 'society_name', 'cmpct_labl', 'project_title', 'property_title'],
   preferredLocation: ['locality', 'locality_name', 'location', 'area', 'sub_locality', 'preferred_location', 'project_locality', 'micro_market'],
-  city: ['city', 'city_name', 'project_city'],
+  city: ['city', 'city_name', 'project_city', 'sender_city'],
   configuration: ['bhk', 'configuration', 'config', 'bedrooms', 'bedroom', 'unit_type', 'apartment_type', 'flat_type'],
-  propertyType: ['property_type', 'propertytype', 'prop_type', 'category'],
+  propertyType: ['property_type', 'propertytype', 'prop_type'],
   budget: ['budget', 'price', 'price_range', 'budget_range', 'expected_price'],
   budgetMin: ['min_budget', 'budget_min', 'min_price', 'price_min'],
   budgetMax: ['max_budget', 'budget_max', 'max_price', 'price_max'],
-  message: ['message', 'msg', 'query', 'qry_info', 'comments', 'comment', 'remarks', 'requirement', 'enquiry', 'inquiry', 'details', 'description', 'note', 'notes'],
-  receivedAt: ['created_at', 'created_time', 'date', 'lead_date', 'received_on', 'rcvd_on', 'enquiry_date', 'query_date', 'timestamp', 'submitted_at'],
+  message: ['message', 'msg', 'query', 'qry_info', 'query_message', 'subject', 'comments', 'comment', 'remarks', 'requirement', 'enquiry', 'inquiry', 'details', 'description', 'note', 'notes'],
+  receivedAt: ['created_at', 'created_time', 'date', 'lead_date', 'received_on', 'rcvd_on', 'enquiry_date', 'query_date', 'timestamp', 'submitted_at', 'query_time'],
+  subSource: ['sub_source', 'subsource', 'lead_sub_source', 'campaign_name', 'campaign', 'utm_campaign', 'ad_name', 'adset_name', 'form_name', 'query_product_name', 'product_name', 'category', 'service'],
 };
 
 const EXACT = new Map<string, string>();
@@ -78,8 +80,10 @@ const flatten = (obj: unknown, out: [string, string][] = [], prefix = ''): [stri
   if (typeof obj === 'object') {
     // Meta-style {name, values:[...]} / {question, answer} pairs.
     const o = obj as Record<string, unknown>;
-    const pairKey = o.name ?? o.question ?? o.field ?? o.key ?? o.label;
-    const pairValue = o.values ?? o.value ?? o.answer;
+    // Google Ads: standard questions have a known column_id (PHONE_NUMBER), custom ones a readable column_name.
+    const googleKey = typeof o.column_id === 'string' && LOOKUP.get(norm(o.column_id)) ? o.column_id : o.column_name ?? o.column_id;
+    const pairKey = o.name ?? o.question ?? o.field ?? o.key ?? o.label ?? googleKey;
+    const pairValue = o.values ?? o.value ?? o.answer ?? o.string_value;
     if (typeof pairKey === 'string' && pairValue !== undefined && (typeof pairValue !== 'object' || Array.isArray(pairValue)) && Object.keys(o).length <= 4) {
       out.push([norm(pairKey), Array.isArray(pairValue) ? pairValue.join(', ') : String(pairValue)]);
       return out;
@@ -182,7 +186,7 @@ export const mapPropertyLead = (raw: unknown): PropertyLead => {
   }
 
   // Requirement can also be buried in the message ("Looking for 2 BHK in Baner under 60 lakh").
-  const haystack = [found.configuration, found.propertyType, found.message, found.projectName].filter(Boolean).join(' ');
+  const haystack = [found.configuration, found.propertyType, found.message, found.projectName, found.subSource].filter(Boolean).join(' ');
   const [bMin, bMax] = found.budgetMin || found.budgetMax
     ? [parseBudget(found.budgetMin)[0], parseBudget(found.budgetMax)[0]]
     : parseBudget(found.budget || (found.message && /lakh|lac|cr|₹/i.test(found.message) ? found.message : ''));
@@ -216,6 +220,7 @@ export const mapPropertyLead = (raw: unknown): PropertyLead => {
     budgetMin: bMin,
     budgetMax: bMax,
     message: found.message || null,
+    subSource: cut(found.subSource || null, 255),
     receivedAt,
     extras: extras.slice(0, 40),
   };

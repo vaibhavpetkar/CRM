@@ -80,6 +80,7 @@ interface LeadAttributes {
   configuration?: string | null; // '1 RK' | '1 BHK' | '2 BHK' | ... (see frontend lib/lead-options.ts)
   preferredLocation?: string | null; // area / locality the buyer wants
   projectName?: string | null; // project or listing the enquiry came for
+  subSource?: string | null; // finer than leadSource: the campaign, form, project or listing it came from (set automatically by integrations)
   budgetMin?: number | null; // rupees
   budgetMax?: number | null;
 
@@ -167,6 +168,7 @@ class Lead extends Model<LeadAttributes, LeadCreationAttributes> implements Lead
   public configuration?: string | null;
   public preferredLocation?: string | null;
   public projectName?: string | null;
+  public subSource?: string | null;
   public budgetMin?: number | null;
   public budgetMax?: number | null;
   public createdById?: number | null;
@@ -436,6 +438,7 @@ Lead.init(
     configuration: { type: DataTypes.STRING(30), allowNull: true },
     preferredLocation: { type: DataTypes.STRING(255), allowNull: true },
     projectName: { type: DataTypes.STRING(255), allowNull: true },
+    subSource: { type: DataTypes.STRING(255), allowNull: true },
     budgetMin: { type: DataTypes.DECIMAL(15, 2), allowNull: true },
     budgetMax: { type: DataTypes.DECIMAL(15, 2), allowNull: true },
     assignedToId: {

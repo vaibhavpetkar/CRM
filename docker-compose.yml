@@ -145,6 +145,7 @@ services:
       - PORTAL_POLL_MINUTES=${PORTAL_POLL_MINUTES:-10}
       - ACRES99_API_URL=${ACRES99_API_URL:-}
       - HOUSING_API_URL=${HOUSING_API_URL:-}
+      - INDIAMART_API_URL=${INDIAMART_API_URL:-}
       - SUPER_ADMIN_EMAIL=${SUPER_ADMIN_EMAIL:-admin@crmpro.com}
       - SUPER_ADMIN_PASSWORD=${SUPER_ADMIN_PASSWORD:?Set SUPER_ADMIN_PASSWORD in .env}
       # AI Assistant — free, local Ollama provider (see the `ollama` service

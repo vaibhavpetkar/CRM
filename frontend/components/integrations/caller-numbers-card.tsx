@@ -18,7 +18,9 @@ const userName = (u: TeamMember) => `${u.firstName || ''} ${u.lastName || ''}`.t
  * sales person, or left in the shared pool that the CRM hands out per call so
  * people calling at the same time show different numbers.
  */
-export default function CallerNumbersCard() {
+export default function CallerNumbersCard({ bare = false }: { bare?: boolean } = {}) {
+  // Inside Settings > Integrations' detail view the card's frame is dropped.
+  const Box = bare ? 'div' : Card;
   const toast = useToast();
   const [rows, setRows] = useState<CallerNumberRow[] | null>(null);
   const [users, setUsers] = useState<TeamMember[]>([]);
@@ -76,7 +78,7 @@ export default function CallerNumbersCard() {
   const poolCount = rows?.filter((r) => r.isActive && !r.userId).length || 0;
 
   return (
-    <Card className="sm:col-span-2 lg:col-span-3">
+    <Box className={bare ? "" : "sm:col-span-2 lg:col-span-3"}>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">Calling</p>
@@ -205,6 +207,6 @@ export default function CallerNumbersCard() {
           {acting === 'add' ? 'Adding...' : 'Add number'}
         </Button>
       </form>
-    </Card>
+    </Box>
   );
 }

@@ -25,6 +25,8 @@ router.get('/portals', ...manage, salesController.listPortals);
 router.put('/portals/:source', ...manage, salesController.updatePortal);
 router.post('/portals/:source/sync', ...manage, salesController.syncPortal);
 router.post('/portals/:source/test', ...manage, salesController.sendPortalTestLead);
+router.post('/import', ...manage, salesController.importLeadRows);
+router.get('/integrations/:key/activity', ...manage, salesController.integrationActivity);
 
 router.get('/incoming-calls', ...manage, salesController.getIncomingCalls);
 router.put('/incoming-calls', ...manage, salesController.saveIncomingCalls);

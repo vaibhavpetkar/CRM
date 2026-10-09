@@ -493,6 +493,10 @@ export default function LeadDetailsPage() {
                   </select>
                 </div>
                 <div>
+                  <label className="block text-sm font-medium text-slate-700">Sub Source</label>
+                  <input type="text" value={formData.subSource || ''} onChange={(e) => setFormData({ ...formData, subSource: e.target.value })} placeholder="Campaign, form or listing" className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none" />
+                </div>
+                <div>
                   <label className="block text-sm font-medium text-slate-700">Industry</label>
                   <select
                     value={formData.industry || ''}

@@ -451,6 +451,8 @@ const importLead = async (page: MetaPage, leadgenId: string, prefetched?: any): 
           leadSource: platform === 'ig' ? 'instagram' : 'facebook',
           status: 'new',
           projectName: property.projectName,
+          // Sub source: the campaign the ad ran in, else the form (else the Page).
+          subSource: String(metaLead?.campaign_name || formName || page.pageName || '').slice(0, 255) || null,
           preferredLocation: property.preferredLocation,
           configuration: property.configuration,
           propertyType: property.propertyType,

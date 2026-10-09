@@ -29,7 +29,7 @@ const childTableIncludes = [
 // plus the Series ID and company it always covered (Task 2.17).
 const TEXT_SEARCH_FIELDS = [
   'leadNumber', 'company', 'firstName', 'lastName', 'email',
-  'preferredLocation', 'city', 'territory', 'street', 'projectName', 'configuration',
+  'preferredLocation', 'city', 'territory', 'street', 'projectName', 'configuration', 'subSource',
 ];
 const PHONE_FIELDS = ['mobile', 'alternateMobile', 'phone'];
 
@@ -114,6 +114,9 @@ class LeadRepository extends BaseRepository<Lead> {
 
     const sources = csv(params.leadSource);
     if (sources.length) and.push({ leadSource: { [Op.in]: sources } });
+
+    const subSource = String(params.subSource ?? '').trim();
+    if (subSource) and.push({ subSource: { [Op.iLike]: `%${escapeLike(subSource)}%` } });
 
     const configurations = csv(params.configuration);
     if (configurations.length) and.push({ configuration: { [Op.in]: configurations } });
