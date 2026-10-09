@@ -97,6 +97,7 @@ const leadSchema = z.object({
   configuration: z.string().optional(),
   preferredLocation: z.string().optional(),
   projectName: z.string().optional(),
+  subSource: z.string().optional(),
   budgetMin: z.string().optional(),
   budgetMax: z.string().optional(),
 });
@@ -409,6 +410,7 @@ export default function LeadsPage() {
       configuration: data.configuration || null,
       preferredLocation: data.preferredLocation || null,
       projectName: data.projectName || null,
+      subSource: data.subSource || null,
       budgetMin: data.budgetMin ? Number(data.budgetMin) : null,
       budgetMax: data.budgetMax ? Number(data.budgetMax) : null,
     } as Record<string, any>;
@@ -581,6 +583,12 @@ export default function LeadsPage() {
       id: 'leadSource',
       optional: true,
       accessor: (lead) => <span className="text-slate-600">{lead.source || lead.leadSource ? leadSourceLabel(lead.source || lead.leadSource) : '—'}</span>,
+    },
+    {
+      header: 'Sub Source',
+      id: 'subSource',
+      optional: true,
+      accessor: (lead) => <span className="text-slate-600">{lead.subSource || '—'}</span>,
     },
     {
       header: 'Industry',
@@ -912,6 +920,10 @@ export default function LeadsPage() {
                         <option key={o.value} value={o.value}>{o.label}</option>
                       ))}
                     </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700">Sub Source</label>
+                    <input type="text" {...register('subSource')} placeholder="Campaign, form or listing" className="mt-1 w-full rounded-lg border-0 bg-slate-100/50 p-2 text-sm focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)]" />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-slate-700">Territory</label>

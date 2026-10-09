@@ -82,6 +82,10 @@ For each incoming call the CRM:
 
 ## Property portals (99acres, MagicBricks, Housing.com)
 
+The full step-by-step guide for every lead app (Google Ads, IndiaMART,
+JustDial, Square Yards, NoBroker, website forms, Zapier, Excel import...) is
+in [lead-integrations.md](lead-integrations.md).
+
 Settings > Integrations > **Property portals**. Each portal has a secret
 *lead push URL* (`https://<your domain>/api/webhooks/leads/<portal>/<token>`)
 and an on/off switch.

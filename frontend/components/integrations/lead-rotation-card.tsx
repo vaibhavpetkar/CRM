@@ -13,7 +13,9 @@ import { LEAD_SOURCE_OPTIONS, leadSourceLabel } from '@/lib/lead-options';
  * skipping anyone offline or already on a call. The same order can route
  * incoming calls through the calling provider's dynamic routing URL.
  */
-export default function LeadRotationCard() {
+export default function LeadRotationCard({ bare = false }: { bare?: boolean } = {}) {
+  // Inside Settings > Integrations' detail view the card's frame is dropped.
+  const Box = bare ? 'div' : Card;
   const toast = useToast();
   const [settings, setSettings] = useState<RotationSettings | null>(null);
   const [users, setUsers] = useState<{ id: number; name: string }[]>([]);
@@ -73,7 +75,7 @@ export default function LeadRotationCard() {
   const select = 'rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-[var(--primary)] focus:outline-none';
 
   return (
-    <Card className="sm:col-span-2 lg:col-span-3">
+    <Box className={bare ? "" : "sm:col-span-2 lg:col-span-3"}>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">Calling</p>
@@ -180,6 +182,6 @@ export default function LeadRotationCard() {
           </div>
         </div>
       )}
-    </Card>
+    </Box>
   );
 }

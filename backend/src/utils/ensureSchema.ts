@@ -148,6 +148,12 @@ const SCHEMA_PATCHES: { name: string; sql: string }[] = [
     `,
   },
   {
+    // Sub source: the campaign / form / project / listing a lead came from,
+    // filled in automatically by the lead integrations.
+    name: 'leads.subSource',
+    sql: `ALTER TABLE "leads" ADD COLUMN IF NOT EXISTS "subSource" VARCHAR(255);`,
+  },
+  {
     // Incoming calls (a customer calling the company's Vi / Exotel number)
     // are logged next to click-to-call ones.
     name: 'calls.direction',

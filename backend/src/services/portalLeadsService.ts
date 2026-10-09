@@ -28,16 +28,36 @@ import logger from '../utils/logger';
  * already a lead (same mobile or email) gets a timeline entry instead.
  */
 
-export type PortalSource = '99acres' | 'magicbricks' | 'housing.com';
+export type PortalSource =
+  | '99acres'
+  | 'magicbricks'
+  | 'housing.com'
+  | 'google-ads'
+  | 'indiamart'
+  | 'justdial'
+  | 'square-yards'
+  | 'nobroker'
+  | 'commonfloor'
+  | 'proptiger'
+  | 'makaan'
+  | 'website'
+  | 'webhook'
+  | 'import';
 
 interface PortalDef {
   source: PortalSource;
   label: string;
-  // Fields the company fills in to let us pull leads; empty = push only.
+  // Fields the company fills in: an API login to pull leads with, or (Google Ads) the webhook key.
   credentialFields: { key: string; label: string; secret?: boolean }[];
+  push: boolean; // has a lead push URL
+  pull: boolean; // we can read new leads with the saved credentials
   pullHelp: string;
   pushHelp: string;
+  // Any other app / file import: each lead may name its own source ("lead_source" column).
+  sourceFromLead?: boolean;
 }
+
+const pushOnly = (source: PortalSource, label: string, pushHelp: string): PortalDef => ({ source, label, credentialFields: [], push: true, pull: false, pullHelp: '', pushHelp });
 
 export const PORTALS: PortalDef[] = [
   {
@@ -47,16 +67,12 @@ export const PORTALS: PortalDef[] = [
       { key: 'username', label: '99acres login (username / email)' },
       { key: 'password', label: '99acres password', secret: true },
     ],
+    push: true,
+    pull: true,
     pullHelp: 'With your 99acres login saved, new responses are read every few minutes from the 99acres response API.',
     pushHelp: 'Or ask your 99acres account manager to push leads to this URL.',
   },
-  {
-    source: 'magicbricks',
-    label: 'MagicBricks',
-    credentialFields: [],
-    pullHelp: '',
-    pushHelp: 'Send this URL to your MagicBricks account manager and ask them to enable lead push (API integration) to it.',
-  },
+  pushOnly('magicbricks', 'MagicBricks', 'Send this URL to your MagicBricks account manager and ask them to enable lead push (API integration) to it.'),
   {
     source: 'housing.com',
     label: 'Housing.com',
@@ -64,9 +80,41 @@ export const PORTALS: PortalDef[] = [
       { key: 'profileId', label: 'Housing.com profile / builder id' },
       { key: 'encryptionKey', label: 'Housing.com API key (encryption key)', secret: true },
     ],
+    push: true,
+    pull: true,
     pullHelp: 'With your Housing.com profile id and API key saved, new leads are read every few minutes.',
     pushHelp: 'Or ask Housing.com to push leads to this URL.',
   },
+  {
+    source: 'google-ads',
+    label: 'Google Ads',
+    credentialFields: [{ key: 'googleKey', label: 'Webhook key (type the same key in Google Ads)', secret: true }],
+    push: true,
+    pull: false,
+    pullHelp: '',
+    pushHelp: 'In Google Ads, open your lead form asset, go to "Lead delivery" > Webhook integration, paste this URL and the key, then press "Send test data".',
+  },
+  {
+    source: 'indiamart',
+    label: 'IndiaMART',
+    credentialFields: [{ key: 'crmKey', label: 'IndiaMART CRM key', secret: true }],
+    push: true,
+    pull: true,
+    pullHelp: 'Generate the CRM key in IndiaMART Seller panel > Lead Manager > Import/Export leads > CRM Integration (Pull API). New enquiries are then read every few minutes.',
+    pushHelp: 'Or choose "Push API" in the same IndiaMART screen and paste this URL.',
+  },
+  pushOnly('justdial', 'JustDial', 'Send this URL to your JustDial account manager and ask them to enable "lead push to CRM / API integration" to it.'),
+  pushOnly('square-yards', 'Square Yards', 'Send this URL to your Square Yards relationship manager and ask them to push your project leads to it.'),
+  pushOnly('nobroker', 'NoBroker', 'Send this URL to your NoBroker account manager (Builder / NoBroker Prime) and ask them to push leads to it.'),
+  pushOnly('commonfloor', 'CommonFloor', 'Send this URL to your CommonFloor account manager and ask them to push leads to it.'),
+  pushOnly('proptiger', 'PropTiger', 'PropTiger is part of the Housing.com group: ask your account manager to push PropTiger leads to this URL.'),
+  pushOnly('makaan', 'Makaan', 'Makaan is part of the Housing.com group: ask your account manager to push Makaan leads to this URL.'),
+  pushOnly('website', 'Website & landing pages', 'Point your website or landing page form at this URL (POST, JSON or form fields: name, mobile, email, project, message...). Works with WordPress (Contact Form 7 / Elementor webhooks), Webflow, Wix, Unbounce and custom forms.'),
+  {
+    ...pushOnly('webhook', 'Any other app (Zapier, Pabbly, Make)', 'Use this URL as a webhook in Zapier, Pabbly Connect, Make, Google Sheets scripts or any app. Send a "lead_source" field (e.g. "nobroker", "walk-in") to set the source; otherwise it is saved as "Other".'),
+    sourceFromLead: true,
+  },
+  { source: 'import', label: 'Excel / CSV import', credentialFields: [], push: false, pull: false, pullHelp: '', pushHelp: '', sourceFromLead: true },
 ];
 
 const portal = (source: string) => {
@@ -94,6 +142,17 @@ const hasCredentials = (conn: PortalConnection) => {
   const def = portal(conn.source);
   const creds = readCredentials(conn);
   return def.credentialFields.length > 0 && def.credentialFields.every((f) => !!creds[f.key]);
+};
+
+const canPullNow = (conn: PortalConnection) => portal(conn.source).pull && hasCredentials(conn);
+
+const KNOWN_SOURCE = /^[a-z0-9][a-z0-9.\-]{1,39}$/;
+/** For "any other app" and file imports: the lead's own lead_source column, else a default. */
+const leadSourceFor = (def: PortalDef, raw: any, fallback?: string | null) => {
+  if (!def.sourceFromLead) return def.source;
+  const named = raw && typeof raw === 'object' ? raw.lead_source ?? raw.leadSource ?? raw.source ?? raw['Lead Source'] : null;
+  const value = String(named ?? '').trim().toLowerCase().replace(/\s+/g, '-');
+  return KNOWN_SOURCE.test(value) ? value : fallback || 'other';
 };
 
 /** The company's row for a portal, created (with its webhook token) on first look. */
@@ -124,10 +183,25 @@ const describe = (label: string, lead: PropertyLead) =>
     .filter(Boolean)
     .join(' · ');
 
+export interface ImportOptions {
+  leadSource?: string | null; // default source for imports / other apps
+  subSource?: string | null; // used when the lead names no sub source of its own
+  quiet?: boolean; // no per-lead notification (file imports)
+}
+
+/** The campaign / form / project a lead came from, so reports can split a source. */
+export const subSourceFor = (source: string, lead: PropertyLead, raw: any): string | null => {
+  if (lead.subSource) return lead.subSource;
+  if (source === 'google-ads' && raw?.campaign_id) return `Campaign ${raw.campaign_id}${raw.form_id ? ` · Form ${raw.form_id}` : ''}`;
+  return lead.projectName || null;
+};
+
 /** Imports one raw portal lead into the current company. */
-export const importPortalLead = async (conn: PortalConnection, raw: unknown): Promise<ImportResult> => {
+export const importPortalLead = async (conn: PortalConnection, raw: unknown, opts: ImportOptions = {}): Promise<ImportResult> => {
   const def = portal(conn.source);
   const lead = mapPropertyLead(raw);
+  const leadSource = leadSourceFor(def, raw, opts.leadSource);
+  const subSource = (lead.subSource || opts.subSource || subSourceFor(conn.source, lead, raw) || '').slice(0, 255) || null;
   if (!lead.mobile && !lead.email) return 'skipped'; // nothing to contact the buyer on
   const externalId = lead.externalId!;
 
@@ -166,7 +240,8 @@ export const importPortalLead = async (conn: PortalConnection, raw: unknown): Pr
           mobile: lead.mobile,
           email: lead.email,
           city: lead.city,
-          leadSource: conn.source,
+          leadSource,
+          subSource,
           status: 'new',
           projectName: lead.projectName,
           preferredLocation: lead.preferredLocation,
@@ -186,7 +261,7 @@ export const importPortalLead = async (conn: PortalConnection, raw: unknown): Pr
     await event.update({ status: result === 'created' ? 'created' : 'duplicate', leadId, error: null });
     await conn.increment('leadsReceived');
     await conn.update({ lastLeadAt: new Date(), lastError: null });
-    await notifyAdmins(
+    if (!opts.quiet) await notifyAdmins(
       leadId,
       result === 'created' ? `New ${def.label} lead: ${lead.firstName} ${lead.lastName}` : `${def.label} enquiry from existing lead`,
       details
@@ -205,25 +280,32 @@ export const importPortalLead = async (conn: PortalConnection, raw: unknown): Pr
 export const leadsInBody = (body: any): unknown[] => {
   if (!body) return [];
   if (Array.isArray(body)) return body;
-  for (const key of ['leads', 'data', 'results', 'enquiries', 'responses', 'Leads', 'Data']) {
+  for (const key of ['leads', 'data', 'results', 'enquiries', 'responses', 'Leads', 'Data', 'RESPONSE']) {
     if (Array.isArray(body[key])) return body[key];
   }
+  // IndiaMART push: {CODE, STATUS, RESPONSE: {one lead}}.
+  if (body.RESPONSE && typeof body.RESPONSE === 'object') return [body.RESPONSE];
   return [body];
 };
 
-const importMany = async (conn: PortalConnection, leads: unknown[]) => {
+const importMany = async (conn: PortalConnection, leads: unknown[], opts: ImportOptions = {}, max = 500) => {
   const counts = { created: 0, duplicate: 0, skipped: 0, failed: 0 };
-  for (const raw of leads.slice(0, 500)) counts[await importPortalLead(conn, raw)] += 1;
+  for (const raw of leads.slice(0, max)) counts[await importPortalLead(conn, raw, opts)] += 1;
   return counts;
 };
+
+export class PushKeyError extends Error {}
 
 /** Webhook push (public). Returns null when the token doesn't match a connection. */
 export const receivePush = async (source: string, token: string, body: unknown) => {
   if (!/^[a-f0-9]{48}$/.test(token)) return null;
   const conn = await runUnscoped(() => PortalConnection.findOne({ where: { source, webhookToken: token } }));
   const companyId = conn?.get('companyId') as number | null | undefined;
-  if (!conn || !companyId) return null;
+  if (!conn || !companyId || !portal(conn.source).push) return null;
   if (!conn.isEnabled) return { disabled: true };
+  // Google Ads sends the key typed in the lead form; when one is saved it must match.
+  const savedKey = readCredentials(conn).googleKey;
+  if (conn.source === 'google-ads' && savedKey && (body as any)?.google_key !== savedKey) throw new PushKeyError('The Google Ads key does not match the one saved in the CRM.');
   return runWithTenant(companyId, () => importMany(conn, leadsInBody(body)));
 };
 
@@ -302,15 +384,42 @@ const pullHousing = async (creds: Record<string, string>, from: Date, to: Date) 
   return leadsInBody(body);
 };
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+/** IndiaMART wants "DD-Mon-YYYYHH:MM:SS" in Indian time. */
+export const indiamartTime = (d: Date) => {
+  const ist = new Date(d.getTime() + 330 * 60000);
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${p(ist.getUTCDate())}-${MONTHS[ist.getUTCMonth()]}-${ist.getUTCFullYear()}${p(ist.getUTCHours())}:${p(ist.getUTCMinutes())}:${p(ist.getUTCSeconds())}`;
+};
+
+/** IndiaMART CRM Pull API (v2): at most 7 days per call, at most one call every 5 minutes. */
+const pullIndiamart = async (creds: Record<string, string>, from: Date, to: Date) => {
+  const base = process.env.INDIAMART_API_URL || 'https://mapi.indiamart.com/wservce/crm/crmListing/v2/';
+  const qs = new URLSearchParams({ glusr_crm_key: creds.crmKey, start_time: indiamartTime(from), end_time: indiamartTime(to) });
+  const res = await fetch(`${base}?${qs.toString()}`, { headers: { Accept: 'application/json' } });
+  const text = await res.text();
+  let body: any = null;
+  try {
+    body = JSON.parse(text);
+  } catch {
+    throw new Error(`IndiaMART sent something unexpected (HTTP ${res.status}).`);
+  }
+  const code = Number(body?.CODE);
+  if (code === 204) return []; // no new enquiries
+  if (!res.ok || (code && code !== 200)) throw new Error(body?.MESSAGE || `IndiaMART answered ${code || `HTTP ${res.status}`}.`);
+  return leadsInBody(body);
+};
+
 const PULLERS: Partial<Record<PortalSource, (c: Record<string, string>, from: Date, to: Date) => Promise<unknown[]>>> = {
   '99acres': pull99acres,
   'housing.com': pullHousing,
+  indiamart: pullIndiamart,
 };
 
 /** Reads new leads from the portal for the current company's connection. */
 export const pullNow = async (conn: PortalConnection) => {
   const puller = PULLERS[conn.source as PortalSource];
-  if (!puller || !hasCredentials(conn)) throw new ValidationError(`Save your ${portal(conn.source).label} API login first.`);
+  if (!puller || !canPullNow(conn)) throw new ValidationError(`Save your ${portal(conn.source).label} API login first.`);
   const to = new Date();
   const earliest = to.getTime() - MAX_PULL_DAYS * 86400000;
   // Re-read a little overlap; dedupe makes it harmless.
@@ -339,7 +448,7 @@ export const startPortalPoller = () => {
       const conns = await runUnscoped(() => PortalConnection.findAll({ where: { isEnabled: true, credentials: { [Op.ne]: null } } }));
       for (const conn of conns) {
         const companyId = conn.get('companyId') as number | null;
-        if (!companyId || !PULLERS[conn.source as PortalSource] || !hasCredentials(conn)) continue;
+        if (!companyId || !PULLERS[conn.source as PortalSource] || !canPullNow(conn)) continue;
         await runWithTenant(companyId, () => pullNow(conn)).catch((err) => logger.warn(`[portals] ${conn.source} pull for company #${companyId}: ${err.message}`));
       }
     } catch (err) {
@@ -360,10 +469,10 @@ const serialize = async (conn: PortalConnection) => {
     source: def.source,
     label: def.label,
     isEnabled: conn.isEnabled,
-    webhookUrl: webhookUrl(conn),
+    webhookUrl: def.push ? webhookUrl(conn) : null,
     pushHelp: def.pushHelp,
     pullHelp: def.pullHelp,
-    canPull: def.credentialFields.length > 0,
+    canPull: def.pull,
     credentialFields: def.credentialFields.map((f) => ({ ...f, isSet: !!creds[f.key], value: f.secret ? '' : creds[f.key] || '' })),
     hasCredentials: hasCredentials(conn),
     leadsReceived: conn.leadsReceived,
@@ -416,4 +525,23 @@ export const sendTestLead = async (source: string) => {
     message: 'Interested in 2 BHK, budget 60 lakh. (Test lead sent from Settings > Integrations, safe to delete.)',
   });
   return { result, portal: await serialize(conn) };
+};
+
+/**
+ * Excel / CSV import: rows already read from the file in the browser (one
+ * object per row, keyed by the column headings). Same mapping and duplicate
+ * checks as the portals, so a file can be imported twice safely.
+ */
+export const importRows = async (input: { rows?: unknown; leadSource?: unknown; subSource?: unknown; fileName?: unknown }) => {
+  if (!Array.isArray(input.rows) || !input.rows.length) throw new ValidationError('The file has no rows to import.');
+  if (input.rows.length > 5000) throw new ValidationError('Import at most 5,000 rows at a time; split the file.');
+  const conn = await getConnection('import');
+  const fileName = typeof input.fileName === 'string' ? input.fileName.slice(0, 120) : '';
+  const opts: ImportOptions = {
+    leadSource: typeof input.leadSource === 'string' && input.leadSource.trim() ? input.leadSource.trim().toLowerCase() : 'other',
+    subSource: typeof input.subSource === 'string' && input.subSource.trim() ? input.subSource.trim() : fileName || null,
+    quiet: true,
+  };
+  const counts = await importMany(conn, input.rows, opts, 5000);
+  return { ...counts, portal: await serialize(conn) };
 };

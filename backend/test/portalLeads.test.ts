@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mapPropertyLead, parseBudget, parseConfiguration, parsePropertyType } from '../src/utils/propertyLeadMapping';
-import { parse99acresXml, housingSignature, leadsInBody } from '../src/services/portalLeadsService';
+import { parse99acresXml, housingSignature, leadsInBody, subSourceFor, indiamartTime } from '../src/services/portalLeadsService';
 import { readInboundEvent } from '../src/services/incomingCallService';
 
 // ─── Portal lead mapping ────────────────────────────────────────────────────
@@ -103,4 +103,50 @@ test('incoming call event: caller, agent and company number', () => {
 test('"under 75 lakh" is a ceiling, "above 1 Cr" a floor', () => {
   assert.deepEqual(parseBudget('2 BHK under 75 lakh'), [null, 7500000]);
   assert.deepEqual(parseBudget('above 1 Cr'), [10000000, null]);
+});
+
+// ─── More lead sources ──────────────────────────────────────────────────────
+
+test('Google Ads lead form webhook', () => {
+  const body = {
+    lead_id: 'TeSter-123',
+    api_version: '1.0',
+    form_id: 40000000,
+    campaign_id: 12345,
+    google_key: 'secret',
+    is_test: true,
+    user_column_data: [
+      { column_name: 'Full Name', string_value: 'Priya Desai', column_id: 'FULL_NAME' },
+      { column_name: 'User Phone', string_value: '+919812300000', column_id: 'PHONE_NUMBER' },
+      { column_name: 'User Email', string_value: 'priya@example.com', column_id: 'EMAIL' },
+      { column_name: 'Which BHK?', string_value: '2 BHK', column_id: 'CUSTOM_1' },
+    ],
+  };
+  const lead = mapPropertyLead(body);
+  assert.equal(lead.externalId, 'TeSter-123');
+  assert.equal(lead.firstName, 'Priya');
+  assert.equal(lead.mobile, '9812300000');
+  assert.equal(lead.email, 'priya@example.com');
+  assert.equal(lead.configuration, '2 BHK');
+  assert.equal(subSourceFor('google-ads', lead, body), 'Campaign 12345 · Form 40000000');
+});
+
+test('IndiaMART push and pull rows', () => {
+  const push = { CODE: 200, STATUS: 'SUCCESS', RESPONSE: { UNIQUE_QUERY_ID: '2771234', SENDER_NAME: 'Mahesh Jain', SENDER_MOBILE: '+91-9898989898', SENDER_EMAIL: 'm@example.com', SENDER_CITY: 'Pune', QUERY_PRODUCT_NAME: '2 BHK Flat in Wakad', QUERY_MESSAGE: 'Need details', QUERY_TIME: '2026-10-08 11:20:00' } };
+  const [row] = leadsInBody(push);
+  const lead = mapPropertyLead(row);
+  assert.equal(lead.externalId, '2771234');
+  assert.equal(lead.mobile, '9898989898');
+  assert.equal(lead.city, 'Pune');
+  assert.equal(lead.subSource, '2 BHK Flat in Wakad');
+  assert.equal(lead.configuration, '2 BHK');
+  assert.equal(leadsInBody({ CODE: 200, RESPONSE: [{ a: 1 }, { a: 2 }] }).length, 2);
+  // 2026-10-08 05:30 UTC is 11:00 in India.
+  assert.equal(indiamartTime(new Date('2026-10-08T05:30:00Z')), '08-Oct-202611:00:00');
+});
+
+test('JustDial category becomes the sub source', () => {
+  const lead = mapPropertyLead({ leadid: 'JD9', name: 'Sunil', mobile: '9822000011', category: 'Residential Flats', area: 'Kothrud', city: 'Pune' });
+  assert.equal(lead.subSource, 'Residential Flats');
+  assert.equal(lead.preferredLocation, 'Kothrud');
 });

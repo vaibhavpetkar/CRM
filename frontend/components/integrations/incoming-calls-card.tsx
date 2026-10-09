@@ -12,7 +12,9 @@ import { IncomingCallSettings, salesApi } from '@/lib/api';
  * each call's events to this URL, and the call shows in Call Tracking against
  * the matching lead, with its recording.
  */
-export default function IncomingCallsCard() {
+export default function IncomingCallsCard({ bare = false }: { bare?: boolean } = {}) {
+  // Inside Settings > Integrations' detail view the card's frame is dropped.
+  const Box = bare ? 'div' : Card;
   const toast = useToast();
   const [settings, setSettings] = useState<IncomingCallSettings | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -45,7 +47,7 @@ export default function IncomingCallsCard() {
   };
 
   return (
-    <Card className="sm:col-span-2 lg:col-span-3">
+    <Box className={bare ? "" : "sm:col-span-2 lg:col-span-3"}>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">Calling</p>
@@ -107,6 +109,6 @@ export default function IncomingCallsCard() {
           </div>
         </div>
       )}
-    </Card>
+    </Box>
   );
 }

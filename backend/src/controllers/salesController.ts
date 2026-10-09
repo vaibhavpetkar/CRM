@@ -5,6 +5,7 @@ import * as salesService from '../services/salesService';
 import * as leadRotation from '../services/leadRotation';
 import * as portalLeads from '../services/portalLeadsService';
 import * as incomingCalls from '../services/incomingCallService';
+import { getIntegrationActivity } from '../services/integrationActivityService';
 import { getOnlineUserIds } from '../realtime/presence';
 import logger from '../utils/logger';
 
@@ -101,6 +102,14 @@ const portalBody = (req: Request): unknown => {
   }
 };
 
+export const importLeadRows = asyncHandler(async (req: AuthRequest, res: Response) => {
+  return res.json(await portalLeads.importRows(req.body || {}));
+});
+
+export const integrationActivity = asyncHandler(async (req: AuthRequest, res: Response) => {
+  return res.json(await getIntegrationActivity(String(req.params.key), req.query as Record<string, unknown>));
+});
+
 // Public: a portal pushes enquiries. The secret token in the URL is the key.
 export const receivePortalLeads = async (req: Request, res: Response) => {
   try {
@@ -111,7 +120,13 @@ export const receivePortalLeads = async (req: Request, res: Response) => {
       const ok = await portalLeads.isValidPushUrl(source, token);
       return ok ? res.json({ ok: true }) : res.sendStatus(404);
     }
-    const result = await portalLeads.receivePush(source, token, portalBody(req));
+    let result;
+    try {
+      result = await portalLeads.receivePush(source, token, portalBody(req));
+    } catch (err) {
+      if (err instanceof portalLeads.PushKeyError) return res.status(403).json({ ok: false, message: err.message });
+      throw err;
+    }
     if (!result) return res.sendStatus(404);
     if ('disabled' in result) return res.status(200).json({ ok: false, message: 'Lead capture for this portal is switched off in the CRM.' });
     return res.json({ ok: true, ...result });

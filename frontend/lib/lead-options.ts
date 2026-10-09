@@ -82,6 +82,8 @@ export const LEAD_SOURCE_OPTIONS: { value: string; label: string }[] = [
   { value: 'facebook', label: 'Facebook' },
   { value: 'instagram', label: 'Instagram' },
   { value: 'google-ads', label: 'Google Ads' },
+  { value: 'indiamart', label: 'IndiaMART' },
+  { value: 'justdial', label: 'JustDial' },
   { value: 'website', label: 'Website' },
   { value: 'walk-in', label: 'Walk-in / Site' },
   { value: 'channel-partner', label: 'Channel Partner / Broker' },

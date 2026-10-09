@@ -1298,6 +1298,10 @@ export const salesApi = {
     request<PortalImportCounts & { portal: PortalConnectionRow }>(`/sales/portals/${encodeURIComponent(source)}/sync`, { method: 'POST' }),
   sendPortalTestLead: async (source: string) =>
     request<{ result: string; portal: PortalConnectionRow }>(`/sales/portals/${encodeURIComponent(source)}/test`, { method: 'POST' }),
+  importLeads: async (payload: { rows: Record<string, unknown>[]; leadSource?: string; subSource?: string; fileName?: string }) =>
+    request<PortalImportCounts & { portal: PortalConnectionRow }>('/sales/import', { method: 'POST', body: JSON.stringify(payload) }),
+  getIntegrationActivity: async (key: string, params: { page?: number; limit?: number } = {}) =>
+    request<IntegrationActivity>(`/sales/integrations/${encodeURIComponent(key)}/activity${qs(params)}`),
   getIncomingCalls: async () => request<IncomingCallSettings>('/sales/incoming-calls'),
   saveIncomingCalls: async (payload: { createLeads?: boolean; regenerate?: boolean }) =>
     request<IncomingCallSettings>('/sales/incoming-calls', { method: 'PUT', body: JSON.stringify(payload) }),
@@ -1314,7 +1318,7 @@ export interface PortalConnectionRow {
   source: string;
   label: string;
   isEnabled: boolean;
-  webhookUrl: string;
+  webhookUrl: string | null;
   pushHelp: string;
   pullHelp: string;
   canPull: boolean;
@@ -1325,6 +1329,30 @@ export interface PortalConnectionRow {
   lastPolledAt: string | null;
   lastError: string | null;
   recent: { id: number; status: 'created' | 'duplicate' | 'failed'; name: string | null; mobile: string | null; projectName: string | null; leadId: number | null; error: string | null; createdAt: string }[];
+}
+
+export interface IntegrationActivityRow {
+  eventId: string;
+  result: 'created' | 'duplicate' | 'failed' | 'processing';
+  leadId: number | null;
+  leadNumber: string | null;
+  name: string | null;
+  mobile: string | null;
+  subSource: string | null;
+  leadStatus: string | null;
+  assignedTo: string | null;
+  error: string | null;
+  at: string;
+}
+
+export interface IntegrationActivity {
+  key: string;
+  page: number;
+  pages: number;
+  total: number;
+  stats: { leads: number; today: number; last7Days: number; last30Days: number };
+  bySubSource: { subSource: string; leads: number }[];
+  items: IntegrationActivityRow[];
 }
 
 export interface IncomingCallSettings {

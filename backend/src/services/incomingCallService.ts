@@ -191,6 +191,7 @@ const upsertCall = async (event: InboundEvent, createLeads: boolean): Promise<Ca
         status: 'new',
         assignedToId: userId,
         sourceDetails: event.did ? `Called ${formatIndianNumber(event.did)}` : 'Incoming call',
+        subSource: event.did ? formatIndianNumber(event.did) : null, // which company number they rang
         allowDuplicate: true,
       } as any,
       null
