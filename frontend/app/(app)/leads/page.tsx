@@ -13,8 +13,9 @@ import UserAutocomplete from '@/components/ui/user-autocomplete';
 import TerritoryAutocomplete from '@/components/ui/territory-autocomplete';
 import { LEAD_FIELDS } from '@/lib/import-export/field-configs';
 import { formatCurrency } from '@/lib/utils';
-import { leadsApi, usersApi, getStoredUser } from '@/lib/api';
-import { TERRITORY_OPTIONS } from '@/lib/lead-options';
+import { leadsApi, usersApi, salesApi, getStoredUser, PresenceState } from '@/lib/api';
+import { TERRITORY_OPTIONS, LEAD_SOURCE_OPTIONS, CONFIGURATION_OPTIONS, PROPERTY_TYPE_OPTIONS, BUDGET_OPTIONS, leadSourceLabel, budgetRange } from '@/lib/lead-options';
+import { AgentStatusDot } from '@/components/sales/agent-status';
 import { hasPermission } from '@/lib/permissions';
 import { useKeyboardShortcuts } from '@/lib/hooks/useKeyboardShortcuts';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -37,7 +38,7 @@ const emptyForm = {
   company: '',
   website: '',
   jobTitle: '',
-  leadSource: 'Website',
+  leadSource: 'website',
   status: 'new',
   industry: '',
   noOfEmployees: '',
@@ -91,6 +92,13 @@ const leadSchema = z.object({
   qualifiedById: z.union([z.string(), z.number()]).optional(),
   alternateMobile: z.string().optional().refine(val => !val || /^\d{10}$/.test(val), 'Alternate mobile must be 10 digits'),
   meetingStatus: z.string().optional(),
+  // Real-estate requirement
+  propertyType: z.string().optional(),
+  configuration: z.string().optional(),
+  preferredLocation: z.string().optional(),
+  projectName: z.string().optional(),
+  budgetMin: z.string().optional(),
+  budgetMax: z.string().optional(),
 });
 type LeadFormValues = z.infer<typeof leadSchema>;
 
@@ -99,6 +107,21 @@ export default function LeadsPage() {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
   const [territoryFilter, setTerritoryFilter] = useState('all');
+  // Real-estate filters ("More filters" panel). 'all' / '' means no filter.
+  const [sourceFilter, setSourceFilter] = useState('all');
+  const [assigneeFilter, setAssigneeFilter] = useState('all');
+  const [configFilter, setConfigFilter] = useState<string[]>([]);
+  const [propertyTypeFilter, setPropertyTypeFilter] = useState('all');
+  const [locationFilter, setLocationFilter] = useState('');
+  const [budgetFilter, setBudgetFilter] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+  // Typed text waits a moment before searching, so each key press doesn't reload every lead.
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [debouncedLocation, setDebouncedLocation] = useState('');
+  // Live green/red status of each sales person, for the Assigned To column.
+  const [agentStates, setAgentStates] = useState<Map<number, PresenceState>>(new Map());
   const [leads, setLeads] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -135,7 +158,7 @@ export default function LeadsPage() {
       email: '',
       mobile: '',
       company: '',
-      leadSource: 'Website',
+      leadSource: 'website',
       assignedToId: '',
     },
   });
@@ -150,7 +173,40 @@ export default function LeadsPage() {
       .getAssignableUsers()
       .then((res) => setAssignableUsers(res.users.map((u) => ({ id: u.id, name: u.name }))))
       .catch(() => setAssignableUsers([]));
+    salesApi
+      .getActivity()
+      .then((res) => setAgentStates(new Map(res.agents.map((a) => [a.userId, a.state]))))
+      .catch(() => {});
   }, []);
+
+  // Deep links from Lead Sources / Sales Activity: /leads?leadSource=99acres&dateFrom=...
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    let any = false;
+    const take = (key: string, set: (v: string) => void) => {
+      const v = q.get(key);
+      if (v) {
+        set(v);
+        any = true;
+      }
+    };
+    take('leadSource', setSourceFilter);
+    take('assignedToId', setAssigneeFilter);
+    take('dateFrom', setDateFrom);
+    take('dateTo', setDateTo);
+    take('location', setLocationFilter);
+    if (any) setShowFilters(true);
+  }, []);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedLocation(locationFilter), 300);
+    return () => clearTimeout(t);
+  }, [locationFilter]);
 
   // Support deep-linking from the topbar's Quick Create menu (/leads?quickCreate=1)
   useEffect(() => {
@@ -162,7 +218,7 @@ export default function LeadsPage() {
         email: '',
         mobile: '',
         company: '',
-        leadSource: 'Website',
+        leadSource: 'website',
         assignedToId: '',
         territory: '',
         qualifiedById: '',
@@ -218,10 +274,20 @@ export default function LeadsPage() {
     setLoading(true);
     setError(null);
     try {
+      const budget = BUDGET_OPTIONS[Number(budgetFilter)];
       const rows = await leadsApi.getAllLeads({
-        search,
+        search: debouncedSearch,
         status: filter,
         territory: territoryFilter,
+        leadSource: sourceFilter,
+        assignedToId: assigneeFilter,
+        configuration: configFilter.join(','),
+        propertyType: propertyTypeFilter,
+        location: debouncedLocation,
+        budgetFrom: budgetFilter !== '' ? budget?.from : undefined,
+        budgetTo: budgetFilter !== '' ? budget?.to : undefined,
+        dateFrom,
+        dateTo,
       });
       setLeads(rows);
     } catch (err: any) {
@@ -230,7 +296,30 @@ export default function LeadsPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, filter, territoryFilter]);
+  }, [debouncedSearch, filter, territoryFilter, sourceFilter, assigneeFilter, configFilter, propertyTypeFilter, debouncedLocation, budgetFilter, dateFrom, dateTo]);
+
+  const activeFilterCount = [
+    sourceFilter !== 'all',
+    assigneeFilter !== 'all',
+    configFilter.length > 0,
+    propertyTypeFilter !== 'all',
+    !!locationFilter.trim(),
+    budgetFilter !== '',
+    !!dateFrom || !!dateTo,
+  ].filter(Boolean).length;
+
+  const clearFilters = () => {
+    setSourceFilter('all');
+    setAssigneeFilter('all');
+    setConfigFilter([]);
+    setPropertyTypeFilter('all');
+    setLocationFilter('');
+    setBudgetFilter('');
+    setDateFrom('');
+    setDateTo('');
+  };
+
+  const toggleConfig = (c: string) => setConfigFilter((prev) => (prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]));
 
   useEffect(() => {
     fetchLeads();
@@ -244,7 +333,7 @@ export default function LeadsPage() {
       email: '',
       mobile: '',
       company: '',
-      leadSource: 'Website',
+      leadSource: 'website',
       assignedToId: '',
     });
     setIsModalOpen(true);
@@ -310,12 +399,18 @@ export default function LeadsPage() {
       email: data.email,
       mobile: data.mobile,
       company: data.company,
-      leadSource: (data.leadSource || 'Website').toLowerCase().replace(/\s+/g, '-'),
+      leadSource: (data.leadSource || 'website').toLowerCase().replace(/\s+/g, '-'),
       assignedToId: resolvedAssignedToId,
       qualifiedById: resolvedQualifiedById,
       territory: data.territory,
       alternateMobile: data.alternateMobile,
       meetingStatus: data.meetingStatus,
+      propertyType: data.propertyType || null,
+      configuration: data.configuration || null,
+      preferredLocation: data.preferredLocation || null,
+      projectName: data.projectName || null,
+      budgetMin: data.budgetMin ? Number(data.budgetMin) : null,
+      budgetMax: data.budgetMax ? Number(data.budgetMax) : null,
     } as Record<string, any>;
 
     // emptyForm defaults numeric fields to '' so the inputs render blank —
@@ -357,7 +452,7 @@ export default function LeadsPage() {
     const payload: Record<string, any> = { ...row };
     if (payload.leadSource) payload.leadSource = String(payload.leadSource).toLowerCase().trim().replace(/\s+/g, '-');
     if (payload.status) payload.status = String(payload.status).toLowerCase().trim();
-    ['score', 'value', 'noOfEmployees', 'latitude', 'longitude'].forEach((key) => {
+    ['score', 'value', 'noOfEmployees', 'latitude', 'longitude', 'budgetMin', 'budgetMax'].forEach((key) => {
       if (payload[key] !== undefined && payload[key] !== '') payload[key] = Number(payload[key]);
       else delete payload[key];
     });
@@ -396,6 +491,9 @@ export default function LeadsPage() {
   // Name, Contact Person, Status. Everything else (Phone, Email, Title,
   // Source, Industry, Score, Value, Assigned To, Last Contact, Next Follow Up)
   // moved off the main table; still editable from the Lead detail page.
+  const filterField =
+    'mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]';
+
   const columns: DataTableColumn<any>[] = [
     {
       header: 'Series ID',
@@ -426,6 +524,32 @@ export default function LeadsPage() {
       },
     },
     { header: 'Status', accessor: (lead) => <StatusBadge status={lead.status} /> },
+    {
+      header: 'Requirement',
+      id: 'requirement',
+      accessor: (lead) => {
+        const parts = [lead.configuration, lead.propertyType].filter(Boolean).join(' ');
+        const budget = budgetRange(lead.budgetMin, lead.budgetMax);
+        if (!parts && !budget) return <span className="text-slate-400">—</span>;
+        return (
+          <span className="text-slate-600">
+            {parts}
+            {budget && <span className="block text-xs text-slate-400">{budget}</span>}
+          </span>
+        );
+      },
+    },
+    {
+      header: 'Area',
+      id: 'preferredLocation',
+      accessor: (lead) => <span className="text-slate-600">{lead.preferredLocation || lead.city || '—'}</span>,
+    },
+    {
+      header: 'Project',
+      id: 'projectName',
+      optional: true,
+      accessor: (lead) => <span className="text-slate-600">{lead.projectName || '—'}</span>,
+    },
     // Task 2.16 removed these from the default view, but they're still real
     // lead fields — available on request via "Arrange & Hide Columns" -> Add.
     {
@@ -456,7 +580,7 @@ export default function LeadsPage() {
       header: 'Source',
       id: 'leadSource',
       optional: true,
-      accessor: (lead) => <span className="text-slate-600">{lead.source || lead.leadSource || '—'}</span>,
+      accessor: (lead) => <span className="text-slate-600">{lead.source || lead.leadSource ? leadSourceLabel(lead.source || lead.leadSource) : '—'}</span>,
     },
     {
       header: 'Industry',
@@ -482,7 +606,15 @@ export default function LeadsPage() {
       header: 'Assigned To',
       id: 'assignedTo',
       optional: true,
-      accessor: (lead) => <span className="text-slate-600">{lead.assignedTo || '—'}</span>,
+      accessor: (lead) =>
+        lead.assignedTo ? (
+          <span className="flex items-center gap-2 text-slate-600">
+            <AgentStatusDot state={agentStates.get(Number(lead.assignedToId)) || 'offline'} />
+            {lead.assignedTo}
+          </span>
+        ) : (
+          <span className="text-slate-400">—</span>
+        ),
     },
   ];
 
@@ -509,7 +641,7 @@ export default function LeadsPage() {
       />
 
       <div className="mb-4 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs flex flex-col gap-3 sm:flex-row sm:items-center">
-        <SearchInput value={search} onChange={setSearch} placeholder="Search by Series ID or Company Name..." className="sm:max-w-xs" />
+        <SearchInput value={search} onChange={setSearch} placeholder="Search name, number, area, 2 BHK..." className="sm:max-w-xs" />
         <div className="flex items-center gap-2">
           <select
             value={territoryFilter}
@@ -539,7 +671,16 @@ export default function LeadsPage() {
             <option value="lost">Lost</option>
           </select>
         </div>
-        <span className="text-sm text-slate-500">{leads.length} lead{leads.length === 1 ? '' : 's'}</span>
+        <button
+          type="button"
+          onClick={() => setShowFilters((v) => !v)}
+          className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border px-3 py-2 text-sm font-medium ${
+            showFilters || activeFilterCount ? 'border-[var(--primary)] text-[var(--primary)]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+          }`}
+        >
+          <FunnelIcon className="h-4 w-4" /> More filters{activeFilterCount ? ` (${activeFilterCount})` : ''}
+        </button>
+        <span className="whitespace-nowrap text-sm text-slate-500">{leads.length} lead{leads.length === 1 ? '' : 's'}</span>
         <div className="ml-auto flex items-center gap-1 rounded-lg border border-slate-200 bg-white p-1">
           <button
             onClick={() => setView('list')}
@@ -559,6 +700,87 @@ export default function LeadsPage() {
           </button>
         </div>
       </div>
+
+      {showFilters && (
+        <div className="mb-4 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div>
+              <label className="block text-xs font-medium text-slate-500">Lead source</label>
+              <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)} className={filterField}>
+                <option value="all">All sources</option>
+                {LEAD_SOURCE_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-500">Sales person</label>
+              <select value={assigneeFilter} onChange={(e) => setAssigneeFilter(e.target.value)} className={filterField}>
+                <option value="all">Everyone</option>
+                <option value="unassigned">Unassigned</option>
+                {assignableUsers.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {agentStates.size ? (agentStates.get(u.id) && agentStates.get(u.id) !== 'offline' ? '🟢 ' : '🔴 ') : ''}
+                    {u.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-500">Property type</label>
+              <select value={propertyTypeFilter} onChange={(e) => setPropertyTypeFilter(e.target.value)} className={filterField}>
+                <option value="all">Any type</option>
+                {PROPERTY_TYPE_OPTIONS.map((o) => (
+                  <option key={o} value={o}>{o}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-500">Budget</label>
+              <select value={budgetFilter} onChange={(e) => setBudgetFilter(e.target.value)} className={filterField}>
+                <option value="">Any budget</option>
+                {BUDGET_OPTIONS.map((o, i) => (
+                  <option key={o.label} value={i}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-500">Area / locality</label>
+              <input value={locationFilter} onChange={(e) => setLocationFilter(e.target.value)} placeholder="e.g. Baner, Wakad" className={filterField} />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-500">Lead date from</label>
+              <input type="date" value={dateFrom} max={dateTo || undefined} onChange={(e) => setDateFrom(e.target.value)} className={filterField} />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-500">Lead date to</label>
+              <input type="date" value={dateTo} min={dateFrom || undefined} onChange={(e) => setDateTo(e.target.value)} className={filterField} />
+            </div>
+            <div className="flex items-end">
+              <button type="button" onClick={clearFilters} disabled={!activeFilterCount} className="text-sm font-medium text-[var(--primary)] hover:underline disabled:text-slate-300 disabled:no-underline">
+                Clear filters
+              </button>
+            </div>
+          </div>
+          <div className="mt-3">
+            <span className="block text-xs font-medium text-slate-500">Configuration</span>
+            <div className="mt-1 flex flex-wrap gap-1.5">
+              {CONFIGURATION_OPTIONS.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => toggleConfig(c)}
+                  className={`rounded-full border px-3 py-1 text-xs font-semibold ${
+                    configFilter.includes(c) ? 'border-[var(--primary)] bg-[var(--primary)] text-white' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
 
@@ -686,16 +908,9 @@ export default function LeadsPage() {
                       {...register('leadSource')}
                       className="mt-1 w-full rounded-lg border-0 bg-slate-100/50 p-2 text-sm focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
                     >
-                      <option value="Website">Website</option>
-                      <option value="LinkedIn">LinkedIn</option>
-                      <option value="Facebook">Facebook</option>
-                      <option value="Instagram">Instagram</option>
-                      <option value="Referral">Referral</option>
-                      <option value="Event">Event</option>
-                      <option value="Social Media">Social Media</option>
-                      <option value="Cold Call">Cold Call</option>
-                      <option value="Email">Email</option>
-                      <option value="Other">Other</option>
+                      {LEAD_SOURCE_OPTIONS.map((o) => (
+                        <option key={o.value} value={o.value}>{o.label}</option>
+                      ))}
                     </select>
                   </div>
                   <div>
@@ -718,6 +933,46 @@ export default function LeadsPage() {
               </div>
 
               <div className="border-b border-slate-200 pb-4">
+                <h4 className="text-sm font-medium text-slate-700 mb-3">Property Requirement</h4>
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700">Configuration</label>
+                    <select {...register('configuration')} className="mt-1 w-full rounded-lg border-0 bg-slate-100/50 p-2 text-sm focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)]">
+                      <option value="">— Select —</option>
+                      {CONFIGURATION_OPTIONS.map((o) => (
+                        <option key={o} value={o}>{o}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700">Property Type</label>
+                    <select {...register('propertyType')} className="mt-1 w-full rounded-lg border-0 bg-slate-100/50 p-2 text-sm focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)]">
+                      <option value="">— Select —</option>
+                      {PROPERTY_TYPE_OPTIONS.map((o) => (
+                        <option key={o} value={o}>{o}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700">Preferred Area</label>
+                    <input type="text" {...register('preferredLocation')} placeholder="e.g. Baner, Pune" className="mt-1 w-full rounded-lg border-0 bg-slate-100/50 p-2 text-sm focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)]" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700">Project / Listing</label>
+                    <input type="text" {...register('projectName')} className="mt-1 w-full rounded-lg border-0 bg-slate-100/50 p-2 text-sm focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)]" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700">Budget From (₹)</label>
+                    <input type="number" min={0} step={100000} {...register('budgetMin')} placeholder="e.g. 5000000" className="mt-1 w-full rounded-lg border-0 bg-slate-100/50 p-2 text-sm focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)]" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700">Budget To (₹)</label>
+                    <input type="number" min={0} step={100000} {...register('budgetMax')} placeholder="e.g. 7500000" className="mt-1 w-full rounded-lg border-0 bg-slate-100/50 p-2 text-sm focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)]" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-b border-slate-200 pb-4">
                 <h4 className="text-sm font-medium text-slate-700 mb-3">Assignment & Scheduling</h4>
                 
                 <div className="grid grid-cols-2 gap-3">
@@ -728,7 +983,7 @@ export default function LeadsPage() {
                       onChange={(val) => setValue('assignedToId', val)}
                       placeholder="Type user name to search..."
                     />
-                    <p className="mt-1 text-[11px] text-slate-400">The assignee is notified automatically when assigned.</p>
+                    <p className="mt-1 text-[11px] text-slate-400">The assignee is notified automatically. Left blank, lead rotation (if on) picks the next sales person.</p>
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-slate-700">Schedule Meeting</label>

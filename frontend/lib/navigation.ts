@@ -26,6 +26,10 @@ import {
   ReceiptRefundIcon,
   PuzzlePieceIcon,
   BriefcaseIcon,
+  PhoneIcon,
+  MapPinIcon,
+  ChartPieIcon,
+  SignalIcon,
 } from '@heroicons/react/24/outline';
 
 export type NavItem = {
@@ -48,12 +52,16 @@ export const navigation: NavSection[] = [
       { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
       { name: 'Reports', href: '/reports', icon: ChartBarIcon, permission: 'reports:view' },
       { name: 'Analytics', href: '/marketing/analytics', icon: PresentationChartLineIcon, permission: 'marketing:view' },
+      { name: 'Lead Sources', href: '/lead-sources', icon: ChartPieIcon, permission: 'leads:read' },
     ],
   },
   {
     title: 'Sales',
     items: [
       { name: 'Leads', href: '/leads', icon: ClipboardDocumentListIcon, permission: 'leads:read' },
+      { name: 'Sales Activity', href: '/sales-activity', icon: SignalIcon },
+      { name: 'Call Tracking', href: '/call-tracking', icon: PhoneIcon },
+      { name: 'Site Visits', href: '/site-visits', icon: MapPinIcon, permission: 'leads:read' },
       { name: 'Deals', href: '/deals', icon: BriefcaseIcon, permission: 'deals:read' },
       { name: 'Quotes', href: '/quotes', icon: DocumentTextIcon, permission: 'quotes:view' },
       { name: 'Tasks', href: '/tasks', icon: CheckCircleIcon, permission: 'tasks:view' },

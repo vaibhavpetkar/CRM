@@ -75,6 +75,14 @@ interface LeadAttributes {
   qualifiedById?: number | null; // user who qualified the lead
   meetingStatus?: string | null; // 'unassigned' | 'pending' | 'scheduled' | 'completed' | 'rescheduled' | 'cancelled' | 'no-show' (Task 2.10)
 
+  // Real-estate requirement (what the buyer is looking for)
+  propertyType?: string | null; // 'Apartment' | 'Villa' | 'Plot' | 'Commercial' ...
+  configuration?: string | null; // '1 RK' | '1 BHK' | '2 BHK' | ... (see frontend lib/lead-options.ts)
+  preferredLocation?: string | null; // area / locality the buyer wants
+  projectName?: string | null; // project or listing the enquiry came for
+  budgetMin?: number | null; // rupees
+  budgetMax?: number | null;
+
   createdById?: number | null;
   modifiedById?: number | null;
   deletedAt?: Date | null;
@@ -155,6 +163,12 @@ class Lead extends Model<LeadAttributes, LeadCreationAttributes> implements Lead
   public timelineToPurchase?: string | null;
   public qualifiedById?: number | null;
   public meetingStatus?: string | null;
+  public propertyType?: string | null;
+  public configuration?: string | null;
+  public preferredLocation?: string | null;
+  public projectName?: string | null;
+  public budgetMin?: number | null;
+  public budgetMax?: number | null;
   public createdById?: number | null;
   public modifiedById?: number | null;
   public deletedAt?: Date | null;
@@ -418,6 +432,12 @@ Lead.init(
       type: DataTypes.STRING(30),
       allowNull: true,
     },
+    propertyType: { type: DataTypes.STRING(50), allowNull: true },
+    configuration: { type: DataTypes.STRING(30), allowNull: true },
+    preferredLocation: { type: DataTypes.STRING(255), allowNull: true },
+    projectName: { type: DataTypes.STRING(255), allowNull: true },
+    budgetMin: { type: DataTypes.DECIMAL(15, 2), allowNull: true },
+    budgetMax: { type: DataTypes.DECIMAL(15, 2), allowNull: true },
     assignedToId: {
       type: DataTypes.INTEGER.UNSIGNED,
       allowNull: true,

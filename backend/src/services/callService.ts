@@ -26,7 +26,7 @@ const RECORDING_RETRY_MS = 10000;
 const isTerminal = (status: string) => (TERMINAL_CALL_STATUSES as string[]).includes(status);
 
 /** Same rules as authorize(): super admins and '*' roles can do anything. */
-const userCan = (user: any, permission: string) => {
+export const userCan = (user: any, permission: string) => {
   if (user?.isSuperAdmin) return true;
   let perms: string[] = [];
   try {
@@ -64,6 +64,7 @@ export const getConfig = async (user: any) => {
   const hasNumbers = await hasCallerNumbers();
   const hasCallerId = hasNumbers || !!provider?.defaultCallerId();
   if (provider && !hasCallerId && provider.key === 'exotel') missingEnvVars.push('EXOTEL_CALLER_ID');
+  if (provider && !hasCallerId && provider.key === 'vi') missingEnvVars.push('VI_CALLER_ID');
   const agentNumber = normalizeIndianNumber(user?.phone);
   return {
     enabled: !!provider && missingEnvVars.length === 0,
@@ -215,7 +216,7 @@ const logCallActivity = async (call: Call) => {
     entityType: target.entityType,
     entityId: target.entityId,
     performedById: call.userId,
-    details: `Call to ${formatIndianNumber(call.customerNumber)}: ${outcome}${talk}.`,
+    details: `${call.direction === 'inbound' ? 'Incoming call from' : 'Call to'} ${formatIndianNumber(call.customerNumber)}: ${outcome}${talk}.`,
   });
 };
 
@@ -289,17 +290,23 @@ export const handleCallback = async (token: string, body: Record<string, any>) =
 const loadCall = async (user: any, id: number, action: 'read' | 'update') => {
   const call = await Call.findByPk(id);
   if (!call) throw new NotFoundError('Call', id);
+  // An incoming call from someone who isn't a lead: theirs, or a manager's.
+  if (!call.leadId && !call.contactId) {
+    if (call.userId !== user.id && !userCan(user, 'users:read')) throw new ForbiddenError();
+    return call;
+  }
   await loadTarget(user, { leadId: call.leadId, contactId: call.contactId }, action === 'update' && call.userId === user.id ? 'read' : action);
   return call;
 };
 
 const serialize = (call: Call, extra: Record<string, any> = {}) => ({
   id: call.id,
+  direction: call.direction || 'outbound',
   provider: call.provider,
   status: call.status as CallStatus,
   isActive: !isTerminal(call.status),
   customerNumber: formatIndianNumber(call.customerNumber),
-  agentNumber: formatIndianNumber(call.agentNumber),
+  agentNumber: call.agentNumber ? formatIndianNumber(call.agentNumber) : '',
   callerId: call.callerId ? formatIndianNumber(call.callerId) : null,
   leadId: call.leadId,
   contactId: call.contactId,
