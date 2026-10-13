@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PageHeader from '@/components/ui/page-header';
 import StatusBadge from '@/components/ui/status-badge';
 import Button from '@/components/ui/button';
@@ -38,12 +38,14 @@ const emptyForm = {
   assignedToId: '',
 };
 
+const isTaskOverdue = (t: any) => !!t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'completed';
+
 export default function TasksPage() {
   const toast = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [filter, setFilter] = useState('pending');
-  const [tasks, setTasks] = useState<any[]>([]);
+  const [allTasks, setAllTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -81,30 +83,22 @@ export default function TasksPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
+  // All tasks are loaded once and each tab is a view over them, so the summary
+  // cards count every task whichever tab is open (they used to count only the
+  // open tab, so In Progress showed 0 Completed).
   const fetchTasks = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      // Task 4.1: Overdue is now its own tab, computed from all non-completed
-      // tasks rather than being folded into "Pending". The backend has no
-      // distinct "overdue" status (it's date-derived), so for that tab we
-      // fetch everything not completed and filter client-side.
-      const res = await tasksApi.getTasks({ status: filter === 'overdue' ? 'all' : filter });
-      let list = res.tasks || [];
-      if (filter === 'overdue') {
-        list = list.filter((t: any) => t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'completed');
-      } else if (filter === 'pending') {
-        // Pending tab now excludes overdue ones, since those live under Overdue.
-        list = list.filter((t: any) => !(t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'completed'));
-      }
-      setTasks(list);
+      const res = await tasksApi.getTasks({ status: 'all' });
+      setAllTasks(res.tasks || []);
     } catch (err: any) {
       setError(err.message || 'Failed to load tasks. Is the backend running?');
-      setTasks([]);
+      setAllTasks([]);
     } finally {
       setLoading(false);
     }
-  }, [filter]);
+  }, []);
 
   useEffect(() => {
     fetchTasks();
@@ -243,11 +237,18 @@ export default function TasksPage() {
     }
   };
 
-  const pendingCount = tasks.filter((t) => t.status === 'pending' || t.status === 'in-progress').length;
-  const overdueCount = tasks.filter((t) => {
-    if (!t.dueDate) return false;
-    return new Date(t.dueDate) < new Date() && t.status !== 'completed';
-  }).length;
+  // Task 4.1: Overdue is its own tab. The backend has no "overdue" status (it
+  // is date-derived), and Pending leaves out the overdue ones.
+  const tasks = useMemo(() => {
+    if (filter === 'all') return allTasks;
+    if (filter === 'overdue') return allTasks.filter(isTaskOverdue);
+    if (filter === 'pending') return allTasks.filter((t) => t.status === 'pending' && !isTaskOverdue(t));
+    return allTasks.filter((t) => t.status === filter);
+  }, [allTasks, filter]);
+
+  const pendingCount = allTasks.filter((t) => t.status === 'pending' || t.status === 'in-progress').length;
+  const overdueCount = allTasks.filter(isTaskOverdue).length;
+  const completedCount = allTasks.filter((t) => t.status === 'completed').length;
 
   return (
     <>
@@ -282,7 +283,7 @@ export default function TasksPage() {
             <CheckCircleIcon className="h-5 w-5 text-green-600" />
           </div>
           <div>
-            <p className="text-2xl font-bold text-slate-900">{tasks.filter((t) => t.status === 'completed').length}</p>
+            <p className="text-2xl font-bold text-slate-900">{completedCount}</p>
             <p className="text-xs text-slate-500">Completed</p>
           </div>
         </Card>

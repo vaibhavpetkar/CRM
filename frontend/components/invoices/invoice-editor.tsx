@@ -337,6 +337,7 @@ export default function InvoiceEditor({ invoiceId, autoPrint = false }: { invoic
               onChange={(val) => setFormData({ ...formData, client: val })}
               onSelect={handleCompanySelect}
               placeholder="Type client name to search..."
+              scope="clients"
             />
           </div>
           <div>

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Sidebar from './sidebar';
 import Topbar from './topbar';
+import GlobalShortcuts from './global-shortcuts';
 import AuthGuard from './auth-guard';
 import SubscriptionGate from '@/components/subscription/subscription-gate';
 import { cn } from '@/lib/utils';
@@ -31,6 +32,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-[var(--background)]">
+      <GlobalShortcuts />
       <Sidebar
         collapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
