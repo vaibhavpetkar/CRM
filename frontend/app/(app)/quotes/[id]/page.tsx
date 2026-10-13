@@ -122,6 +122,24 @@ export default function QuoteDetailPage() {
     }
   };
 
+  const addLineItem = () => setLineItems((prev) => [...prev, { itemId: '', productName: '', quantity: 1, unit: 'Nos', rate: 0 }]);
+
+  // An accepted quotation is locked; a revision copies it into a new,
+  // editable version so items can still be added or changed.
+  const [revising, setRevising] = useState(false);
+  const handleRevise = async () => {
+    setRevising(true);
+    try {
+      const res = await quotesApi.reviseQuote(quoteId);
+      toast.success(`Revision ${res.quote?.quoteNumber || ''} created. You can edit it now.`);
+      router.push(`/quotes/${res.quote.id}`);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to create a revision');
+    } finally {
+      setRevising(false);
+    }
+  };
+
   const runAction = async (action: 'send' | 'accept' | 'approve' | 'reject') => {
     setBusyAction(action);
     try {
@@ -215,9 +233,12 @@ export default function QuoteDetailPage() {
         <StatusBadge status={quote.status} />
       </div>
       {isLocked && (
-        <p className="rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs text-amber-700">
-          This quotation has been accepted and can no longer be edited directly — create a revision instead.
-        </p>
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs text-amber-700 no-print">
+          <span>This quotation has been accepted and can no longer be edited directly. Create a revision to add or change items.</span>
+          <Button type="button" variant="secondary" size="sm" onClick={handleRevise} disabled={revising} className="ml-auto">
+            {revising ? 'Creating...' : 'Create Revision'}
+          </Button>
+        </div>
       )}
 
       <Card title="Client Details">
@@ -283,8 +304,8 @@ export default function QuoteDetailPage() {
           !isLocked && (
             <button
               type="button"
-              onClick={() => setLineItems([...lineItems, { itemId: '', productName: '', quantity: 1, unit: 'Nos', rate: 0 }])}
-              className="flex items-center gap-1 text-xs font-medium text-[var(--primary)] hover:underline"
+              onClick={addLineItem}
+              className="flex items-center gap-1 text-xs font-medium text-[var(--primary)] hover:underline no-print"
             >
               <PlusIcon className="h-3.5 w-3.5" /> Add Item
             </button>
@@ -292,7 +313,14 @@ export default function QuoteDetailPage() {
         }
       >
         {lineItems.length === 0 ? (
-          <p className="py-6 text-center text-sm text-slate-400">No line items yet.</p>
+          <div className="py-6 text-center text-sm text-slate-400">
+            <p>No line items yet.</p>
+            {!isLocked && (
+              <Button type="button" size="sm" onClick={addLineItem} className="mx-auto mt-3 no-print">
+                <PlusIcon className="h-4 w-4" /> Add Item
+              </Button>
+            )}
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">

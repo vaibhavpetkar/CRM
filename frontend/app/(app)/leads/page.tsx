@@ -420,8 +420,12 @@ export default function LeadsPage() {
     // for type integer"). Convert to a number when filled, or drop the key
     // (-> backend defaults it to null) when left blank. Mirrors the same
     // sanitization already applied on the CSV import path below.
-    ['noOfEmployees', 'latitude', 'longitude', 'leadOwnerId', 'assignedToId', 'qualifiedById'].forEach((key) => {
-      if (payload[key] !== undefined && payload[key] !== '') payload[key] = Number(payload[key]);
+    // null must be checked too: Number(null) is 0, which reached the API as
+    // the user id "0" and blocked saving a lead with Assigned To or
+    // Qualified By left blank. A blank picker is sent as null so lead
+    // rotation can pick the assignee (and an edit can clear the field).
+    ['noOfEmployees', 'latitude', 'longitude', 'leadOwnerId'].forEach((key) => {
+      if (payload[key] !== undefined && payload[key] !== null && payload[key] !== '') payload[key] = Number(payload[key]);
       else delete payload[key];
     });
 
@@ -450,7 +454,7 @@ export default function LeadsPage() {
     }
   };
 
-  const handleImportRow = async (row: Record<string, any>) => {
+  const importPayload = (row: Record<string, any>) => {
     const payload: Record<string, any> = { ...row };
     if (payload.leadSource) payload.leadSource = String(payload.leadSource).toLowerCase().trim().replace(/\s+/g, '-');
     if (payload.status) payload.status = String(payload.status).toLowerCase().trim();
@@ -458,8 +462,13 @@ export default function LeadsPage() {
       if (payload[key] !== undefined && payload[key] !== '') payload[key] = Number(payload[key]);
       else delete payload[key];
     });
-    return leadsApi.createLead(payload);
+    return payload;
   };
+
+  const handleImportRow = async (row: Record<string, any>) => leadsApi.createLead(importPayload(row));
+
+  // Large files (tens of thousands of leads) go up in batches of 500 rows.
+  const handleImportBatch = async (rows: Record<string, any>[]) => (await leadsApi.importLeads(rows.map(importPayload))).results;
 
   const handleDelete = async (lead: any) => {
     const name = lead.name || `${lead.firstName || ''} ${lead.lastName || ''}`.trim() || 'this lead';
@@ -640,6 +649,8 @@ export default function LeadsPage() {
                 fields: LEAD_FIELDS,
                 getExportData: () => leads,
                 onImportRow: handleImportRow,
+                onImportBatch: handleImportBatch,
+                importBatchSize: 500,
                 onImportComplete: fetchLeads,
               }}
             />

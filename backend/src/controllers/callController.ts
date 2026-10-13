@@ -24,6 +24,21 @@ export const startCall = asyncHandler(async (req: AuthRequest, res: Response) =>
   return res.status(201).json(call);
 });
 
+export const logManualCall = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const { leadId, contactId, number, direction, status, durationMinutes, calledAt, notes } = req.body || {};
+  const call = await callService.logManualCall(req.user, {
+    leadId: optionalId(leadId),
+    contactId: optionalId(contactId),
+    number,
+    direction,
+    status,
+    durationMinutes,
+    calledAt,
+    notes,
+  });
+  return res.status(201).json(call);
+});
+
 export const listCalls = asyncHandler(async (req: AuthRequest, res: Response) => {
   return res.json(
     await callService.listCalls(req.user, { leadId: optionalId(req.query.leadId), contactId: optionalId(req.query.contactId) })

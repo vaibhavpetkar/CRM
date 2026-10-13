@@ -25,7 +25,13 @@ import { useToast } from '@/components/ui/toast';
 import FormField, { getInputClassName } from '@/components/ui/form-field';
 import { itemSchema, validateForm, FieldErrors } from '@/lib/validation';
 
-const UNITS = ['Nos', 'Kg', 'Gram', 'Litre', 'ML', 'Box', 'Piece', 'Hour', 'Day', 'Meter', 'Dozen'];
+// Property units first (the CRM sells flats, plots and land), then the
+// general units kept for items that are not property.
+const UNIT_GROUPS: { label: string; units: string[] }[] = [
+  { label: 'Real estate', units: ['Flat / Unit', 'Sq.ft', 'Sq.m', 'Sq.yd', 'Acre', 'Gunta', 'Hectare', 'Plot'] },
+  { label: 'General', units: ['Nos', 'Kg', 'Gram', 'Litre', 'ML', 'Box', 'Piece', 'Hour', 'Day', 'Meter', 'Dozen'] },
+];
+const UNITS = UNIT_GROUPS.flatMap((g) => g.units);
 
 const emptyForm = {
   itemName: '',
@@ -287,8 +293,13 @@ export default function ItemsPage() {
                     onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
                     className={getInputClassName()}
                   >
-                    {UNITS.map((u) => (
-                      <option key={u} value={u}>{u}</option>
+                    {formData.unit && !UNITS.includes(formData.unit) && <option value={formData.unit}>{formData.unit}</option>}
+                    {UNIT_GROUPS.map((g) => (
+                      <optgroup key={g.label} label={g.label}>
+                        {g.units.map((u) => (
+                          <option key={u} value={u}>{u}</option>
+                        ))}
+                      </optgroup>
                     ))}
                   </select>
                 </FormField>

@@ -16,6 +16,17 @@ import { PlusIcon, VideoCameraIcon, MapPinIcon, PhoneIcon, XMarkIcon, TrashIcon 
 import { useToast } from '@/components/ui/toast';
 import PrintButton from '@/components/ui/print-button';
 
+// Meeting times are stored as text ("10:00 AM"), so the picker offers
+// 15-minute slots in that same format through the working day.
+const TIME_SLOTS = Array.from({ length: (22 - 7) * 4 + 1 }, (_, i) => {
+  const minutes = 7 * 60 + i * 15;
+  const h24 = Math.floor(minutes / 60);
+  const h12 = h24 % 12 || 12;
+  return `${h12}:${String(minutes % 60).padStart(2, '0')} ${h24 < 12 ? 'AM' : 'PM'}`;
+});
+
+const DURATIONS = ['15 min', '30 min', '45 min', '1 hour', '1.5 hours', '2 hours', '3 hours'];
+
 const emptyForm = {
   title: '',
   client: '',
@@ -265,25 +276,33 @@ export default function MeetingsPage() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-700">Time</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 10:00 AM"
+                  <select
                     value={formData.time}
                     onChange={(e) => setFormData({ ...formData, time: e.target.value })}
                     className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
-                  />
+                  >
+                    <option value="">Pick a time</option>
+                    {formData.time && !TIME_SLOTS.includes(formData.time) && <option value={formData.time}>{formData.time}</option>}
+                    {TIME_SLOTS.map((t) => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-slate-700">Duration</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 30 min"
+                  <select
                     value={formData.duration}
                     onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
                     className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
-                  />
+                  >
+                    <option value="">Pick a duration</option>
+                    {formData.duration && !DURATIONS.includes(formData.duration) && <option value={formData.duration}>{formData.duration}</option>}
+                    {DURATIONS.map((d) => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-700">Type</label>

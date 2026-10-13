@@ -2,7 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ChevronDownIcon, ChevronRightIcon, PhoneIcon, PhoneArrowDownLeftIcon, PhoneArrowUpRightIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { ChevronDownIcon, ChevronRightIcon, PhoneIcon, PlusIcon, PhoneArrowDownLeftIcon, PhoneArrowUpRightIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import PageHeader from '@/components/ui/page-header';
 import Card from '@/components/ui/card';
 import Button from '@/components/ui/button';
@@ -10,6 +10,7 @@ import LoadingSpinner from '@/components/ui/loading-spinner';
 import DateRangePicker, { DateRange, presetRange } from '@/components/sales/date-range';
 import { AgentStatusDot, AgentStatusBadge } from '@/components/sales/agent-status';
 import RecordingPlayer from '@/components/calls/recording-player';
+import LogCallModal from '@/components/calls/log-call-modal';
 import { CALL_STATUS_CLASS, CALL_STATUS_LABEL, formatDuration } from '@/components/calls/call-format';
 import { CallLogRow, PresenceState, salesApi, SalesAgentActivity } from '@/lib/api';
 import { getSocket } from '@/lib/socket';
@@ -48,6 +49,7 @@ export default function CallTrackingPage() {
   const [canSeeTeam, setCanSeeTeam] = useState(false);
   const [open, setOpen] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [logOpen, setLogOpen] = useState(false);
 
   // Deep link from Sales Activity: /call-tracking?userId=3&from=...&to=...
   useEffect(() => {
@@ -111,7 +113,12 @@ export default function CallTrackingPage() {
       <PageHeader
         title="Call Tracking"
         description="Every incoming and outgoing call, with outcome, talk time, notes and recordings"
-        actions={<Link href="/sales-activity"><Button size="sm" variant="secondary">Sales activity</Button></Link>}
+        actions={
+          <>
+            <Link href="/sales-activity"><Button size="sm" variant="secondary">Sales activity</Button></Link>
+            <Button size="sm" onClick={() => setLogOpen(true)}><PlusIcon className="h-4 w-4" /> Log Call</Button>
+          </>
+        }
       />
 
       <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs">
@@ -252,6 +259,16 @@ export default function CallTrackingPage() {
           <span className="text-slate-500">Page {page} of {pages}</span>
           <Button size="sm" variant="secondary" disabled={page >= pages} onClick={() => setPage((p) => p + 1)}>Next</Button>
         </div>
+      )}
+      {logOpen && (
+        <LogCallModal
+          onClose={() => setLogOpen(false)}
+          onSaved={() => {
+            setLogOpen(false);
+            loadCalls();
+            loadAgents();
+          }}
+        />
       )}
     </>
   );

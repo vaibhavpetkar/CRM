@@ -186,6 +186,63 @@ export const startCall = async (user: any, input: Target & { number?: string }) 
   return serialize(call, { targetName: target.name });
 };
 
+// ─── Manual call log ────────────────────────────────────────────────────────
+
+const MANUAL_OUTCOMES: CallStatus[] = ['completed', 'no-answer', 'busy'];
+
+/**
+ * Logs a call a sales person made or took on their own mobile, outside the
+ * calling provider. It lands in Call Tracking, the activity reports and the
+ * lead's timeline like any other call, marked as provider "manual".
+ */
+export const logManualCall = async (
+  user: any,
+  input: Target & { number?: string; direction?: string; status?: string; durationMinutes?: unknown; calledAt?: string; notes?: string }
+) => {
+  const target = input.leadId || input.contactId ? await loadTarget(user, input, 'read') : null;
+
+  const typed = input.number ? normalizeIndianNumber(input.number) : null;
+  if (input.number && !typed) throw new ValidationError('That is not a valid Indian phone number.');
+  const customerNumber = typed || target?.numbers.map((n) => normalizeIndianNumber(n)).find(Boolean) || null;
+  if (!customerNumber) throw new ValidationError('Enter the phone number you called, or pick a lead that has one.');
+
+  const status = (MANUAL_OUTCOMES as string[]).includes(String(input.status)) ? (input.status as CallStatus) : 'completed';
+  const minutes = Number(input.durationMinutes);
+  const durationSeconds = status === 'completed' && Number.isFinite(minutes) && minutes > 0 ? Math.round(minutes * 60) : 0;
+
+  const now = new Date();
+  let startedAt = input.calledAt ? new Date(input.calledAt) : now;
+  if (Number.isNaN(startedAt.getTime()) || startedAt > now) startedAt = now;
+  const endedAt = new Date(startedAt.getTime() + durationSeconds * 1000);
+
+  const call = await Call.create({
+    provider: 'manual',
+    direction: input.direction === 'inbound' ? 'inbound' : 'outbound',
+    callbackToken: crypto.randomBytes(24).toString('hex'),
+    status,
+    agentNumber: normalizeIndianNumber(user.phone) || '',
+    customerNumber,
+    leadId: target?.kind === 'Lead' ? target.id : null,
+    contactId: target?.kind === 'Contact' ? target.id : null,
+    userId: user.id,
+    notes: typeof input.notes === 'string' && input.notes.trim() ? input.notes.trim().slice(0, 5000) : null,
+    durationSeconds,
+    startedAt,
+    endedAt,
+  });
+  // Reports and Call Tracking count a call on the day it was created, so a
+  // call logged after the fact is dated to when it actually happened.
+  if (startedAt < now) {
+    await Call.sequelize!.query('UPDATE calls SET "createdAt" = :at WHERE id = :id', { replacements: { at: startedAt, id: call.id } });
+    (call as any).setDataValue('createdAt', startedAt);
+  }
+
+  await logCallActivity(call);
+  if (target?.kind === 'Lead') await Lead.update({ lastContacted: startedAt }, { where: { id: target.id } });
+  if (target?.kind === 'Contact') await Contact.update({ lastContacted: startedAt }, { where: { id: target.id } });
+  return serialize(call, target ? { targetName: target.name } : {});
+};
+
 // ─── Status updates (webhook + polling) ─────────────────────────────────────
 
 const recordingExtension = (contentType: string) =>

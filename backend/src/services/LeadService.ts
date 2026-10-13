@@ -61,7 +61,19 @@ const USER_REF_FIELD_LABELS: Record<string, string> = {
   qualifiedById: 'Qualified By',
 };
 
+// A blank user picker has reached us as 0 / "0" (Number(null) on the client),
+// which is never a real user id. Treat it as "nobody picked" so an empty
+// Assigned To falls through to lead rotation and an empty Qualified By
+// simply stays unset instead of failing validation.
+const clearBlankUserReferences = (data: Record<string, unknown>) => {
+  for (const field of Object.keys(USER_REF_FIELD_LABELS)) {
+    const value = data[field];
+    if (value === 0 || value === '0' || (typeof value === 'string' && value.trim() === '')) data[field] = null;
+  }
+};
+
 const validateUserReferences = async (data: Record<string, unknown>) => {
+  clearBlankUserReferences(data);
   const fields = Object.keys(USER_REF_FIELD_LABELS).filter(
     (field) => data[field] !== undefined && data[field] !== null
   );
