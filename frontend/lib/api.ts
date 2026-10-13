@@ -420,8 +420,8 @@ export const leadsApi = {
     });
   },
 
-  searchCompanies: async (query: string) => {
-    return request<{ results: CompanySuggestion[] }>(`/leads/company-search?q=${encodeURIComponent(query)}`);
+  searchCompanies: async (query: string, scope: 'companies' | 'clients' = 'companies') => {
+    return request<{ results: CompanySuggestion[] }>(`/leads/company-search?q=${encodeURIComponent(query)}&scope=${scope}`);
   },
 
   getStats: async () => {
@@ -885,7 +885,7 @@ export interface GlobalSearchResult {
 }
 
 export interface CompanySuggestion {
-  type: 'company' | 'contact';
+  type: 'company' | 'contact' | 'lead';
   id: number;
   name: string;
   email: string | null;

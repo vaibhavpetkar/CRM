@@ -6,7 +6,7 @@ import { leadsApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 export interface CompanySuggestion {
-  type: 'company' | 'contact';
+  type: 'company' | 'contact' | 'lead';
   id: number;
   name: string;
   email: string | null;
@@ -25,6 +25,8 @@ interface CompanyAutocompleteProps {
   placeholder?: string;
   className?: string;
   disabled?: boolean;
+  /** 'clients' also suggests people (leads and contacts by name), for quotes and invoices. */
+  scope?: 'companies' | 'clients';
 }
 
 export default function CompanyAutocomplete({
@@ -34,6 +36,7 @@ export default function CompanyAutocomplete({
   placeholder = 'Type company name to search...',
   className,
   disabled = false,
+  scope = 'companies',
 }: CompanyAutocompleteProps) {
   const [suggestions, setSuggestions] = useState<CompanySuggestion[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -51,7 +54,7 @@ export default function CompanyAutocomplete({
 
     setIsLoading(true);
     try {
-      const res = await leadsApi.searchCompanies(query);
+      const res = await leadsApi.searchCompanies(query, scope);
       setSuggestions(res.results || []);
     } catch (error) {
       console.error('Failed to fetch company suggestions:', error);
@@ -59,7 +62,7 @@ export default function CompanyAutocomplete({
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [scope]);
 
   // Debounced search
   useEffect(() => {
@@ -202,7 +205,12 @@ export default function CompanyAutocomplete({
             <button
               key={`${suggestion.type}-${suggestion.id}`}
               type="button"
-              onClick={() => handleSelect(suggestion)}
+              // mousedown, not click: the input's blur would otherwise close the
+              // list before a slow click lands on the option.
+              onMouseDown={(e) => {
+                e.preventDefault();
+                handleSelect(suggestion);
+              }}
               onMouseEnter={() => setHighlightedIndex(index)}
               className={cn(
                 'w-full px-3 py-2 text-left text-sm transition-colors',
@@ -226,6 +234,12 @@ export default function CompanyAutocomplete({
                       {suggestion.contactName}{suggestion.contactTitle ? `, ${suggestion.contactTitle}` : ''}
                     </p>
                   )}
+                  {/* Two people can share a name, so show their number to tell them apart */}
+                  {suggestion.type !== 'company' && !suggestion.industry && suggestion.phone && (
+                    <p className="truncate text-xs" style={{ opacity: index === highlightedIndex ? 0.8 : 0.6 }}>
+                      {suggestion.phone}
+                    </p>
+                  )}
                   {suggestion.industry && (
                     <p className="truncate text-xs" style={{ opacity: index === highlightedIndex ? 0.8 : 0.6 }}>
                       {suggestion.industry}
@@ -238,11 +252,6 @@ export default function CompanyAutocomplete({
         </div>
       )}
 
-      {isOpen && suggestions.length === 0 && value.length >= 2 && !isLoading && (
-        <div className="absolute z-20 mt-1 w-full rounded-lg border border-slate-200 bg-white shadow-lg ring-1 ring-black ring-opacity-5 p-3 text-sm text-slate-500 text-center">
-          No companies or contacts found
-        </div>
-      )}
     </div>
   );
 }

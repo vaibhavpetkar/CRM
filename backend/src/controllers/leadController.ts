@@ -4,6 +4,7 @@ import { asyncHandler } from '../utils/errorHandler';
 import leadService from '../services/LeadService';
 import Company from '../models/Company';
 import Contact from '../models/Contact';
+import Lead from '../models/Lead';
 import { Op } from 'sequelize';
 import { validationResult } from 'express-validator';
 import { createLeadValidation } from '../validations/leadValidation';
@@ -109,8 +110,8 @@ export const revertLeadChange = asyncHandler(async (req: AuthRequest, res: Respo
 
 // Search companies and contacts for auto-populate in lead form
 export const searchCompaniesAndContacts = asyncHandler(async (req: AuthRequest, res: Response) => {
-  const { q } = req.query as { q?: string };
-  
+  const { q, scope } = req.query as { q?: string; scope?: string };
+
   if (!q || q.trim().length < 2) {
     return res.json({ results: [] });
   }
@@ -124,8 +125,16 @@ export const searchCompaniesAndContacts = asyncHandler(async (req: AuthRequest, 
   const wordConditions = (field: string) => ({
     [Op.and]: words.map((w) => ({ [field]: { [Op.iLike]: `%${w}%` } })),
   });
+  // A person matches when every word is in their first name, last name or
+  // company ("rohan patil", "patil", "rohan kothrud developers").
+  const personConditions = (fields: string[]) => ({
+    [Op.and]: words.map((w) => ({ [Op.or]: fields.map((f) => ({ [f]: { [Op.iLike]: `%${w}%` } })) })),
+  });
+  // scope=clients (quotes, invoices) also offers the people the business
+  // deals with, since a real-estate client is usually a buyer, not a company.
+  const includePeople = scope === 'clients';
 
-  const [companies, contacts] = await Promise.all([
+  const [companies, contacts, leads, people, leadPeople] = await Promise.all([
     Company.findAll({
       where: {
         ...wordConditions('name'),
@@ -144,13 +153,44 @@ export const searchCompaniesAndContacts = asyncHandler(async (req: AuthRequest, 
       limit: 10,
       order: [['company', 'ASC']],
     }),
+    // Company names typed on earlier leads, so the same company is offered
+    // again instead of being re-typed slightly differently.
+    Lead.findAll({
+      where: wordConditions('company'),
+      attributes: ['id', 'firstName', 'lastName', 'email', 'phone', 'mobile', 'company', 'jobTitle', 'street', 'city', 'industry', 'website'],
+      limit: 10,
+      order: [['updatedAt', 'DESC']],
+    }),
+    includePeople
+      ? Contact.findAll({
+          where: { ...personConditions(['firstName', 'lastName', 'company']), isActive: true },
+          attributes: ['id', 'firstName', 'lastName', 'email', 'phone', 'company', 'jobTitle'],
+          limit: 10,
+          order: [['firstName', 'ASC']],
+        })
+      : Promise.resolve([] as Contact[]),
+    includePeople
+      ? Lead.findAll({
+          where: personConditions(['firstName', 'lastName', 'company']),
+          attributes: ['id', 'firstName', 'lastName', 'email', 'phone', 'mobile', 'company', 'jobTitle', 'street', 'city', 'industry', 'website'],
+          limit: 10,
+          order: [['updatedAt', 'DESC']],
+        })
+      : Promise.resolve([] as Lead[]),
   ]);
 
-  // Combine and deduplicate by company name
+  const leadAddress = (l: Lead) => [l.street, l.city].filter(Boolean).join(', ') || null;
+  const fullName = (p: { firstName?: string | null; lastName?: string | null }) =>
+    `${p.firstName || ''} ${p.lastName || ''}`.trim();
+
+  // Combine and deduplicate by name
   const companyMap = new Map<string, any>();
-  
+  const add = (key: string, row: any) => {
+    if (key && !companyMap.has(key)) companyMap.set(key, row);
+  };
+
   companies.forEach((c) => {
-    companyMap.set(c.name.toLowerCase(), {
+    add(c.name.toLowerCase(), {
       type: 'company',
       id: c.id,
       name: c.name,
@@ -165,23 +205,67 @@ export const searchCompaniesAndContacts = asyncHandler(async (req: AuthRequest, 
   });
 
   contacts.forEach((c) => {
-    const key = c.company?.toLowerCase() || '';
-    if (key && !companyMap.has(key)) {
-      companyMap.set(key, {
-        type: 'contact',
-        id: c.id,
-        name: c.company,
-        email: c.email,
-        phone: c.phone,
-        address: null, // contacts don't have address
-        website: null,
-        industry: null,
-        contactName: `${c.firstName} ${c.lastName}`,
-        contactTitle: c.jobTitle,
-      });
-    }
+    add(c.company?.toLowerCase() || '', {
+      type: 'contact',
+      id: c.id,
+      name: c.company,
+      email: c.email,
+      phone: c.phone,
+      address: null, // contacts don't have address
+      website: null,
+      industry: null,
+      contactName: fullName(c),
+      contactTitle: c.jobTitle,
+    });
   });
 
-  const results = Array.from(companyMap.values()).slice(0, 10);
+  leads.forEach((l) => {
+    add(l.company?.toLowerCase() || '', {
+      type: 'lead',
+      id: l.id,
+      name: l.company,
+      email: l.email,
+      phone: l.mobile || l.phone,
+      address: leadAddress(l),
+      website: l.website,
+      industry: l.industry,
+      contactName: fullName(l),
+      contactTitle: l.jobTitle,
+    });
+  });
+
+  people.forEach((c) => {
+    const name = fullName(c);
+    add(`person:${name.toLowerCase()}:${(c.email || c.phone || '').toLowerCase()}`, {
+      type: 'contact',
+      id: c.id,
+      name,
+      email: c.email,
+      phone: c.phone,
+      address: null,
+      website: null,
+      industry: null,
+      contactName: c.company || null,
+      contactTitle: c.jobTitle,
+    });
+  });
+
+  leadPeople.forEach((l) => {
+    const name = fullName(l);
+    add(`person:${name.toLowerCase()}:${(l.email || l.mobile || l.phone || '').toLowerCase()}`, {
+      type: 'lead',
+      id: l.id,
+      name,
+      email: l.email,
+      phone: l.mobile || l.phone,
+      address: leadAddress(l),
+      website: l.website,
+      industry: l.industry,
+      contactName: l.company || null,
+      contactTitle: l.jobTitle,
+    });
+  });
+
+  const results = Array.from(companyMap.values()).slice(0, includePeople ? 15 : 10);
   return res.json({ results });
 });
