@@ -5,6 +5,9 @@ import leadService from '../services/LeadService';
 import Company from '../models/Company';
 import Contact from '../models/Contact';
 import { Op } from 'sequelize';
+import { validationResult } from 'express-validator';
+import { createLeadValidation } from '../validations/leadValidation';
+import { ConflictError, ValidationError } from '../errors/AppError';
 
 export const getLeads = asyncHandler(async (req: AuthRequest, res: Response) => {
   const result = await leadService.list(req.query as any);
@@ -21,6 +24,52 @@ export const checkDuplicateLead = asyncHandler(async (req: AuthRequest, res: Res
   const { email, mobile, excludeId } = req.query as { email?: string; mobile?: string; excludeId?: string };
   const result = await leadService.checkDuplicate(email || null, mobile || null, excludeId);
   return res.json(result);
+});
+
+// Bulk import: POST /api/leads/import { rows: [...] }. The browser sends a
+// big file in batches of a few hundred rows instead of one request per lead,
+// so a 30,000-lead file is ~60 requests rather than 30,000. Each row goes
+// through the same validation and create path as the Add Lead form
+// (duplicate check, lead rotation, numbering), and a bad row only fails
+// itself: the response has one result per row, in order.
+export const IMPORT_BATCH_MAX = 1000;
+
+const rowErrorMessage = (err: unknown) => {
+  const e = err as { message?: string; details?: { message?: string }[] };
+  const detail = Array.isArray(e?.details) && e.details[0]?.message;
+  if (e?.message === 'Validation failed' && detail) return detail;
+  return e?.message || 'Import failed';
+};
+
+export const importLeads = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const rows = req.body?.rows;
+  if (!Array.isArray(rows) || rows.length === 0) throw new ValidationError('No rows to import.');
+  if (rows.length > IMPORT_BATCH_MAX) {
+    throw new ValidationError(`Send at most ${IMPORT_BATCH_MAX.toLocaleString('en-IN')} rows per request.`);
+  }
+
+  const results: { ok: boolean; id?: number; error?: string; duplicate?: boolean }[] = [];
+  for (const raw of rows) {
+    const rowReq = { body: raw && typeof raw === 'object' && !Array.isArray(raw) ? { ...raw } : {} } as any;
+    try {
+      await Promise.all(createLeadValidation.map((chain) => chain.run(rowReq)));
+      const invalid = validationResult(rowReq);
+      if (!invalid.isEmpty()) {
+        results.push({ ok: false, error: invalid.array()[0].msg });
+        continue;
+      }
+      const lead = await leadService.create(rowReq.body, req.user?.id);
+      results.push({ ok: true, id: lead.id });
+    } catch (err) {
+      results.push({ ok: false, error: rowErrorMessage(err), duplicate: err instanceof ConflictError || undefined });
+    }
+  }
+
+  return res.json({
+    created: results.filter((r) => r.ok).length,
+    failed: results.filter((r) => !r.ok).length,
+    results,
+  });
 });
 
 export const createLead = asyncHandler(async (req: AuthRequest, res: Response) => {

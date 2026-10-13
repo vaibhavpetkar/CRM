@@ -9,6 +9,11 @@ import { LEAD_SOURCE_OPTIONS } from '@/lib/lead-options';
 
 type Row = Record<string, unknown>;
 
+// Rows per request. Each request is handled while the browser waits, so a big
+// file goes up in batches small enough to finish well inside the server's
+// request timeout; any file size works this way.
+const BATCH_SIZE = 500;
+
 /** Excel / CSV import: read the sheet in the browser, preview it, send the rows. */
 export default function ImportSetup({ onImported }: { onImported: () => void }) {
   const toast = useToast();
@@ -19,6 +24,7 @@ export default function ImportSetup({ onImported }: { onImported: () => void }) 
   const [subSource, setSubSource] = useState('');
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<PortalImportCounts | null>(null);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
 
   const read = async (file: File) => {
     setResult(null);
@@ -39,15 +45,26 @@ export default function ImportSetup({ onImported }: { onImported: () => void }) 
 
   const doImport = async () => {
     setBusy(true);
+    const totals: PortalImportCounts = { created: 0, duplicate: 0, skipped: 0, failed: 0 };
+    setProgress({ done: 0, total: rows.length });
     try {
-      const res = await salesApi.importLeads({ rows, leadSource, subSource: subSource.trim() || undefined, fileName });
-      setResult(res);
-      toast.success(`${res.created} new lead${res.created === 1 ? '' : 's'} imported.`);
-      onImported();
+      for (let start = 0; start < rows.length; start += BATCH_SIZE) {
+        const res = await salesApi.importLeads({ rows: rows.slice(start, start + BATCH_SIZE), leadSource, subSource: subSource.trim() || undefined, fileName });
+        totals.created += res.created;
+        totals.duplicate += res.duplicate;
+        totals.skipped += res.skipped;
+        totals.failed += res.failed;
+        setResult({ ...totals });
+        setProgress({ done: Math.min(rows.length, start + BATCH_SIZE), total: rows.length });
+      }
+      toast.success(`${totals.created} new lead${totals.created === 1 ? '' : 's'} imported.`);
     } catch (err) {
-      toast.error((err as Error).message || 'Import failed.');
+      // Batches already sent stay imported; importing the file again skips them.
+      toast.error(`${(err as Error).message || 'Import failed.'} ${totals.created} leads were imported before this; importing the same file again skips them.`);
     } finally {
       setBusy(false);
+      setProgress(null);
+      onImported();
     }
   };
 
@@ -100,7 +117,11 @@ export default function ImportSetup({ onImported }: { onImported: () => void }) 
               <input value={subSource} onChange={(e) => setSubSource(e.target.value)} placeholder={fileName || 'e.g. Property expo Sept'} className={`${select} w-56`} />
             </label>
             <Button size="sm" disabled={busy} onClick={doImport}>
-              {busy ? 'Importing...' : `Import ${rows.length} row${rows.length === 1 ? '' : 's'}`}
+              {busy
+                ? progress
+                  ? `Importing ${progress.done.toLocaleString('en-IN')} of ${progress.total.toLocaleString('en-IN')}...`
+                  : 'Importing...'
+                : `Import ${rows.length.toLocaleString('en-IN')} row${rows.length === 1 ? '' : 's'}`}
             </Button>
           </div>
         </>

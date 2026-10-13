@@ -159,6 +159,21 @@ const SCHEMA_PATCHES: { name: string; sql: string }[] = [
     name: 'calls.direction',
     sql: `ALTER TABLE "calls" ADD COLUMN IF NOT EXISTS "direction" VARCHAR(10) NOT NULL DEFAULT 'outbound';`,
   },
+  {
+    // Large lead books (30,000+ leads): every create and import checks for a
+    // duplicate by mobile or email, the Leads page filters by assignee and
+    // status, and reports and the activity log read by date. Without these,
+    // each of those is a full scan of the company's rows.
+    name: 'lead scale indexes',
+    sql: `
+      CREATE INDEX IF NOT EXISTS "leads_company_mobile" ON "leads" ("companyId", "mobile");
+      CREATE INDEX IF NOT EXISTS "leads_company_email" ON "leads" ("companyId", "email");
+      CREATE INDEX IF NOT EXISTS "leads_company_assigned_status" ON "leads" ("companyId", "assignedToId", "status");
+      CREATE INDEX IF NOT EXISTS "leads_company_created" ON "leads" ("companyId", "createdAt" DESC);
+      CREATE INDEX IF NOT EXISTS "activity_logs_company_created" ON "activity_logs" ("companyId", "createdAt" DESC);
+      CREATE INDEX IF NOT EXISTS "calls_company_created" ON "calls" ("companyId", "createdAt" DESC);
+    `,
+  },
 ];
 
 export const runSchemaPatches = async (sequelize: Sequelize): Promise<void> => {

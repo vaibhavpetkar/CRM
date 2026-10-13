@@ -34,6 +34,8 @@ type Props = {
   initialTab?: Tab;
 };
 
+const PREVIEW_ROW_LIMIT = 200;
+
 const FORMATS: { id: ExportFormat; label: string; icon: typeof TableCellsIcon; hint: string }[] = [
   { id: 'excel', label: 'Excel', icon: TableCellsIcon, hint: '.xlsx' },
   { id: 'csv', label: 'CSV', icon: DocumentTextIcon, hint: '.csv' },
@@ -69,6 +71,7 @@ export default function ImportExportModal({ open, onClose, config, initialTab = 
   const [importing, setImporting] = useState(false);
   const [importSummary, setImportSummary] = useState<{ done: number; total: number } | null>(null);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [onlyFailed, setOnlyFailed] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const exportFields = useMemo(() => config.fields.filter((f) => selectedFields.has(f.key)), [config.fields, selectedFields]);
@@ -83,6 +86,10 @@ export default function ImportExportModal({ open, onClose, config, initialTab = 
   const selectedCount = rows.filter((r) => r.__selected).length;
   const successCount = rows.filter((r) => r.__status === 'success').length;
   const errorCount = rows.filter((r) => r.__status === 'error').length;
+  // A big file is imported in full, but only part of it is drawn in the
+  // preview: thousands of editable table rows would freeze the browser.
+  const previewSource = onlyFailed ? rows.filter((r) => r.__status === 'error') : rows;
+  const previewRows = previewSource.slice(0, PREVIEW_ROW_LIMIT);
 
   if (!open) return null;
 
@@ -185,6 +192,7 @@ export default function ImportExportModal({ open, onClose, config, initialTab = 
 
   const resetImport = () => {
     setRows([]);
+    setOnlyFailed(false);
     setExpandedRows(new Set());
     setImportSummary(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -207,36 +215,64 @@ export default function ImportExportModal({ open, onClose, config, initialTab = 
     return null;
   };
 
+  // Imports in chunks and writes row statuses back once per chunk: with a
+  // 30,000-row file, updating state after every single row re-rendered (and
+  // re-copied) the whole list 30,000 times and froze the tab.
   const handleImport = async () => {
     const targets = rows.filter((r) => r.__selected && r.__status !== 'success');
     if (targets.length === 0) return;
     setImporting(true);
     setImportSummary({ done: 0, total: targets.length });
 
-    for (let i = 0; i < targets.length; i += 1) {
-      const row = targets[i];
-      const validationError = validateRow(row);
-      if (validationError) {
-        setRows((prev) =>
-          prev.map((r) => (r.__rowId === row.__rowId ? { ...r, __status: 'error', __error: validationError } : r))
-        );
-        setImportSummary({ done: i + 1, total: targets.length });
-        continue;
+    const applyResults = (results: Map<string, { ok: boolean; error?: string }>) => {
+      if (!results.size) return;
+      setRows((prev) =>
+        prev.map((r) => {
+          const res = results.get(r.__rowId);
+          if (!res) return r;
+          return res.ok ? { ...r, __status: 'success', __error: undefined } : { ...r, __status: 'error', __error: res.error || 'Import failed' };
+        })
+      );
+    };
+
+    const recordOf = (row: ImportRow) => {
+      const { __rowId, __status, __error, __selected, ...record } = row;
+      return record;
+    };
+
+    const chunkSize = config.onImportBatch ? Math.max(1, config.importBatchSize || 500) : 25;
+    let done = 0;
+    for (let start = 0; start < targets.length; start += chunkSize) {
+      const chunk = targets.slice(start, start + chunkSize);
+      const results = new Map<string, { ok: boolean; error?: string }>();
+      const valid: ImportRow[] = [];
+      for (const row of chunk) {
+        const validationError = validateRow(row);
+        if (validationError) results.set(row.__rowId, { ok: false, error: validationError });
+        else valid.push(row);
       }
-      try {
-        const { __rowId, __status, __error, __selected, ...record } = row;
-        await config.onImportRow(record);
-        setRows((prev) =>
-          prev.map((r) => (r.__rowId === row.__rowId ? { ...r, __status: 'success', __error: undefined } : r))
-        );
-      } catch (err: any) {
-        setRows((prev) =>
-          prev.map((r) =>
-            r.__rowId === row.__rowId ? { ...r, __status: 'error', __error: err.message || 'Import failed' } : r
-          )
-        );
+
+      if (valid.length && config.onImportBatch) {
+        try {
+          const batch = await config.onImportBatch(valid.map(recordOf));
+          valid.forEach((row, i) => results.set(row.__rowId, batch[i] || { ok: false, error: 'No result returned' }));
+        } catch (err: any) {
+          valid.forEach((row) => results.set(row.__rowId, { ok: false, error: err.message || 'Import failed' }));
+        }
+      } else {
+        for (const row of valid) {
+          try {
+            await config.onImportRow(recordOf(row));
+            results.set(row.__rowId, { ok: true });
+          } catch (err: any) {
+            results.set(row.__rowId, { ok: false, error: err.message || 'Import failed' });
+          }
+        }
       }
-      setImportSummary({ done: i + 1, total: targets.length });
+
+      applyResults(results);
+      done += chunk.length;
+      setImportSummary({ done, total: targets.length });
     }
 
     setImporting(false);
@@ -435,6 +471,12 @@ export default function ImportExportModal({ open, onClose, config, initialTab = 
                           <XCircleIcon className="h-4 w-4" /> {errorCount} failed
                         </span>
                       )}
+                      {errorCount > 0 && (
+                        <label className="flex items-center gap-1">
+                          <input type="checkbox" checked={onlyFailed} onChange={(e) => setOnlyFailed(e.target.checked)} className="h-3.5 w-3.5" />
+                          Show only failed
+                        </label>
+                      )}
                     </div>
                     <button
                       onClick={resetImport}
@@ -470,7 +512,7 @@ export default function ImportExportModal({ open, onClose, config, initialTab = 
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-50">
-                        {rows.map((row) => (
+                        {previewRows.map((row) => (
                           <Fragment key={row.__rowId}>
                             <tr
                               className={cn(
@@ -591,6 +633,12 @@ export default function ImportExportModal({ open, onClose, config, initialTab = 
                       </tbody>
                     </table>
                   </div>
+                  {previewSource.length > previewRows.length && (
+                    <p className="text-xs text-slate-500">
+                      Showing the first {previewRows.length.toLocaleString('en-IN')} of {previewSource.length.toLocaleString('en-IN')} rows.
+                      Every selected row is imported, not only the ones shown.
+                    </p>
+                  )}
                   {importFields.length > previewColumns.length && (
                     <p className="text-xs text-slate-400">
                       Showing the first {previewColumns.length} of {importFields.length} columns in the preview — every

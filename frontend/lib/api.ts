@@ -301,18 +301,26 @@ export const rolesApi = {
 // need every row, otherwise "All Statuses" silently shows only the newest page
 // — which usually looks like a single status. This walks every page.
 const FETCH_ALL_PAGE_SIZE = 200;
+const FETCH_ALL_CONCURRENCY = 4;
 
 export async function fetchAllPages<R extends { pages?: number }, T>(
   fetchPage: (page: number, limit: number) => Promise<R>,
   pick: (res: R) => T[] | undefined
 ): Promise<T[]> {
   const first = await fetchPage(1, FETCH_ALL_PAGE_SIZE);
-  const rows = [...(pick(first) || [])];
   const pages = Math.max(1, Number(first.pages) || 1);
-  for (let page = 2; page <= pages; page++) {
-    rows.push(...(pick(await fetchPage(page, FETCH_ALL_PAGE_SIZE)) || []));
-  }
-  return rows;
+  const byPage: T[][] = [pick(first) || []];
+  // Fetch the remaining pages a few at a time rather than one after another:
+  // a 30,000-lead book is 150 pages, which took minutes in sequence.
+  let next = 2;
+  const worker = async () => {
+    while (next <= pages) {
+      const page = next++;
+      byPage[page - 1] = pick(await fetchPage(page, FETCH_ALL_PAGE_SIZE)) || [];
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(FETCH_ALL_CONCURRENCY, pages - 1) }, worker));
+  return byPage.flat();
 }
 
 // ─── Leads API ────────────────────────────────────────────────────────────────
@@ -358,6 +366,13 @@ export const leadsApi = {
   getLead: async (id: string | number) => {
     return request<any>(`/leads/${id}`);
   },
+
+  /** Bulk import: one request per batch, one result per row (see POST /leads/import). */
+  importLeads: async (rows: Record<string, any>[]) =>
+    request<{ created: number; failed: number; results: { ok: boolean; id?: number; error?: string; duplicate?: boolean }[] }>('/leads/import', {
+      method: 'POST',
+      body: JSON.stringify({ rows }),
+    }),
 
   createLead: async (leadData: any) => {
     return request<{ message: string; lead: any }>('/leads', {
@@ -811,6 +826,17 @@ export const campaignsApi = {
   deleteCampaign: async (id: string | number) => request<{ message: string }>(`/campaigns/${id}`, { method: 'DELETE' }),
 };
 
+// ─── Payments API ─────────────────────────────────────────────────────────────
+
+export type PaymentInput = { amount: number; method?: string; reference?: string; paidOn?: string; notes?: string };
+
+export const paymentsApi = {
+  getForInvoice: async (invoiceId: string | number) =>
+    request<{ payments: any[]; totalPaid: number; balanceDue: number | null }>(`/payments/invoice/${invoiceId}`),
+  record: async (invoiceId: string | number, data: PaymentInput) =>
+    request<{ message: string; payment: any }>(`/payments/invoice/${invoiceId}`, { method: 'POST', body: JSON.stringify(data) }),
+};
+
 // ─── Templates API ─────────────────────────────────────────────────────────────
 
 export const templatesApi = {
@@ -1135,6 +1161,16 @@ export const callsApi = {
   start: async (payload: { leadId?: number; contactId?: number; number: string }) =>
     request<CallRow>('/calls', { method: 'POST', body: JSON.stringify(payload) }),
   get: async (id: number) => request<CallRow>(`/calls/${id}`),
+  /** Logs a call made outside the calling provider, e.g. from a personal mobile. */
+  logManual: async (payload: {
+    leadId?: number;
+    number?: string;
+    direction: 'outbound' | 'inbound';
+    status: 'completed' | 'no-answer' | 'busy';
+    durationMinutes?: number;
+    calledAt?: string;
+    notes?: string;
+  }) => request<CallRow>('/calls/manual', { method: 'POST', body: JSON.stringify(payload) }),
   saveNotes: async (id: number, notes: string) =>
     request<CallRow>(`/calls/${id}`, { method: 'PATCH', body: JSON.stringify({ notes }) }),
   list: async (target: { leadId?: number | string; contactId?: number | string }) => {

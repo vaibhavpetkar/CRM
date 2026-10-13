@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import PageHeader from '@/components/ui/page-header';
 import StatusBadge from '@/components/ui/status-badge';
 import Button from '@/components/ui/button';
@@ -54,6 +54,8 @@ export default function TasksPage() {
   const [companyOptions, setCompanyOptions] = useState<string[]>([]);
   const [leadOptions, setLeadOptions] = useState<{ id: number; label: string }[]>([]);
   const [openMenuId, setOpenMenuId] = useState<number | string | null>(null);
+  const [editingId, setEditingId] = useState<number | string | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const currentUser = getStoredUser();
   const isMgrOrAdmin = ['Administrator', 'Sales Manager'].includes(currentUser?.role?.name);
 
@@ -137,29 +139,74 @@ export default function TasksPage() {
       .catch(() => {});
   }, []);
 
+  // Close the ⋮ menu on a press outside it. This used to be a document
+  // 'click' listener, but React handles clicks on the document too, so the
+  // same click that opened the menu also closed it and the menu never showed.
   useEffect(() => {
-    const closeMenu = () => setOpenMenuId(null);
-    document.addEventListener('click', closeMenu);
-    return () => document.removeEventListener('click', closeMenu);
-  }, []);
+    if (openMenuId === null) return;
+    const close = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setOpenMenuId(null);
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [openMenuId]);
+
+  const openNew = () => {
+    setEditingId(null);
+    setFormData(emptyForm);
+    setAssignToName('');
+    setIsModalOpen(true);
+  };
+
+  const openEdit = (task: any) => {
+    setOpenMenuId(null);
+    setEditingId(task.id);
+    setFormData({
+      title: task.title || '',
+      type: task.type || 'call',
+      priority: task.priority || 'medium',
+      dueDate: task.dueDate ? String(task.dueDate).split('T')[0] : '',
+      dueTime: task.dueTime ? String(task.dueTime).slice(0, 5) : '',
+      status: task.status || 'pending',
+      relatedTo: task.relatedTo || '',
+      leadId: task.leadId ? String(task.leadId) : '',
+      description: task.description || '',
+      assignedToId: task.assignedToId ? String(task.assignedToId) : '',
+    });
+    setAssignToName(task.assignedTo || '');
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setEditingId(null);
+    setFormData(emptyForm);
+    setAssignToName('');
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
     try {
-      await tasksApi.createTask({
+      const payload = {
         ...formData,
+        dueDate: formData.dueDate || null,
+        dueTime: formData.dueTime || null,
         leadId: formData.leadId ? Number(formData.leadId) : undefined,
         // Task 4.6: "Assign to Me" explicitly assigns to the current user
         // rather than leaving assignedToId empty/unassigned.
         assignedToId: formData.assignedToId ? Number(formData.assignedToId) : currentUser?.id || undefined,
-      });
-      setIsModalOpen(false);
-      setFormData(emptyForm);
-      setAssignToName('');
+      };
+      if (editingId) {
+        await tasksApi.updateTask(editingId, payload);
+        toast.success('Task updated');
+      } else {
+        await tasksApi.createTask(payload);
+      }
+      closeModal();
       fetchTasks();
     } catch (err: any) {
-      toast.error(err.message || 'Failed to create task');
+      toast.error(err.message || (editingId ? 'Failed to update task' : 'Failed to create task'));
     } finally {
       setSubmitting(false);
     }
@@ -168,7 +215,7 @@ export default function TasksPage() {
   // Task 4.2 / 4.3: task status is now managed entirely through the ⋮ action
   // menu instead of a checkbox. "Note" appends a timestamped line to the
   // task's description rather than opening a whole separate notes system.
-  const applyAction = async (task: any, action: 'done' | 'in-progress' | 'rescheduled' | 'disconnect-call' | 'delete' | 'note') => {
+  const applyAction = async (task: any, action: 'done' | 'reopen' | 'in-progress' | 'rescheduled' | 'disconnect-call' | 'delete' | 'note') => {
     setOpenMenuId(null);
     try {
       if (action === 'delete') {
@@ -183,6 +230,7 @@ export default function TasksPage() {
       } else {
         const statusMap: Record<string, string> = {
           done: 'completed',
+          reopen: 'pending',
           'in-progress': 'in-progress',
           rescheduled: 'rescheduled',
           'disconnect-call': 'disconnected-call',
@@ -206,7 +254,7 @@ export default function TasksPage() {
       <PageHeader
         title="Tasks"
         description="Manage follow-ups and to-dos"
-        actions={<Button size="sm" onClick={() => setIsModalOpen(true)}><PlusIcon className="h-4 w-4" /> Add Task</Button>}
+        actions={<Button size="sm" onClick={openNew}><PlusIcon className="h-4 w-4" /> Add Task</Button>}
       />
 
       {/* Summary Cards */}
@@ -268,11 +316,27 @@ export default function TasksPage() {
           {tasks.map((task) => {
             const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'completed';
             return (
-              <Card key={task.id} className={`flex items-center justify-between !p-4 ${isOverdue ? '!border-red-200 bg-red-50/30' : '!border-slate-200'}`}>
-                <div>
-                  <p className={`text-sm font-medium ${task.status === 'completed' ? 'text-slate-400 line-through' : 'text-slate-900'}`}>
+              <div
+                key={task.id}
+                className={`flex items-center justify-between gap-3 rounded-2xl border bg-white p-4 shadow-xs ${isOverdue ? 'border-red-200 bg-red-50/30' : 'border-slate-200'}`}
+              >
+                <div className="flex min-w-0 items-start gap-3">
+                  <input
+                    type="checkbox"
+                    checked={task.status === 'completed'}
+                    onChange={() => applyAction(task, task.status === 'completed' ? 'reopen' : 'done')}
+                    className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded border-slate-300 accent-[var(--primary)]"
+                    aria-label={task.status === 'completed' ? `Reopen ${task.title}` : `Mark ${task.title} as done`}
+                    title={task.status === 'completed' ? 'Reopen' : 'Mark as done'}
+                  />
+                  <div className="min-w-0">
+                  <button
+                    type="button"
+                    onClick={() => openEdit(task)}
+                    className={`text-left text-sm font-medium hover:text-[var(--primary)] hover:underline ${task.status === 'completed' ? 'text-slate-400 line-through' : 'text-slate-900'}`}
+                  >
                     {task.title}
-                  </p>
+                  </button>
                   <p className="text-xs text-slate-500">
                     {task.type && <span className="capitalize">{TASK_TYPES.find((t) => t.value === task.type)?.label || task.type}</span>}
                     {task.lead ? (
@@ -295,28 +359,30 @@ export default function TasksPage() {
                     {task.assignedTo && ` · 👤 ${task.assignedTo}`}
                     {isOverdue && <span className="ml-1 font-medium text-red-500">· OVERDUE</span>}
                   </p>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex shrink-0 items-center gap-2">
                   <StatusBadge status={task.priority} />
                   <StatusBadge status={task.status} />
                   <PrintButton docType="task" id={task.id} variant="icon" />
-                  <div className="relative">
+                  <div className="relative" ref={openMenuId === task.id ? menuRef : undefined}>
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setOpenMenuId(openMenuId === task.id ? null : task.id);
-                      }}
+                      type="button"
+                      onClick={() => setOpenMenuId(openMenuId === task.id ? null : task.id)}
                       className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
                       aria-label="Task actions"
+                      aria-expanded={openMenuId === task.id}
                     >
                       <EllipsisVerticalIcon className="h-5 w-5" />
                     </button>
                     {openMenuId === task.id && (
-                      <div
-                        onClick={(e) => e.stopPropagation()}
-                        className="absolute right-0 top-7 z-10 w-44 rounded-lg border border-slate-200 bg-white py-1 text-sm shadow-lg"
-                      >
-                        <button onClick={() => applyAction(task, 'done')} className="block w-full px-3 py-1.5 text-left hover:bg-slate-50">Done</button>
+                      <div className="absolute right-0 top-7 z-20 w-44 rounded-lg border border-slate-200 bg-white py-1 text-sm text-slate-700 shadow-lg">
+                        <button onClick={() => openEdit(task)} className="block w-full px-3 py-1.5 text-left hover:bg-slate-50">Edit</button>
+                        {task.status === 'completed' ? (
+                          <button onClick={() => applyAction(task, 'reopen')} className="block w-full px-3 py-1.5 text-left hover:bg-slate-50">Reopen</button>
+                        ) : (
+                          <button onClick={() => applyAction(task, 'done')} className="block w-full px-3 py-1.5 text-left hover:bg-slate-50">Mark Done</button>
+                        )}
                         <button onClick={() => applyAction(task, 'in-progress')} className="block w-full px-3 py-1.5 text-left hover:bg-slate-50">In Progress</button>
                         <button onClick={() => applyAction(task, 'rescheduled')} className="block w-full px-3 py-1.5 text-left hover:bg-slate-50">Rescheduled</button>
                         <button onClick={() => applyAction(task, 'disconnect-call')} className="block w-full px-3 py-1.5 text-left hover:bg-slate-50">Disconnect Call</button>
@@ -327,7 +393,7 @@ export default function TasksPage() {
                     )}
                   </div>
                 </div>
-              </Card>
+              </div>
             );
           })}
         </div>
@@ -337,8 +403,8 @@ export default function TasksPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-lg font-semibold text-slate-900">Add New Task</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+              <h3 className="text-lg font-semibold text-slate-900">{editingId ? 'Edit Task' : 'Add New Task'}</h3>
+              <button onClick={closeModal} className="text-slate-400 hover:text-slate-600">
                 <XMarkIcon className="h-5 w-5" />
               </button>
             </div>
@@ -448,7 +514,7 @@ export default function TasksPage() {
               </div>
 
               <div className="mt-4 flex justify-end gap-2 pt-2">
-                <Button type="button" variant="secondary" size="sm" onClick={() => setIsModalOpen(false)}>Cancel</Button>
+                <Button type="button" variant="secondary" size="sm" onClick={closeModal}>Cancel</Button>
                 <Button type="submit" size="sm" disabled={submitting}>{submitting ? 'Saving...' : 'Save Task'}</Button>
               </div>
             </form>

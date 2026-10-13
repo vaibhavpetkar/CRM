@@ -230,6 +230,33 @@ body {
   background-color: #3b4a61;
 }
 
+/* Native dropdowns: the select itself is transparent, and browsers draw the
+   option list on their own surface, so without explicit colours the options
+   came out dark-on-dark (invisible) in dark mode. Give the list the dark card
+   colour with light text. The select rule sits in the base layer so a page's
+   own bg-/text- utilities still win. */
+@layer base {
+  .dark select {
+    background-color: var(--card-bg);
+    color: var(--foreground);
+  }
+}
+
+.dark select option,
+.dark select optgroup {
+  background-color: var(--card-bg);
+  color: var(--foreground);
+}
+
+.dark select option:checked {
+  background-color: var(--primary);
+  color: #ffffff;
+}
+
+.dark select option:disabled {
+  color: var(--muted);
+}
+
 /* White surfaces become the dark card colour. :where() keeps these at the
    same weight as the utility itself, so hover:/focus: colours still win. */
 @layer utilities {

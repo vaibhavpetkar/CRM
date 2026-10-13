@@ -243,7 +243,13 @@ export default function UserAutocomplete({
             <button
               key={suggestion.id}
               type="button"
-              onClick={() => handleSelect(suggestion)}
+              // Select on mousedown and keep focus in the input: a plain
+              // onClick fires only after the input's blur handler has
+              // already closed the list, so mouse picks were lost.
+              onMouseDown={(e) => {
+                e.preventDefault();
+                handleSelect(suggestion);
+              }}
               onMouseEnter={() => setHighlightedIndex(index)}
               className={cn(
                 'w-full px-3 py-2 text-left text-sm transition-colors',

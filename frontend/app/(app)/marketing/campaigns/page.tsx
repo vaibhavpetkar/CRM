@@ -8,7 +8,7 @@ import Button from '@/components/ui/button';
 import Card from '@/components/ui/card';
 import DataTable, { DataTableColumn } from '@/components/ui/data-table';
 import { campaignsApi } from '@/lib/api';
-import { PlusIcon, XMarkIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, XMarkIcon, TrashIcon, PencilSquareIcon } from '@heroicons/react/24/outline';
 import { useToast } from '@/components/ui/toast';
 
 import FormField, { getInputClassName } from '@/components/ui/form-field';
@@ -27,6 +27,32 @@ export default function CampaignsPage() {
   const [formData, setFormData] = useState(emptyForm);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
+  const [editing, setEditing] = useState<any | null>(null);
+
+  const openNew = () => {
+    setEditing(null);
+    setFormData(emptyForm);
+    setFieldErrors({});
+    setIsModalOpen(true);
+  };
+
+  const openCampaign = (campaign: any) => {
+    setEditing(campaign);
+    setFormData({
+      name: campaign.name || '',
+      type: campaign.type || 'email',
+      status: campaign.status || 'draft',
+      startDate: campaign.startDate ? String(campaign.startDate).split('T')[0] : '',
+    });
+    setFieldErrors({});
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setEditing(null);
+    setFormData(emptyForm);
+  };
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -68,13 +94,17 @@ export default function CampaignsPage() {
 
     setSubmitting(true);
     try {
-      await campaignsApi.createCampaign(formData);
-      setIsModalOpen(false);
-      setFormData(emptyForm);
+      if (editing) {
+        await campaignsApi.updateCampaign(editing.id, { ...formData, startDate: formData.startDate || undefined });
+        toast.success('Campaign updated');
+      } else {
+        await campaignsApi.createCampaign(formData);
+      }
+      closeModal();
       setFieldErrors({});
       fetchAll();
     } catch (err: any) {
-      toast.error(err.message || 'Failed to create campaign');
+      toast.error(err.message || (editing ? 'Failed to update campaign' : 'Failed to create campaign'));
     } finally {
       setSubmitting(false);
     }
@@ -91,7 +121,14 @@ export default function CampaignsPage() {
   };
 
   const columns: DataTableColumn<any>[] = [
-    { header: 'Campaign', accessor: (c) => <span className="font-medium text-slate-900">{c.name}</span> },
+    {
+      header: 'Campaign',
+      accessor: (c) => (
+        <button type="button" onClick={() => openCampaign(c)} className="text-left font-medium text-slate-900 hover:text-[var(--primary)] hover:underline">
+          {c.name}
+        </button>
+      ),
+    },
     { header: 'Type', accessor: (c) => <span className="capitalize text-slate-600">{c.type}</span> },
     { header: 'Status', accessor: (c) => <StatusBadge status={c.status} /> },
     { header: 'Sent', accessor: (c) => <span className="text-slate-600">{Number(c.sent || 0).toLocaleString()}</span> },
@@ -106,7 +143,7 @@ export default function CampaignsPage() {
       <PageHeader
         title="Campaigns"
         description="Create and manage email & SMS marketing campaigns"
-        actions={<Button size="sm" onClick={() => { setFieldErrors({}); setIsModalOpen(true); }}><PlusIcon className="h-4 w-4" /> New Campaign</Button>}
+        actions={<Button size="sm" onClick={openNew}><PlusIcon className="h-4 w-4" /> New Campaign</Button>}
       />
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-4">
@@ -147,9 +184,14 @@ export default function CampaignsPage() {
           }}
           emptyMessage='No campaigns yet. Click "New Campaign" to create one.'
           actions={(campaign) => (
-            <button onClick={() => handleDelete(campaign)} className="text-slate-400 hover:text-red-600" aria-label="Delete">
-              <TrashIcon className="h-4 w-4" />
-            </button>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => openCampaign(campaign)} className="text-slate-400 hover:text-[var(--primary)]" aria-label="View or edit">
+                <PencilSquareIcon className="h-4 w-4" />
+              </button>
+              <button onClick={() => handleDelete(campaign)} className="text-slate-400 hover:text-red-600" aria-label="Delete">
+                <TrashIcon className="h-4 w-4" />
+              </button>
+            </div>
           )}
         />
       </Card>
@@ -158,11 +200,27 @@ export default function CampaignsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-lg font-semibold text-slate-900">New Campaign</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+              <h3 className="text-lg font-semibold text-slate-900">{editing ? 'Campaign' : 'New Campaign'}</h3>
+              <button onClick={closeModal} className="text-slate-400 hover:text-slate-600">
                 <XMarkIcon className="h-5 w-5" />
               </button>
             </div>
+
+            {editing && (
+              <div className="mt-4 grid grid-cols-4 gap-2 text-center">
+                {[
+                  ['Sent', editing.sent],
+                  ['Opened', editing.opened],
+                  ['Clicked', editing.clicked],
+                  ['Converted', editing.converted],
+                ].map(([label, value]) => (
+                  <div key={label} className="rounded-lg bg-slate-50 p-2">
+                    <p className="text-sm font-semibold text-slate-900">{Number(value || 0).toLocaleString()}</p>
+                    <p className="text-[11px] text-slate-500">{label}</p>
+                  </div>
+                ))}
+              </div>
+            )}
 
             <form onSubmit={handleSubmit} className="mt-4 space-y-4">
               <FormField label="Campaign Name" required error={fieldErrors.name}>
@@ -211,8 +269,8 @@ export default function CampaignsPage() {
               </FormField>
 
               <div className="mt-4 flex justify-end gap-2 pt-2">
-                <Button type="button" variant="secondary" size="sm" onClick={() => setIsModalOpen(false)}>Cancel</Button>
-                <Button type="submit" size="sm" disabled={submitting}>{submitting ? 'Saving...' : 'Create Campaign'}</Button>
+                <Button type="button" variant="secondary" size="sm" onClick={closeModal}>Cancel</Button>
+                <Button type="submit" size="sm" disabled={submitting}>{submitting ? 'Saving...' : editing ? 'Save Changes' : 'Create Campaign'}</Button>
               </div>
             </form>
           </div>

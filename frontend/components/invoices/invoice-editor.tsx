@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { invoicesApi, documentTemplatesApi, openPrintWindow } from '@/lib/api';
+import { invoicesApi, documentTemplatesApi, openPrintWindow, paymentsApi } from '@/lib/api';
 import Button from '@/components/ui/button';
 import Card from '@/components/ui/card';
 import StatusBadge from '@/components/ui/status-badge';
@@ -11,7 +11,7 @@ import LoadingSpinner from '@/components/ui/loading-spinner';
 import CompanyAutocomplete from '@/components/ui/company-autocomplete';
 import ItemAutocomplete, { ItemSuggestion } from '@/components/ui/item-autocomplete';
 import { formatCurrency } from '@/lib/utils';
-import { ArrowLeftIcon, PlusIcon, TrashIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, BanknotesIcon, PlusIcon, TrashIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { useToast } from '@/components/ui/toast';
 import PrintButton from '@/components/ui/print-button';
 import { useKeyboardShortcuts } from '@/lib/hooks/useKeyboardShortcuts';
@@ -24,6 +24,87 @@ const INVOICE_STATUSES = ['draft', 'pending', 'partial', 'paid', 'overdue', 'can
 const inputClass = 'mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none';
 
 const today = () => new Date().toISOString().slice(0, 10);
+
+const PAYMENT_METHODS = [
+  { value: 'bank_transfer', label: 'Bank transfer / NEFT / RTGS' },
+  { value: 'upi', label: 'UPI' },
+  { value: 'cheque', label: 'Cheque' },
+  { value: 'cash', label: 'Cash' },
+  { value: 'card', label: 'Card' },
+  { value: 'other', label: 'Other' },
+];
+
+/** Records a payment against an invoice; the server moves it to partial or paid. */
+function RecordPaymentModal({ invoiceId, balance, onClose, onRecorded }: { invoiceId: string | number; balance: number; onClose: () => void; onRecorded: () => void }) {
+  const toast = useToast();
+  const [form, setForm] = useState({ amount: balance > 0 ? String(Math.round(balance * 100) / 100) : '', method: 'bank_transfer', reference: '', paidOn: today(), notes: '' });
+  const [saving, setSaving] = useState(false);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const amount = Number(form.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      toast.warning('Enter the amount received.');
+      return;
+    }
+    setSaving(true);
+    try {
+      await paymentsApi.record(invoiceId, { ...form, amount });
+      toast.success(amount >= balance ? 'Payment recorded. Invoice marked as paid.' : 'Payment recorded.');
+      onRecorded();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to record payment');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 no-print">
+      <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <h3 className="text-lg font-semibold text-slate-900">Record Payment</h3>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600" aria-label="Close">
+            <XMarkIcon className="h-5 w-5" />
+          </button>
+        </div>
+        <form onSubmit={submit} className="mt-4 space-y-3">
+          <p className="text-xs text-slate-500">Balance due: <span className="font-semibold text-slate-900">{formatCurrency(balance)}</span></p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-700">Amount received *</label>
+              <input type="number" min={0.01} step="0.01" required value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} className={inputClass} />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-700">Paid on</label>
+              <input type="date" value={form.paidOn} onChange={(e) => setForm({ ...form, paidOn: e.target.value })} className={inputClass} />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-700">Method</label>
+            <select value={form.method} onChange={(e) => setForm({ ...form, method: e.target.value })} className={inputClass}>
+              {PAYMENT_METHODS.map((m) => (
+                <option key={m.value} value={m.value}>{m.label}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-700">Reference (UTR / cheque no.)</label>
+            <input value={form.reference} onChange={(e) => setForm({ ...form, reference: e.target.value })} className={inputClass} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-700">Notes</label>
+            <textarea rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className={inputClass} />
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="secondary" size="sm" onClick={onClose}>Cancel</Button>
+            <Button type="submit" size="sm" disabled={saving}>{saving ? 'Saving...' : 'Record Payment'}</Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
 const inDays = (days: number) => new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
 const emptyForm = () => ({
@@ -62,6 +143,7 @@ export default function InvoiceEditor({ invoiceId, autoPrint = false }: { invoic
   const [formData, setFormData] = useState<any>(emptyForm);
   const [lineItems, setLineItems] = useState<LineItem[]>(isNew ? [{ itemId: '', productName: '', quantity: 1, unit: 'Nos', rate: 0 }] : []);
   const [taxLines, setTaxLines] = useState<TaxLine[]>([]);
+  const [paymentOpen, setPaymentOpen] = useState(false);
 
   const loadInvoice = useCallback((data: any) => {
     setInvoice(data);
@@ -230,6 +312,11 @@ export default function InvoiceEditor({ invoiceId, autoPrint = false }: { invoic
         )}
         <div className="ml-auto flex flex-wrap gap-2">
           {!isNew && invoice && <PrintButton docType="invoice" id={invoice.id} />}
+          {!isNew && invoice && !['paid', 'cancelled'].includes(invoice.status) && (
+            <Button type="button" variant="secondary" onClick={() => setPaymentOpen(true)}>
+              <BanknotesIcon className="h-4 w-4" /> Record Payment
+            </Button>
+          )}
           <Button type="button" onClick={handleSave} disabled={saving}>
             {saving ? 'Saving...' : isNew ? 'Create Invoice' : 'Save'}
           </Button>
@@ -455,6 +542,18 @@ export default function InvoiceEditor({ invoiceId, autoPrint = false }: { invoic
           </div>
         </div>
       </Card>
+
+      {paymentOpen && invoice && (
+        <RecordPaymentModal
+          invoiceId={invoice.id}
+          balance={Math.max(0, (Number(invoice.amount) || totals.grandTotal) - (invoice.totalPaid || 0))}
+          onClose={() => setPaymentOpen(false)}
+          onRecorded={() => {
+            setPaymentOpen(false);
+            fetchInvoice();
+          }}
+        />
+      )}
 
       <Card title="Terms & Notes">
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">

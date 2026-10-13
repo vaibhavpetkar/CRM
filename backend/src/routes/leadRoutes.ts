@@ -26,6 +26,8 @@ router.get('/company-search', protect, authorize('leads:read'), leadController.s
 // table fast under load while staying close to real-time.
 router.get('/', protect, authorize('leads:read'), cacheRoute((req) => `leads:list:${req.originalUrl}`, 15), leadController.getLeads);
 router.post('/', protect, authorize('leads:create'), validate(createLeadValidation), leadController.createLead);
+// Bulk import in batches (Import & Export on the Leads page).
+router.post('/import', protect, authorize('leads:create'), leadController.importLeads);
 router.get('/:id', protect, authorize('leads:read'), leadController.getLeadById);
 router.put('/:id', protect, authorize('leads:update'), validate(updateLeadValidation), leadController.updateLead);
 router.delete('/:id', protect, authorize('leads:delete'), leadController.deleteLead);
