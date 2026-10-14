@@ -7,7 +7,7 @@ import { hasPermission } from '@/lib/permissions';
 import { navigation } from '@/lib/navigation';
 import LoadingSpinner from '@/components/ui/loading-spinner';
 
-function findPermissionForPath(pathname: string): string | undefined {
+function findPermissionForPath(pathname: string): string | string[] | undefined {
   for (const section of navigation) {
     for (const item of section.items) {
       if (pathname === item.href || pathname.startsWith(item.href + '/')) {

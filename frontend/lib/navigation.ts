@@ -14,7 +14,6 @@ import {
   MegaphoneIcon,
   EnvelopeIcon,
   DocumentDuplicateIcon,
-  PresentationChartLineIcon,
   ViewColumnsIcon,
   BuildingOffice2Icon,
   CreditCardIcon,
@@ -28,7 +27,6 @@ import {
   BriefcaseIcon,
   PhoneIcon,
   MapPinIcon,
-  ChartPieIcon,
   SignalIcon,
 } from '@heroicons/react/24/outline';
 
@@ -36,8 +34,8 @@ export type NavItem = {
   name: string;
   href: string;
   icon: ComponentType<{ className?: string }>;
-  /** Permission key required to see/access this item. Omit for items open to every logged-in user. */
-  permission?: string;
+  /** Permission key required to see/access this item (a list means any one of them). Omit for items open to every logged-in user. */
+  permission?: string | string[];
 };
 
 export type NavSection = {
@@ -50,9 +48,9 @@ export const navigation: NavSection[] = [
     title: 'Overview',
     items: [
       { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
-      { name: 'Reports', href: '/reports', icon: ChartBarIcon, permission: 'reports:view' },
-      { name: 'Analytics', href: '/marketing/analytics', icon: PresentationChartLineIcon, permission: 'marketing:view' },
-      { name: 'Lead Sources', href: '/lead-sources', icon: ChartPieIcon, permission: 'leads:read' },
+      // One wizard page holds every report: overview, forecast, P&L,
+      // marketing analytics and lead sources (each step checks its own permission).
+      { name: 'Reports & Analytics', href: '/reports', icon: ChartBarIcon, permission: ['reports:view', 'marketing:view', 'leads:read'] },
     ],
   },
   {

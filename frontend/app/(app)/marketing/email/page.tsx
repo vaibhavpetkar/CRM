@@ -92,7 +92,7 @@ export default function EmailMarketingPage() {
             <Link href="/contacts" className="rounded-lg border-2 border-slate-200 p-4 text-sm font-medium text-slate-700 hover:bg-slate-50">
               Import List
             </Link>
-            <Link href="/marketing/analytics" className="rounded-lg border-2 border-slate-200 p-4 text-sm font-medium text-slate-700 hover:bg-slate-50">
+            <Link href="/reports?step=marketing" className="rounded-lg border-2 border-slate-200 p-4 text-sm font-medium text-slate-700 hover:bg-slate-50">
               View Analytics
             </Link>
           </div>
