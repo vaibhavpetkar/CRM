@@ -1,0 +1,155 @@
+# Developer mode: the whole CRM on your own machine (Windows, macOS or Linux)
+# with live reload. Edit code in backend/ or frontend/ and the running app
+# picks it up, no image rebuilds.
+#
+#   docker compose -f docker-compose.dev.yml up
+#
+#   Frontend      http://localhost:3000
+#   Backend API   http://localhost:5000/api
+#   Postgres      localhost:5432  (postgres / postgres, database crm_db)
+#   Redis         localhost:6379
+#   Login         company code my-company, admin@crmpro.com / Admin@123456
+#
+# Works with no .env at all; every value below has a local-only default. Put
+# overrides (API keys, Google login, a different admin password) in a
+# .env.dev file and add --env-file .env.dev to the command.
+#
+# Free local AI Assistant (downloads a ~2GB model on first start):
+#   docker compose -f docker-compose.dev.yml --profile ai up
+#
+# Runs as its own Compose project (crm-dev) with its own volumes, so it never
+# touches the production stack in docker-compose.yml.
+
+name: crm-dev
+
+x-node-dev: &node-dev
+  image: node:20-alpine
+  restart: unless-stopped
+  environment: &node-env
+    # File change events don't reach containers from a Windows folder, so the
+    # watchers poll instead.
+    CHOKIDAR_USEPOLLING: "true"
+    WATCHPACK_POLLING: "true"
+    # Installs packages on first start and whenever package-lock.json
+    # changes, otherwise skips straight to the app. A half-finished install
+    # (network drop) is wiped and redone on the next start.
+    INSTALL: >-
+      if cmp -s package-lock.json node_modules/.installed-lock; then true; else
+      echo 'Installing packages...' &&
+      find node_modules -mindepth 1 -maxdepth 1 -exec rm -rf {} + &&
+      npm install --no-audit --no-fund &&
+      cp package-lock.json node_modules/.installed-lock; fi
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-crm_db}
+      POSTGRES_USER: ${DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    <<: *node-dev
+    working_dir: /app
+    command: ["sh", "-c", "eval \"$$INSTALL\" && exec npx ts-node-dev --respawn --transpile-only --poll src/server.ts"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      <<: *node-env
+      # development: tables are created and altered automatically at start.
+      NODE_ENV: development
+      PORT: 5000
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-crm_db}
+      DB_USERNAME: ${DB_USERNAME:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-local-dev-only-jwt-secret-change-me}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      CLIENT_URL: http://localhost:3000
+      CORS_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
+      SUPER_ADMIN_EMAIL: ${SUPER_ADMIN_EMAIL:-admin@crmpro.com}
+      SUPER_ADMIN_PASSWORD: ${SUPER_ADMIN_PASSWORD:-Admin@123456}
+      # Demo calls without a real provider; set exotel or vi in .env.dev.
+      VOICE_PROVIDER: ${VOICE_PROVIDER:-mock}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      EMAIL_SERVICE: ${EMAIL_SERVICE:-}
+      EMAIL_USER: ${EMAIL_USER:-}
+      EMAIL_PASS: ${EMAIL_PASS:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      # Only answers when started with --profile ai.
+      AI_PROVIDER: ${AI_PROVIDER:-ollama}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2:1b}
+    volumes:
+      - ./backend:/app
+      # Linux packages stay inside the container, apart from the Windows/macOS
+      # node_modules in your folder.
+      - backend_node_modules:/app/node_modules
+      - backend_uploads:/app/uploads
+    ports:
+      - "5000:5000"
+
+  frontend:
+    <<: *node-dev
+    working_dir: /app
+    command: ["sh", "-c", "eval \"$$INSTALL\" && exec npx next dev -H 0.0.0.0 -p 3000"]
+    depends_on:
+      - backend
+    environment:
+      <<: *node-env
+      # The browser on your machine calls the API, so this is localhost.
+      NEXT_PUBLIC_API_URL: http://localhost:5000/api
+      NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-}
+      NEXT_TELEMETRY_DISABLED: "1"
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+      - frontend_next:/app/.next
+    ports:
+      - "3000:3000"
+
+  ollama:
+    image: ollama/ollama:latest
+    profiles: ["ai"]
+    restart: unless-stopped
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "11434:11434"
+    entrypoint: ["/bin/sh", "-c", "ollama serve & sleep 5 && ollama pull ${OLLAMA_MODEL:-llama3.2:1b}; wait"]
+
+volumes:
+  postgres_data:
+  backend_node_modules:
+  backend_uploads:
+  frontend_node_modules:
+  frontend_next:
+  ollama_data:
