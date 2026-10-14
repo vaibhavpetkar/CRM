@@ -113,6 +113,7 @@ CRM/
 │
 ├── docker-compose.yml        # Base orchestration (local + production)
 ├── docker-compose.prod.yml   # Production overrides (SSL, HTTPS)
+├── docker-compose.dev.yml    # Developer mode: everything on localhost with live reload
 └── CHANGELOG.md
 ```
 
@@ -163,6 +164,21 @@ docker compose up --build
 > First run also pulls the free local AI model (`ollama` service, ~2GB) in
 > the background — the app works immediately, the AI Assistant just needs a
 > minute or two after first startup before it responds.
+
+### Developer mode (live reload)
+For working on the code, `docker-compose.dev.yml` runs Postgres, Redis, the
+backend and the frontend from your local folders, so saved changes reload
+without rebuilding images. It needs no `.env`; it uses local-only defaults.
+```bash
+docker compose -f docker-compose.dev.yml up
+```
+The first start installs packages inside the containers, which takes a few
+minutes. Then open http://localhost:3000 and sign in with company code
+`my-company`, `admin@crmpro.com` / `Admin@123456`. Postgres is on
+`localhost:5432` (`postgres` / `postgres`). Add `--profile ai` for the local
+AI Assistant, and `down -v` to wipe the dev database. On Windows, Docker
+Desktop with the WSL 2 backend is recommended; keeping the repo inside WSL
+makes reloads much faster.
 
 ### 4. Access the App
 | Service | URL |
