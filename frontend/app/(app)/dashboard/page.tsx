@@ -1,173 +1,189 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import StatusBadge from '@/components/ui/status-badge';
 import LoadingSpinner from '@/components/ui/loading-spinner';
+import { KpiCard, Panel, PanelLink, PeriodSelect, SelectPill, OwnerChip } from '@/components/ui/analytics';
+import { DAY_MS as DAY, dayEnds, dailyCounts, dealMeasures, dealTrend, parseDeals, percentChange } from '@/lib/analytics';
 import { formatCurrency, getCurrencySymbol } from '@/lib/utils';
-import { leadsApi, dealsApi, contactsApi, tasksApi, getStoredUser } from '@/lib/api';
+import { leadsApi, dealsApi, contactsApi, tasksApi, salesApi, getStoredUser } from '@/lib/api';
+import { leadSourceLabel } from '@/lib/lead-options';
 import {
   UsersIcon,
-  BriefcaseIcon,
-  UserGroupIcon,
-  ArrowTrendingUpIcon,
-  ArrowTrendingDownIcon,
-  ChevronRightIcon,
-  CalendarIcon,
+  UserIcon,
+  IdentificationIcon,
+  ChartBarIcon,
   ArrowPathIcon,
-  CheckCircleIcon,
-  EyeIcon,
+  ClipboardDocumentCheckIcon,
+  EllipsisHorizontalIcon,
+  BriefcaseIcon,
 } from '@heroicons/react/24/outline';
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, CartesianGrid } from 'recharts';
 
 type Slice = { name: string; value: number; color: string };
-type Activity = { id: string; type: 'lead' | 'task'; title: string; name: string; detail: string; badge: string };
+type Activity = {
+  id: string;
+  kind: 'lead' | 'contact' | 'task';
+  title: string;
+  name: string;
+  href: string;
+  detail: string;
+  when: string;
+  at: number;
+};
 
-const TREND_DAYS = 30;
+const RANGES = [
+  { value: '7', label: 'Last 7 days', compare: 'vs last week' },
+  { value: '30', label: 'Last 30 days', compare: 'vs last month' },
+  { value: '90', label: 'Last 90 days', compare: 'vs last quarter' },
+];
 
-// Lead stages left to right, coloured from deep navy to pale sky like the
-// reference design. Text colours are fixed hex so they stay readable in dark mode.
+const METRICS = [
+  { value: 'value', label: 'Pipeline Value' },
+  { value: 'weighted', label: 'Weighted Value' },
+  { value: 'count', label: 'Deal Count' },
+];
+
+// Lead stages as chevrons, deep navy to pale blue like the reference design.
 const PIPELINE_STAGES = [
-  { key: 'new', label: 'New', bg: '#0a2540', text: '#ffffff', sub: '#cbd5e1' },
-  { key: 'contacted', label: 'Contacted', bg: '#0066ff', text: '#ffffff', sub: '#dbeafe' },
-  { key: 'qualified', label: 'Qualified', bg: '#38bdf8', text: '#ffffff', sub: '#e0f2fe' },
-  { key: 'working', label: 'Working', bg: '#7dd3fc', text: '#0f172a', sub: '#334155' },
-  { key: 'converted', label: 'Converted', bg: '#e0f2fe', text: '#0f172a', sub: '#475569' },
-  { key: 'lost', label: 'Lost', bg: '#f1f5f9', text: '#475569', sub: '#64748b' },
+  { key: 'new', label: 'New', bg: '#0b2a6f', text: '#ffffff' },
+  { key: 'contacted', label: 'Contacted', bg: '#0a6cf5', text: '#ffffff' },
+  { key: 'qualified', label: 'Qualified', bg: '#a8cdfb', text: '#0b2a6f' },
+  { key: 'working', label: 'Working', bg: '#c4ddfc', text: '#0b2a6f' },
+  { key: 'converted', label: 'Converted', bg: '#d9e9fd', text: '#0b2a6f' },
+  { key: 'lost', label: 'Lost', bg: '#e8f1fe', text: '#0b2a6f' },
 ];
 
 const STATUS_COLORS: Record<string, string> = {
-  new: '#0066ff',
-  contacted: '#f97316',
-  qualified: '#10b981',
-  working: '#06b6d4',
-  converted: '#8b5cf6',
+  contacted: '#ef4444',
+  converted: '#f97316',
+  lost: '#e11d48',
+  new: '#0a6cf5',
+  qualified: '#16a34a',
+  working: '#8b5cf6',
   unqualified: '#94a3b8',
-  lost: '#ef4444',
 };
 
-const SOURCE_COLORS = ['#0066ff', '#f59e0b', '#10b981', '#6366f1', '#38bdf8', '#06b6d4', '#ec4899', '#8b5cf6', '#84cc16', '#f97316'];
+const SOURCE_COLORS: Record<string, string> = {
+  other: '#0a6cf5',
+  'social-media': '#8b5cf6',
+  'cold-call': '#f97316',
+  email: '#0ea5e9',
+  event: '#f43f5e',
+  linkedin: '#0284c7',
+  referral: '#16a34a',
+  website: '#eab308',
+};
+const FALLBACK_COLORS = ['#0a6cf5', '#f59e0b', '#10b981', '#6366f1', '#38bdf8', '#06b6d4', '#ec4899', '#8b5cf6', '#84cc16', '#f97316'];
 
-const formatLabel = (value: string) =>
-  (value || 'Unknown').replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+const ACTIVITY_BADGE = {
+  lead: { label: 'New', cls: 'bg-blue-50 text-blue-700', icon: UserIcon, tile: 'bg-blue-50 text-[var(--primary)]' },
+  contact: { label: 'Contact', cls: 'bg-emerald-50 text-emerald-700', icon: IdentificationIcon, tile: 'bg-blue-50 text-[var(--primary)]' },
+  task: { label: 'Task', cls: 'bg-orange-50 text-orange-700', icon: ClipboardDocumentCheckIcon, tile: 'bg-orange-50 text-orange-500' },
+} as const;
+
+const formatLabel = (value: string) => (value || 'Unknown').replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
 const greeting = () => {
   const h = new Date().getHours();
   return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
 };
 
-const initialsOf = (name?: string | null) =>
-  (name || '?')
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((p) => p.charAt(0).toUpperCase())
-    .join('');
+const isoDay = (d: Date) => {
+  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 10);
+};
 
 const shortDate = (d: Date) => d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 
-// Compact axis labels (12K, 1.2M) so long currency values don't squeeze the chart.
-const compact = (n: number) => new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(n);
+// Compact axis labels (₹4M, 12K) so long currency values don't squeeze the chart.
+const compact = (n: number) => new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(n);
 
-/** Cumulative deal value at the end of each of the last TREND_DAYS days. */
-function buildTrend(deals: any[]) {
+function timeAgo(at: number) {
+  const mins = Math.max(0, Math.round((Date.now() - at) / 60000));
+  if (mins < 1) return 'Just now';
+  if (mins < 60) return `${mins} min ago`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `${hours} hr${hours === 1 ? '' : 's'} ago`;
+  const days = Math.round(hours / 24);
+  return days === 1 ? 'Yesterday' : `${days} days ago`;
+}
+
+function dueLabel(due?: string | null) {
+  if (!due) return 'No due date';
+  const d = new Date(due);
+  if (Number.isNaN(d.getTime())) return 'No due date';
   const today = new Date();
-  today.setHours(23, 59, 59, 999);
-  const points: { date: string; value: number }[] = [];
-  const sorted = deals
-    .map((d) => ({ at: new Date(d.createdAt).getTime(), value: Number(d.value) || 0 }))
-    .filter((d) => !Number.isNaN(d.at))
-    .sort((a, b) => a.at - b.at);
-  for (let i = TREND_DAYS - 1; i >= 0; i--) {
-    const end = new Date(today);
-    end.setDate(today.getDate() - i);
-    const cutoff = end.getTime();
-    let sum = 0;
-    for (const d of sorted) {
-      if (d.at > cutoff) break;
-      sum += d.value;
-    }
-    points.push({ date: shortDate(end), value: sum });
-  }
-  return points;
-}
-
-function Panel({ title, subtitle, action, children, className = '' }: {
-  title: string;
-  subtitle?: string;
-  action?: React.ReactNode;
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <div className={`space-y-4 rounded-2xl border border-slate-200/80 bg-white p-6 shadow-xs ${className}`}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="text-base font-bold text-slate-900">{title}</h2>
-          {subtitle && <p className="text-xs text-slate-400">{subtitle}</p>}
-        </div>
-        {action}
-      </div>
-      {children}
-    </div>
-  );
-}
-
-function Kpi({ label, value, icon, tone, foot, small }: {
-  label: string;
-  value: React.ReactNode;
-  icon: React.ReactNode;
-  tone: string;
-  foot?: React.ReactNode;
-  /** Smaller value text for long figures such as currency. */
-  small?: boolean;
-}) {
-  return (
-    <div className="flex items-center gap-3 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs">
-      <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${tone}`}>{icon}</div>
-      <div className="min-w-0 flex-1">
-        <span className="block truncate text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</span>
-        <div className={`truncate font-extrabold text-slate-900 ${small ? 'text-lg' : 'text-xl'}`} title={typeof value === 'string' ? value : undefined}>
-          {value}
-        </div>
-        {foot && <div className="truncate text-[11px] font-semibold text-slate-400">{foot}</div>}
-      </div>
-    </div>
-  );
+  const sameDay = d.toDateString() === today.toDateString();
+  const hasTime = d.getHours() !== 0 || d.getMinutes() !== 0;
+  const time = hasTime ? ` at ${d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}` : '';
+  return `${sameDay ? 'Today' : shortDate(d)}${time}`;
 }
 
 function Donut({ data, total }: { data: Slice[]; total: number }) {
-  if (data.length === 0) return <p className="py-8 text-center text-sm text-slate-400">No lead data yet.</p>;
+  if (data.length === 0) return <p className="py-10 text-center text-sm text-slate-400">No lead data yet.</p>;
   return (
-    <div className="flex items-center gap-4">
-      <div className="relative h-36 w-36 shrink-0">
-        <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
-            <Pie data={data} innerRadius={42} outerRadius={60} paddingAngle={data.length > 1 ? 2 : 0} dataKey="value" stroke="none">
-              {data.map((entry) => (
-                <Cell key={entry.name} fill={entry.color} />
-              ))}
-            </Pie>
-            <Tooltip formatter={(v, n) => [v, n]} />
-          </PieChart>
-        </ResponsiveContainer>
-        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-lg font-extrabold text-slate-900">{total.toLocaleString()}</span>
-          <span className="text-[9px] font-medium text-slate-400">Total Leads</span>
+    <div className="flex flex-col items-center gap-3 sm:flex-row 2xl:justify-center 2xl:gap-6">
+      <div className="flex shrink-0 items-center gap-2.5">
+        <div className="w-10 text-center sm:text-left">
+          <p className="text-2xl font-extrabold leading-none text-slate-900">{total.toLocaleString()}</p>
+          <p className="mt-1 text-[11px] font-medium leading-tight text-slate-500">Total Leads</p>
+        </div>
+        <div className="h-[104px] w-[104px] shrink-0 2xl:h-36 2xl:w-36">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie data={data} innerRadius="50%" outerRadius="98%" paddingAngle={data.length > 1 ? 1 : 0} dataKey="value" stroke="none" startAngle={90} endAngle={-270}>
+                {data.map((entry) => (
+                  <Cell key={entry.name} fill={entry.color} />
+                ))}
+              </Pie>
+              <Tooltip formatter={(v, n) => [v, n]} />
+            </PieChart>
+          </ResponsiveContainer>
         </div>
       </div>
-      <div className="min-w-0 flex-1 space-y-1">
+      <ul className="w-full min-w-0 flex-1 space-y-1.5 2xl:max-w-[240px]">
         {data.map((item) => (
-          <div key={item.name} className="flex items-center justify-between gap-2 text-[11px]">
-            <div className="flex min-w-0 items-center gap-1.5">
-              <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ backgroundColor: item.color }} />
+          <li key={item.name} className="flex items-center justify-between gap-2 text-[11px]">
+            <span className="flex min-w-0 items-center gap-1.5">
+              <span className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ backgroundColor: item.color }} />
               <span className="truncate font-medium text-slate-700">{item.name}</span>
-            </div>
-            <span className="shrink-0 font-semibold text-slate-500">
+            </span>
+            <span className="shrink-0 text-slate-500">
               {item.value} ({total > 0 ? ((item.value / total) * 100).toFixed(1) : '0.0'}%)
             </span>
-          </div>
+          </li>
         ))}
+      </ul>
+    </div>
+  );
+}
+
+function PipelineChevrons({ counts }: { counts: Record<string, number> }) {
+  return (
+    <div className="-mx-1 overflow-x-auto px-1 pb-1">
+      <div className="flex min-w-[560px]">
+        {PIPELINE_STAGES.map((s, i) => {
+          const first = i === 0;
+          // Each stage is an arrow; every one after the first is notched to
+          // take the previous arrow's point, and they overlap by the point width.
+          const clip = first
+            ? 'polygon(0 0, calc(100% - 18px) 0, 100% 50%, calc(100% - 18px) 100%, 0 100%)'
+            : 'polygon(0 0, calc(100% - 18px) 0, 100% 50%, calc(100% - 18px) 100%, 0 100%, 18px 50%)';
+          return (
+            <Link
+              key={s.key}
+              href={`/leads?status=${s.key}`}
+              className={`flex h-[72px] flex-1 flex-col items-center justify-center pl-5 pr-3 text-center transition-opacity hover:opacity-90 ${first ? 'rounded-l-lg' : '-ml-3'} ${i >= 2 ? 'dark:brightness-[0.8]' : ''}`}
+              style={{ backgroundColor: s.bg, color: s.text, clipPath: clip }}
+              title={`${s.label} leads`}
+            >
+              <span className="text-xs font-semibold">{s.label}</span>
+              <span className="text-xl font-extrabold">{(counts[s.key] || 0).toLocaleString()}</span>
+            </Link>
+          );
+        })}
       </div>
     </div>
   );
@@ -175,28 +191,39 @@ function Donut({ data, total }: { data: Slice[]; total: number }) {
 
 export default function DashboardPage() {
   const [userName, setUserName] = useState('');
+  const [range, setRange] = useState('30');
+  const [metric, setMetric] = useState('value');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [stats, setStats] = useState({ totalLeads: 0, totalDeals: 0, totalContacts: 0, pipelineValue: 0, winRate: 0, wonDeals: 0, lostDeals: 0 });
+  const [stats, setStats] = useState({ totalLeads: 0, totalContacts: 0, pipelineValue: 0, winRate: 0 });
   const [statusCounts, setStatusCounts] = useState<Record<string, number>>({});
   const [sourceSlices, setSourceSlices] = useState<Slice[]>([]);
-  const [trend, setTrend] = useState<{ date: string; value: number }[]>([]);
+  const [deals, setDeals] = useState<any[]>([]);
+  const [dailyLeads, setDailyLeads] = useState<number[] | null>(null);
+  const [contactTimes, setContactTimes] = useState<number[]>([]);
   const [recentLeads, setRecentLeads] = useState<any[]>([]);
   const [recentActivity, setRecentActivity] = useState<Activity[]>([]);
 
-  const loadDashboardData = useCallback(async () => {
+  const days = Number(range);
+  const compareLabel = RANGES.find((r) => r.value === range)?.compare;
+
+  const loadDashboardData = useCallback(async (windowDays: number) => {
     setLoading(true);
     setError(null);
-    const [leadStats, dealStats, contactStats, leadsRes, tasksRes, dealsRes] = await Promise.allSettled([
+    const from = new Date(Date.now() - (windowDays * 2 - 1) * DAY);
+    const [leadStats, dealStats, contactStats, leadsRes, tasksRes, dealsRes, leadDaily, contactsRes] = await Promise.allSettled([
       leadsApi.getStats(),
       dealsApi.getStats(),
       contactsApi.getStats(),
       leadsApi.getLeads({ limit: 5 }),
       tasksApi.getTasks({ status: 'pending' }),
       dealsApi.getAllDeals(),
+      salesApi.getLeadSources({ from: isoDay(from), to: isoDay(new Date()) }),
+      // Newest contacts, for the activity feed and the contacts trend.
+      contactsApi.getContacts({ limit: 200 }),
     ]);
 
-    const next = { totalLeads: 0, totalDeals: 0, totalContacts: 0, pipelineValue: 0, winRate: 0, wonDeals: 0, lostDeals: 0 };
+    const next = { totalLeads: 0, totalContacts: 0, pipelineValue: 0, winRate: 0 };
     if (leadStats.status === 'fulfilled') {
       next.totalLeads = leadStats.value.totalLeads || 0;
       const counts: Record<string, number> = {};
@@ -207,23 +234,23 @@ export default function DashboardPage() {
       setSourceSlices(
         (leadStats.value.leadsBySource || [])
           .map((s: any, i: number) => ({
-            name: formatLabel(s.leadSource),
+            name: leadSourceLabel(s.leadSource),
             value: Number(s.count ?? s.dataValues?.count) || 0,
-            color: SOURCE_COLORS[i % SOURCE_COLORS.length],
+            color: SOURCE_COLORS[String(s.leadSource || '').toLowerCase()] || FALLBACK_COLORS[i % FALLBACK_COLORS.length],
           }))
           .filter((s: Slice) => s.value > 0)
+          .sort((a: Slice, b: Slice) => a.name.localeCompare(b.name))
       );
     }
     if (dealStats.status === 'fulfilled') {
-      const v = dealStats.value;
-      next.totalDeals = v.totalDeals || 0;
-      next.pipelineValue = v.totalValue || 0;
-      next.winRate = Math.round(v.winRate || 0);
-      next.wonDeals = v.wonDeals || 0;
-      next.lostDeals = v.lostDeals || 0;
+      next.pipelineValue = dealStats.value.totalValue || 0;
+      next.winRate = Math.round(dealStats.value.winRate || 0);
     }
     if (contactStats.status === 'fulfilled') next.totalContacts = contactStats.value.totalContacts || 0;
-    if (dealsRes.status === 'fulfilled') setTrend(buildTrend(dealsRes.value));
+    setDeals(dealsRes.status === 'fulfilled' ? dealsRes.value : []);
+    setDailyLeads(leadDaily.status === 'fulfilled' ? leadDaily.value.daily.map((d) => d.leads) : null);
+    const contacts = contactsRes.status === 'fulfilled' ? contactsRes.value.contacts || [] : [];
+    setContactTimes(contacts.map((c: any) => new Date(c.createdAt).getTime()).filter((t: number) => !Number.isNaN(t)));
     setStats(next);
 
     const activity: Activity[] = [];
@@ -231,29 +258,48 @@ export default function DashboardPage() {
       const leads = leadsRes.value?.leads || [];
       setRecentLeads(leads.slice(0, 5));
       leads.slice(0, 3).forEach((lead: any) => {
+        const at = new Date(lead.createdAt).getTime() || 0;
         activity.push({
           id: `lead-${lead.id}`,
-          type: 'lead',
+          kind: 'lead',
           title: 'Lead added to pipeline',
           name: lead.name?.trim() || 'A lead',
+          href: `/leads/${lead.id}`,
           detail: lead.company || 'No company',
-          badge: formatLabel(lead.status || 'new'),
+          when: at ? timeAgo(at) : '',
+          at,
         });
       });
     }
+    contacts.slice(0, 1).forEach((c: any) => {
+      const at = new Date(c.createdAt).getTime() || 0;
+      activity.push({
+        id: `contact-${c.id}`,
+        kind: 'contact',
+        title: 'New contact created',
+        name: `${c.firstName || ''} ${c.lastName || ''}`.trim() || c.email || 'A contact',
+        href: '/contacts',
+        detail: c.company || 'No company',
+        when: at ? timeAgo(at) : '',
+        at,
+      });
+    });
+    activity.sort((a, b) => b.at - a.at);
     if (tasksRes.status === 'fulfilled') {
-      (tasksRes.value?.tasks || []).slice(0, 2).forEach((task: any) => {
+      (tasksRes.value?.tasks || []).slice(0, 1).forEach((task: any) => {
         activity.push({
           id: `task-${task.id}`,
-          type: 'task',
+          kind: 'task',
           title: 'Task pending',
           name: task.title,
-          detail: task.dueDate ? `Due ${shortDate(new Date(task.dueDate))}` : 'No due date',
-          badge: 'Task',
+          href: '/tasks',
+          detail: '',
+          when: dueLabel(task.dueDate),
+          at: 0,
         });
       });
     }
-    setRecentActivity(activity);
+    setRecentActivity(activity.slice(0, 4));
 
     if ([leadStats, dealStats, contactStats, leadsRes].every((r) => r.status === 'rejected')) {
       setError('Dashboard data failed to load. Check your connection and try again.');
@@ -264,40 +310,70 @@ export default function DashboardPage() {
   useEffect(() => {
     const user = getStoredUser();
     if (user?.firstName) setUserName(user.firstName);
-    loadDashboardData();
-  }, [loadDashboardData]);
+  }, []);
+
+  useEffect(() => {
+    loadDashboardData(days);
+  }, [loadDashboardData, days]);
+
+  // Trends over the selected window (and the window before it, for "vs last ...").
+  const trends = useMemo(() => {
+    const ends = dayEnds(days * 2);
+    const current = ends.slice(days);
+    const windowStart = current[0] - DAY;
+    const parsed = parseDeals(deals);
+    const sum = (a: number[]) => a.reduce((x, y) => x + y, 0);
+
+    const leadDays = dailyLeads && dailyLeads.length >= days * 2 ? dailyLeads.slice(-days * 2) : null;
+    const contactDaily = dailyCounts(contactTimes, ends);
+    const dealDaily = dailyCounts(parsed.map((d) => d.at), ends);
+
+    const pick = dealMeasures[metric === 'count' ? 'count' : metric === 'weighted' ? 'weighted' : 'value'];
+    const chart = current.map((t) => ({ date: shortDate(new Date(t)), value: pick(parsed, t) }));
+
+    return {
+      leads: {
+        spark: leadDays ? leadDays.slice(days) : [],
+        change: leadDays ? percentChange(sum(leadDays.slice(days)), sum(leadDays.slice(0, days))) : null,
+      },
+      deals: {
+        value: dealMeasures.open(parsed, Date.now()),
+        spark: dealTrend(parsed, days, 'open').spark,
+        change: percentChange(sum(dealDaily.slice(days)), sum(dealDaily.slice(0, days))),
+      },
+      contacts: { spark: contactDaily.slice(days), change: percentChange(sum(contactDaily.slice(days)), sum(contactDaily.slice(0, days))) },
+      pipeline: dealTrend(parsed, days, 'value'),
+      winRate: dealTrend(parsed, days, 'winRate'),
+      chart,
+      chartNow: pick(parsed, Date.now()),
+      chartChange: percentChange(pick(parsed, Date.now()), pick(parsed, windowStart)),
+    };
+  }, [deals, dailyLeads, contactTimes, days, metric]);
 
   const statusSlices: Slice[] = Object.entries(statusCounts)
     .filter(([, n]) => n > 0)
+    .sort(([a], [b]) => a.localeCompare(b))
     .map(([status, n]) => ({ name: formatLabel(status), value: n, color: STATUS_COLORS[status] || '#64748b' }));
 
-  const totalByStatus = Object.values(statusCounts).reduce((a, b) => a + b, 0);
-  const openLeads = totalByStatus - (statusCounts.converted || 0) - (statusCounts.lost || 0) - (statusCounts.unqualified || 0);
-  const conversionRate = totalByStatus > 0 ? Math.round(((statusCounts.converted || 0) / totalByStatus) * 1000) / 10 : 0;
-
-  const trendStart = trend[0]?.value ?? 0;
-  const trendEnd = trend[trend.length - 1]?.value ?? 0;
-  const trendChange = trendStart > 0 ? Math.round(((trendEnd - trendStart) / trendStart) * 1000) / 10 : null;
+  const chartValue = (v: number) => (metric === 'count' ? v.toLocaleString() : formatCurrency(v));
+  const tickEvery = Math.max(1, Math.round(days / 6));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">
             {greeting()}{userName ? `, ${userName}` : ''} <span aria-hidden="true">👋</span>
           </h1>
-          <p className="mt-0.5 text-xs font-medium text-slate-500">Here&apos;s what&apos;s happening with your business today.</p>
+          <p className="mt-0.5 text-sm text-slate-500">Here&apos;s what&apos;s happening with your business today.</p>
         </div>
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs">
-            <CalendarIcon className="h-4 w-4 text-slate-400" />
-            <span>Last {TREND_DAYS} days</span>
-          </div>
+          <PeriodSelect value={range} onChange={setRange} options={RANGES} />
           <button
             type="button"
-            onClick={loadDashboardData}
+            onClick={() => loadDashboardData(days)}
             disabled={loading}
-            className="rounded-xl border border-slate-200 bg-white p-2 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-700 disabled:opacity-60"
+            className="rounded-xl border border-slate-200 bg-white p-2 text-slate-500 shadow-2xs transition-colors hover:bg-slate-50 hover:text-slate-700 disabled:opacity-60"
             aria-label="Refresh dashboard"
             title="Refresh"
           >
@@ -308,104 +384,124 @@ export default function DashboardPage() {
 
       {error && <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <Kpi label="Total Leads" value={stats.totalLeads.toLocaleString()} tone="bg-blue-50 text-[var(--primary)]" icon={<UsersIcon className="h-5 w-5" />} />
-        <Kpi label="Active Deals" value={stats.totalDeals.toLocaleString()} tone="bg-cyan-50 text-cyan-600" icon={<BriefcaseIcon className="h-5 w-5" />} />
-        <Kpi label="Contacts" value={stats.totalContacts.toLocaleString()} tone="bg-sky-50 text-sky-600" icon={<UserGroupIcon className="h-5 w-5" />} />
-        <Kpi
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        <KpiCard
+          label="Total Leads"
+          value={stats.totalLeads.toLocaleString()}
+          icon={<UsersIcon className="h-6 w-6" />}
+          tone="blue"
+          change={trends.leads.change}
+          changeLabel={compareLabel}
+          spark={trends.leads.spark}
+          href="/leads"
+        />
+        <KpiCard
+          label="Active Deals"
+          value={trends.deals.value.toLocaleString()}
+          icon={<BriefcaseIcon className="h-6 w-6" />}
+          tone="sky"
+          change={trends.deals.change}
+          changeLabel={compareLabel}
+          spark={trends.deals.spark}
+          href="/deals"
+        />
+        <KpiCard
+          label="Contacts"
+          value={stats.totalContacts.toLocaleString()}
+          icon={<IdentificationIcon className="h-6 w-6" />}
+          tone="violet"
+          change={trends.contacts.change}
+          changeLabel={compareLabel}
+          spark={trends.contacts.spark}
+          href="/contacts"
+        />
+        <KpiCard
           label="Pipeline Value"
           value={formatCurrency(stats.pipelineValue)}
-          small
-          tone="bg-blue-50 text-[var(--primary)] text-lg font-bold"
-          icon={<span>{getCurrencySymbol()}</span>}
-          foot={
-            trendChange !== null && (
-              <span className={`inline-flex items-center gap-1 ${trendChange >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                {trendChange >= 0 ? <ArrowTrendingUpIcon className="h-3 w-3" /> : <ArrowTrendingDownIcon className="h-3 w-3" />}
-                {trendChange >= 0 ? '+' : ''}{trendChange}%<span className="font-normal text-slate-400">in {TREND_DAYS} days</span>
-              </span>
-            )
-          }
+          icon={<span className="text-xl font-bold">{getCurrencySymbol()}</span>}
+          tone="amber"
+          change={trends.pipeline.change}
+          changeLabel={compareLabel}
+          spark={trends.pipeline.spark}
+          href="/pipeline"
         />
-        <Kpi
+        <KpiCard
           label="Win Rate"
           value={`${stats.winRate}%`}
-          tone="bg-indigo-50 text-indigo-600"
-          icon={<ArrowTrendingUpIcon className="h-5 w-5" />}
-          foot={`${stats.wonDeals} won · ${stats.lostDeals} lost`}
+          icon={<ChartBarIcon className="h-6 w-6" />}
+          tone="rose"
+          change={trends.winRate.change}
+          changeLabel={compareLabel}
+          spark={trends.winRate.spark}
+          href="/reports"
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-12">
         <Panel
-          className="lg:col-span-7"
+          className="xl:col-span-7"
           title="Sales Pipeline"
-          subtitle="Track your leads across every stage."
-          action={
-            <Link href="/pipeline" className="flex shrink-0 items-center gap-1 text-xs font-bold text-[var(--primary)] hover:underline">
-              View Pipeline <ChevronRightIcon className="h-3.5 w-3.5" />
-            </Link>
-          }
+          subtitle="Track your opportunities across every stage."
+          action={<PanelLink href="/pipeline">View Pipeline</PanelLink>}
+          bodyClassName="flex items-center"
         >
-          <div className="grid grid-cols-3 gap-1 pt-2 sm:grid-cols-6">
-            {PIPELINE_STAGES.map((s, i) => (
-              <div
-                key={s.key}
-                className={`p-3 text-center ${i === 0 ? 'rounded-l-lg' : ''} ${i === PIPELINE_STAGES.length - 1 ? 'rounded-r-lg' : ''}`}
-                style={{ backgroundColor: s.bg, color: s.text }}
-              >
-                <span className="block truncate text-[10px] font-medium" style={{ color: s.sub }}>{s.label}</span>
-                <span className="text-lg font-bold">{(statusCounts[s.key] || 0).toLocaleString()}</span>
-              </div>
-            ))}
-          </div>
-          <div className="grid grid-cols-3 gap-3 border-t border-slate-100 pt-4 text-xs">
-            <div>
-              <p className="font-semibold text-slate-400">Open leads</p>
-              <p className="text-base font-extrabold text-slate-900">{openLeads.toLocaleString()}</p>
-            </div>
-            <div>
-              <p className="font-semibold text-slate-400">Converted</p>
-              <p className="text-base font-extrabold text-slate-900">{(statusCounts.converted || 0).toLocaleString()}</p>
-            </div>
-            <div>
-              <p className="font-semibold text-slate-400">Conversion rate</p>
-              <p className="text-base font-extrabold text-slate-900">{conversionRate}%</p>
-            </div>
+          <div className="w-full">
+            <PipelineChevrons counts={statusCounts} />
           </div>
         </Panel>
 
         <Panel
-          className="lg:col-span-5"
+          className="xl:col-span-5"
           title="Pipeline Overview"
-          subtitle="Total deal value and trend over time."
-          action={
-            <div className="flex shrink-0 items-center gap-2">
-              <span className="text-lg font-extrabold text-slate-900">{formatCurrency(stats.pipelineValue)}</span>
-              {trendChange !== null && (
-                <span className={`rounded-lg px-2 py-0.5 text-xs font-bold ${trendChange >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
-                  {trendChange >= 0 ? '+' : ''}{trendChange}%
-                </span>
-              )}
-            </div>
-          }
+          subtitle="Total pipeline value and trend over time."
+          action={<SelectPill label="Chart metric" value={metric} onChange={setMetric} options={METRICS} />}
+          bodyClassName="pt-2"
         >
-          <div className="h-44 w-full">
-            {trend.length === 0 ? (
+          <div className="mb-2 flex items-baseline gap-3">
+            <span className="text-2xl font-extrabold text-slate-900">{chartValue(trends.chartNow)}</span>
+            <span className={`text-xs font-bold ${trends.chartChange >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+              {trends.chartChange >= 0 ? '+' : ''}
+              {trends.chartChange}%
+            </span>
+            <span className="text-xs text-slate-500">{compareLabel}</span>
+          </div>
+          <div className="h-36 w-full">
+            {deals.length === 0 && !loading ? (
               <p className="py-12 text-center text-sm text-slate-400">No deals yet.</p>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={trend} margin={{ left: -10, right: 4, top: 4 }}>
+                <AreaChart data={trends.chart} margin={{ left: 0, right: 8, top: 6, bottom: 0 }}>
                   <defs>
                     <linearGradient id="pipelineColor" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#0066ff" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#0066ff" stopOpacity={0} />
+                      <stop offset="0%" stopColor="#0a6cf5" stopOpacity={0.35} />
+                      <stop offset="100%" stopColor="#0a6cf5" stopOpacity={0.02} />
                     </linearGradient>
                   </defs>
-                  <XAxis dataKey="date" stroke="#94a3b8" fontSize={10} tickLine={false} interval={6} />
-                  <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} tickFormatter={compact} width={48} />
-                  <Tooltip formatter={(v) => [formatCurrency(Number(v)), 'Pipeline']} />
-                  <Area type="monotone" dataKey="value" stroke="#0066ff" strokeWidth={3} fillOpacity={1} fill="url(#pipelineColor)" />
+                  <CartesianGrid vertical={false} stroke="var(--border)" strokeDasharray="3 3" />
+                  <XAxis dataKey="date" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} interval={tickEvery - 1} />
+                  <YAxis
+                    stroke="#94a3b8"
+                    fontSize={10}
+                    tickLine={false}
+                    axisLine={false}
+                    width={44}
+                    tickFormatter={(v) => (metric === 'count' ? compact(v) : `${getCurrencySymbol()}${compact(v)}`)}
+                  />
+                  <Tooltip formatter={(v) => [chartValue(Number(v)), METRICS.find((m) => m.value === metric)?.label]} />
+                  <Area
+                    type="linear"
+                    dataKey="value"
+                    stroke="#0a6cf5"
+                    strokeWidth={2.5}
+                    fill="url(#pipelineColor)"
+                    dot={(props: any) =>
+                      props.index % tickEvery === tickEvery - 1 || props.index === trends.chart.length - 1 ? (
+                        <circle key={props.index} cx={props.cx} cy={props.cy} r={3.5} fill="#0a6cf5" stroke="#fff" strokeWidth={1.5} />
+                      ) : (
+                        <g key={props.index} />
+                      )
+                    }
+                  />
                 </AreaChart>
               </ResponsiveContainer>
             )}
@@ -413,125 +509,115 @@ export default function DashboardPage() {
         </Panel>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 xl:grid-cols-[1.2fr_1fr_1fr]">
         <Panel
-          className="lg:col-span-4"
           title="Recent Activity"
-          action={<Link href="/leads" className="shrink-0 text-xs font-bold text-[var(--primary)] hover:underline">View all →</Link>}
+          subtitle="Stay updated with your team's latest actions."
+          action={<PanelLink href="/leads">View all</PanelLink>}
+          className="lg:col-span-2 xl:col-span-1"
         >
           {recentActivity.length === 0 ? (
-            <p className="py-4 text-center text-sm text-slate-400">No recent activity yet.</p>
+            <p className="py-6 text-center text-sm text-slate-400">No recent activity yet.</p>
           ) : (
-            <div className="space-y-4">
-              {recentActivity.map((a) => (
-                <div key={a.id} className="flex items-start gap-3 text-xs">
-                  <div
-                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-                      a.type === 'lead' ? 'bg-blue-50 text-[var(--primary)]' : 'bg-emerald-50 text-emerald-600'
-                    }`}
-                  >
-                    {a.type === 'lead' ? <UsersIcon className="h-4 w-4" /> : <CheckCircleIcon className="h-4 w-4" />}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="font-bold text-slate-800">{a.title}</p>
-                    <p className="truncate font-semibold text-slate-500">
-                      {a.name} <span className="font-normal text-slate-400">• {a.detail}</span>
-                    </p>
-                  </div>
-                  <span
-                    className={`shrink-0 rounded-lg px-2 py-0.5 text-[10px] font-bold ${
-                      a.type === 'lead' ? 'bg-blue-50 text-blue-700' : 'bg-emerald-50 text-emerald-700'
-                    }`}
-                  >
-                    {a.badge}
-                  </span>
-                </div>
-              ))}
-            </div>
+            <ol className="relative">
+              {recentActivity.map((a, i) => {
+                const b = ACTIVITY_BADGE[a.kind];
+                const Icon = b.icon;
+                return (
+                  <li key={a.id} className="relative flex items-center gap-3 border-b border-slate-100 py-3 pl-5 last:border-b-0">
+                    {/* Timeline rail and dot */}
+                    <span
+                      className={`absolute left-[3px] w-px bg-slate-300 ${i === 0 ? 'top-1/2' : 'top-0'} ${i === recentActivity.length - 1 ? 'h-1/2' : 'bottom-0'}`}
+                      aria-hidden="true"
+                    />
+                    <span className="absolute left-0 top-1/2 h-[7px] w-[7px] -translate-y-1/2 rounded-full bg-slate-800" aria-hidden="true" />
+                    <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${b.tile}`}>
+                      <Icon className="h-[18px] w-[18px]" />
+                    </span>
+                    <div className="min-w-0 flex-1 text-xs">
+                      <p className="truncate text-[13px] font-bold text-slate-900">{a.title}</p>
+                      <p className="truncate text-slate-500">
+                        <Link href={a.href} className={a.kind === 'lead' ? 'underline decoration-slate-300 underline-offset-2 hover:text-[var(--primary)]' : 'hover:text-[var(--primary)]'}>
+                          {a.name}
+                        </Link>
+                        {a.detail && <> • {a.detail}</>}
+                      </p>
+                    </div>
+                    <span className="hidden shrink-0 text-[11px] text-slate-500 sm:block">{a.when}</span>
+                    <span className={`shrink-0 rounded-md px-2 py-1 text-center text-[10px] font-bold ${b.cls}`}>{b.label}</span>
+                  </li>
+                );
+              })}
+            </ol>
           )}
         </Panel>
 
-        <Panel className="lg:col-span-4" title="Leads by Status">
-          <Donut data={statusSlices} total={stats.totalLeads} />
+        <Panel title="Leads by Status" bodyClassName="flex items-center">
+          <div className="w-full">
+            <Donut data={statusSlices} total={stats.totalLeads} />
+          </div>
         </Panel>
 
-        <Panel
-          className="lg:col-span-4"
-          title="Leads by Source"
-          action={
-            <Link href="/lead-sources" className="text-xs font-semibold text-[var(--primary)] hover:underline">
-              View report
-            </Link>
-          }
-        >
-          <Donut data={sourceSlices} total={stats.totalLeads} />
+        <Panel title="Leads by Source" action={<PanelLink href="/reports?step=lead-sources">Report</PanelLink>} bodyClassName="flex items-center">
+          <div className="w-full">
+            <Donut data={sourceSlices} total={stats.totalLeads} />
+          </div>
         </Panel>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-xs">
-        <div className="flex items-center justify-between border-b border-slate-100 p-6">
+      <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-xs">
+        <div className="flex items-center justify-between px-5 py-4">
           <h2 className="text-base font-bold text-slate-900">Recent Leads</h2>
-          <Link href="/leads" className="text-xs font-bold text-[var(--primary)] hover:underline">View all →</Link>
+          <PanelLink href="/leads">View all</PanelLink>
         </div>
         {loading && recentLeads.length === 0 ? (
           <div className="flex h-32 items-center justify-center">
             <LoadingSpinner size="md" />
           </div>
         ) : recentLeads.length === 0 ? (
-          <p className="py-6 text-center text-sm text-slate-400">No leads yet.</p>
+          <p className="pb-6 text-center text-sm text-slate-400">No leads yet.</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-left text-xs">
+            <table className="w-full min-w-[760px] border-collapse text-left text-xs">
               <thead>
-                <tr className="border-b border-slate-200 bg-slate-50/70 font-bold uppercase tracking-wider text-slate-500">
-                  <th className="px-4 py-3">Name</th>
-                  <th className="px-4 py-3">Company</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Score</th>
-                  <th className="px-4 py-3">Value</th>
-                  <th className="px-4 py-3">Owner</th>
-                  <th className="px-4 py-3">Added On</th>
-                  <th className="px-4 py-3">Actions</th>
+                <tr className="border-y border-slate-100 bg-slate-50/70 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                  <th className="px-5 py-2.5">Name</th>
+                  <th className="px-4 py-2.5">Company</th>
+                  <th className="px-4 py-2.5">Status</th>
+                  <th className="px-4 py-2.5">Score</th>
+                  <th className="px-4 py-2.5">Value</th>
+                  <th className="px-4 py-2.5">Owner</th>
+                  <th className="px-4 py-2.5">Added On</th>
+                  <th className="px-4 py-2.5"><span className="sr-only">Actions</span></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+              <tbody className="divide-y divide-slate-100 text-slate-700">
                 {recentLeads.map((lead) => {
                   const leadName = lead.name?.trim() || 'Unnamed';
                   return (
                     <tr key={lead.id} className="transition-colors hover:bg-slate-50/80">
-                      <td className="px-4 py-3">
-                        <Link href={`/leads/${lead.id}`} className="font-bold uppercase text-slate-900 hover:text-[var(--primary)]">
+                      <td className="px-5 py-2.5">
+                        <Link href={`/leads/${lead.id}`} className="font-semibold text-slate-900 underline decoration-slate-300 underline-offset-2 hover:text-[var(--primary)]">
                           {leadName}
                         </Link>
-                        <p className="text-[11px] font-normal text-slate-400">{lead.email || 'No email'}</p>
+                        <p className="text-[11px] text-slate-500">{lead.email || 'No email'}</p>
                       </td>
-                      <td className="px-4 py-3 text-slate-400">{lead.company || '—'}</td>
-                      <td className="px-4 py-3"><StatusBadge status={lead.status || 'new'} /></td>
-                      <td className="px-4 py-3 font-bold">{lead.score || 0}</td>
-                      <td className="px-4 py-3 font-bold">{formatCurrency(Number(lead.value) || 0)}</td>
-                      <td className="px-4 py-3">
-                        {lead.assignedTo ? (
-                          <div className="flex items-center gap-2">
-                            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--primary)] text-[10px] font-bold text-white">
-                              {initialsOf(lead.assignedTo)}
-                            </span>
-                            <span className="truncate">{lead.assignedTo}</span>
-                          </div>
-                        ) : (
-                          <span className="text-slate-400">Unassigned</span>
-                        )}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-slate-500">
+                      <td className="px-4 py-2.5 text-slate-500">{lead.company || '—'}</td>
+                      <td className="px-4 py-2.5"><StatusBadge status={lead.status || 'new'} /></td>
+                      <td className="px-4 py-2.5">{lead.score || 0}</td>
+                      <td className="px-4 py-2.5">{formatCurrency(Number(lead.value) || 0)}</td>
+                      <td className="px-4 py-2.5"><OwnerChip name={lead.assignedTo} /></td>
+                      <td className="whitespace-nowrap px-4 py-2.5 text-slate-500">
                         {lead.createdAt ? new Date(lead.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-2.5 text-right">
                         <Link
                           href={`/leads/${lead.id}`}
-                          className="inline-flex rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                          className="inline-flex rounded-lg p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
                           aria-label={`Open ${leadName}`}
                           title="Open lead"
                         >
-                          <EyeIcon className="h-4 w-4" />
+                          <EllipsisHorizontalIcon className="h-5 w-5" />
                         </Link>
                       </td>
                     </tr>
@@ -541,7 +627,7 @@ export default function DashboardPage() {
             </table>
           </div>
         )}
-      </div>
+      </section>
     </div>
   );
 }

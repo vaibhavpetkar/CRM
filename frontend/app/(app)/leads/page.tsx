@@ -197,6 +197,9 @@ export default function LeadsPage() {
     take('dateTo', setDateTo);
     take('location', setLocationFilter);
     if (any) setShowFilters(true);
+    // Dashboard pipeline stages link here with ?status=..., a top-level filter.
+    const status = q.get('status');
+    if (status) setFilter(status);
   }, []);
 
   useEffect(() => {
