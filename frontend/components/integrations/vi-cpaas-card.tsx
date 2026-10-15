@@ -30,7 +30,7 @@ const SECTIONS: Section[] = [
   },
   {
     title: 'CTC login (OBD API credential)',
-    help: 'The Username and Password on the Vi page Click To Call > CTC Configuration > Configure Click To Call API.',
+    help: 'The Username and Password on the Vi page Click To Call > CTC Configuration > Configure Click To Call API. The CRM logs in with them and your DNI to get a token, which also reads the call reports.',
     auth: 'authType',
     fields: [
       { key: 'username', label: 'API username' },
@@ -43,8 +43,8 @@ const SECTIONS: Section[] = [
     help: "Vi's Pull Report API (incoming and click-to-call reports). The CRM reads it every few minutes so calls Vi could not push still arrive.",
     pull: true,
     fields: [
-      { key: 'pullUsername', label: 'Pull API username' },
-      { key: 'pullPassword', label: 'Pull API password', secret: true },
+      { key: 'pullUsername', label: 'Pull API username (empty = CTC login)' },
+      { key: 'pullPassword', label: 'Pull API password (empty = CTC login)', secret: true },
       { key: 'dni', label: 'DNI (your Vi service number)', placeholder: '97xxxxxx42', help: 'Leave empty to use the Vi number above.' },
       { key: 'pullUrl', label: 'Pull API address (leave empty)', placeholder: 'https://cts.myvi.in:8443/Cpaas/api/v1/pullcalldetails' },
     ],
@@ -77,8 +77,9 @@ const SECTIONS: Section[] = [
 ];
 
 const AUTH_LABEL: Record<ViAuthType, string> = {
+  token: 'Vi login token (recommended)',
   bearer: 'Bearer token header',
-  basic: 'Username + password (Basic, recommended)',
+  basic: 'Username + password (Basic)',
   header: 'API key in a custom header',
   none: 'Inside the request body',
 };
@@ -226,7 +227,7 @@ export default function ViCpaasCard({ onChange }: { onChange?: (s: ViCpaasSettin
                 <Button
                   size="sm"
                   variant="secondary"
-                  disabled={!settings.pullUsername || !settings.secretsSet.pullPassword || dirty || acting === 'pull'}
+                  disabled={!(settings.pullUsername || settings.username) || !(settings.secretsSet.pullPassword || settings.secretsSet.password) || dirty || acting === 'pull'}
                   onClick={() =>
                     run('pull', async () => {
                       const res = await salesApi.pullViCpaas();

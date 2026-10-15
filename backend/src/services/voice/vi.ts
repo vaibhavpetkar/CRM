@@ -2,6 +2,7 @@ import type { CallStatus } from '../../models/Call';
 import { CallUpdate, PlaceCallInput, PlaceCallResult, RecordingDownload, VoiceProvider, VoiceProviderError } from './types';
 import { DEFAULT_ENCRYPTED_TEMPLATE, ViSettings, decryptViPayload, loadViSettings, peekViSettings } from './viSettings';
 import { aesEncrypt } from '../../utils/aesCbc';
+import { viDni, viLoginToken } from './viToken';
 
 /**
  * Vi (Vodafone Idea) CPaaS cloud calling. Used when a company switches it on
@@ -147,7 +148,7 @@ export const mapViCall = (body: Record<string, any>): CallUpdate => {
 
 const authHeaders = (s: ViSettings): Record<string, string> => {
   const { authType: type, username: user, password: secret } = s;
-  if (type === 'none' || (!secret && !user)) return {};
+  if (type === 'none' || type === 'token' || (!secret && !user)) return {};
   if (type === 'basic') return { Authorization: `Basic ${Buffer.from(`${user}:${secret}`).toString('base64')}` };
   if (type === 'header') return { [s.authHeader || 'Authorization']: s.authScheme ? `${s.authScheme} ${secret}` : secret };
   return { Authorization: `Bearer ${secret}` };
@@ -258,11 +259,22 @@ export class ViProvider implements VoiceProvider {
       password: s.password,
       reference: input.reference || '',
     });
-    const res = await viRequest(s, s.ctcUrl || VI_CTC_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
+    const send = async (fresh: boolean) => {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (s.authType === 'token') {
+        const login = { username: s.username, password: s.password, dni: viDni(s) };
+        headers.Authorization = `Bearer ${await viLoginToken((url, init) => viRequest({ ...s, authType: 'none' }, url, init), login, fresh)}`;
+      }
+      return viRequest(s, s.ctcUrl || VI_CTC_URL, { method: 'POST', headers, body: JSON.stringify(body) });
+    };
+    let res: any;
+    try {
+      res = await send(false);
+    } catch (err) {
+      // An expired token (403/406): log in again once.
+      if (s.authType !== 'token' || !(err instanceof VoiceProviderError) || err.status !== 502) throw err;
+      res = await send(true);
+    }
     const mapped = mapViCall(res);
     if (!mapped.providerCallId) throw new VoiceProviderError('Vi accepted the request but did not return a call id. Check the CTC API URL against your Vi API document.');
     return { providerCallId: mapped.providerCallId, status: mapped.status && mapped.status !== 'completed' ? mapped.status : 'queued', callerId };
