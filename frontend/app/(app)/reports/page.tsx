@@ -8,6 +8,7 @@ import LoadingSpinner from '@/components/ui/loading-spinner';
 import { PeriodSelect } from '@/components/ui/analytics';
 import { getStoredUser } from '@/lib/api';
 import { hasPermission } from '@/lib/permissions';
+import { isModuleEnabled, type ModuleKey } from '@/lib/modules';
 import { cn } from '@/lib/utils';
 import OverviewStep, { PERIODS } from '@/components/reports/overview-step';
 import ForecastStep from '@/components/reports/forecast-step';
@@ -18,11 +19,11 @@ import LeadSourcesStep from '@/components/reports/lead-sources-step';
 // Every report and analytics view on one page, walked through as wizard
 // steps. Each step is also linkable as /reports?step=<id>.
 const STEPS = [
-  { id: 'overview', label: 'Overview', hint: 'Pipeline, leads and money at a glance', permission: 'reports:view' },
-  { id: 'forecast', label: 'Sales Forecast', hint: 'Expected closes by month', permission: 'reports:view' },
-  { id: 'profit-loss', label: 'Profit & Loss', hint: 'Revenue, expenses and net profit', permission: 'reports:view' },
-  { id: 'marketing', label: 'Marketing Analytics', hint: 'Campaign reach and conversions', permission: 'marketing:view' },
-  { id: 'lead-sources', label: 'Lead Sources', hint: 'Where leads come from and convert', permission: 'leads:read' },
+  { id: 'overview', label: 'Overview', hint: 'Pipeline, leads and money at a glance', permission: 'reports:view', modules: ['deals'] },
+  { id: 'forecast', label: 'Sales Forecast', hint: 'Expected closes by month', permission: 'reports:view', modules: ['deals'] },
+  { id: 'profit-loss', label: 'Profit & Loss', hint: 'Revenue, expenses and net profit', permission: 'reports:view', modules: ['invoices', 'finance'] },
+  { id: 'marketing', label: 'Marketing Analytics', hint: 'Campaign reach and conversions', permission: 'marketing:view', modules: ['marketing'] },
+  { id: 'lead-sources', label: 'Lead Sources', hint: 'Where leads come from and convert', permission: 'leads:read', modules: [] },
 ] as const;
 
 type StepId = (typeof STEPS)[number]['id'];
@@ -42,7 +43,7 @@ function ReportsWizard() {
     setUser(getStoredUser());
   }, []);
 
-  const steps = useMemo(() => (user === undefined ? [] : STEPS.filter((s) => hasPermission(user, s.permission))), [user]);
+  const steps = useMemo(() => (user === undefined ? [] : STEPS.filter((s) => (s.modules as readonly ModuleKey[]).every((m) => isModuleEnabled(m)) && hasPermission(user, s.permission))), [user]);
   const requested = searchParams.get('step');
   const current = steps.find((s) => s.id === requested) || steps[0];
   const index = current ? steps.indexOf(current) : -1;

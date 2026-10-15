@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { isPathDisabled } from './lib/modules';
 
 // Routes that do NOT require authentication.
 const PUBLIC_PATHS = ['/login', '/signup', '/forgot-password', '/reset-password', '/accept-invite'];
@@ -39,6 +40,11 @@ export function proxy(request: NextRequest) {
   // Root path: send visitors to the right place based on auth state.
   if (pathname === '/') {
     return NextResponse.redirect(new URL(token ? '/dashboard' : '/login', request.url));
+  }
+
+  // Pages of switched-off modules (lib/modules.ts) go to the dashboard.
+  if (isPathDisabled(pathname)) {
+    return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
   return NextResponse.next();

@@ -16,6 +16,7 @@ import { PlusIcon, XMarkIcon, PencilSquareIcon, TrashIcon, ShareIcon } from '@he
 import { useToast } from '@/components/ui/toast';
 import CompanyAutocomplete from '@/components/ui/company-autocomplete';
 import { ContactRows, LeadRows, DealRows, RelatedSection, companyHref } from '@/components/contacts/related-records';
+import { isModuleEnabled } from '@/lib/modules';
 import CallButton from '@/components/calls/call-button';
 import CallHistory from '@/components/calls/call-history';
 
@@ -554,7 +555,7 @@ export default function ContactsPage() {
                 <p className="mt-2 text-xs text-slate-400">Loading...</p>
               ) : related.sameCompany.length + related.sharedPhone.length + related.sharedEmail.length + related.leads.length + related.deals.length === 0 ? (
                 <p className="mt-2 text-xs text-slate-400">
-                  {panelContact.company ? 'No other contacts, leads or deals are linked to this company yet.' : 'Add a company to link this contact with colleagues, leads and deals.'}
+                  {panelContact.company ? `No other contacts${isModuleEnabled('deals') ? ', leads or deals' : ' or leads'} are linked to this company yet.` : 'Add a company to link this contact with colleagues, leads and deals.'}
                 </p>
               ) : (
                 <>
@@ -578,7 +579,7 @@ export default function ContactsPage() {
                       <LeadRows leads={related.leads} />
                     </RelatedSection>
                   )}
-                  {related.deals.length > 0 && (
+                  {isModuleEnabled('deals') && related.deals.length > 0 && (
                     <RelatedSection title="Deals" count={related.deals.length}>
                       <DealRows deals={related.deals} />
                     </RelatedSection>

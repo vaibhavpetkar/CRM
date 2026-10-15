@@ -13,6 +13,7 @@ import { navigation } from '@/lib/navigation';
 import { cn } from '@/lib/utils';
 import { authApi, getStoredUser } from '@/lib/api';
 import { hasPermission } from '@/lib/permissions';
+import { isPathDisabled } from '@/lib/modules';
 import { useIsMobile } from '@/lib/hooks/useIsMobile';
 
 type SidebarProps = {
@@ -63,7 +64,7 @@ export default function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose
   const visibleSections = navigation
     .map((section) => ({
       ...section,
-      items: section.items.filter((item) => hasPermission(currentUser, item.permission)),
+      items: section.items.filter((item) => !isPathDisabled(item.href) && hasPermission(currentUser, item.permission)),
     }))
     .filter((section) => section.items.length > 0);
 
