@@ -17,7 +17,7 @@ const stampLabel = (value: string) =>
   new Date(value).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
 
 /**
- * Left-side panel listing every follow-up date on a lead with the remark
+ * Right-side panel listing every follow-up date on a lead with the remark
  * written for it, newest first. Loads fresh each time it opens.
  */
 export default function FollowUpHistoryDrawer({
@@ -67,8 +67,8 @@ export default function FollowUpHistoryDrawer({
         role="dialog"
         aria-label="Follow-up remarks"
         className={cn(
-          'absolute inset-y-0 left-0 flex w-full max-w-md flex-col bg-white shadow-2xl transition-transform duration-300 ease-out',
-          open ? 'translate-x-0' : '-translate-x-full'
+          'absolute inset-y-0 right-0 flex w-full max-w-md flex-col bg-white shadow-2xl transition-transform duration-300 ease-out',
+          open ? 'translate-x-0' : 'translate-x-full'
         )}
       >
         <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-5">
