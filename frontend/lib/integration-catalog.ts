@@ -8,6 +8,7 @@ export type IntegrationKind =
   | 'portal' // push URL and/or pull login (backend portalLeadsService)
   | 'import'
   | 'meta'
+  | 'vi-cpaas'
   | 'incoming-calls'
   | 'caller-numbers'
   | 'rotation'
@@ -269,6 +270,24 @@ export const INTEGRATIONS: IntegrationApp[] = [
       'Choose the file (.xlsx, .xls or .csv) below and check the preview.',
       'Pick the source for rows that have no Lead Source column, then press Import.',
       'Rows whose mobile or email is already a lead are not added twice; the existing lead gets a note instead. Importing the same file again adds nothing.',
+    ],
+  },
+  {
+    key: 'vi-cpaas',
+    name: 'Vi CPaaS (two-way calling)',
+    category: 'calling',
+    kind: 'vi-cpaas',
+    description: 'Click-to-call out and incoming calls in, through your Vodafone Idea CPaaS account.',
+    keywords: 'vi vodafone idea cpaas ctc click to call obd two way calling aes encryption pull api',
+    badge: { text: 'Vi', className: 'bg-[#EE2737] text-white' },
+    steps: [
+      'Open the API document in your Vi CPaaS portal (Tools) and keep the Configuration menu open next to this page.',
+      'CTC configuration: copy the CTC API URL and your Vi number below. In Vi, set the call status / callback URL to the Call events URL shown here.',
+      'OBD API credential: create the API user in Vi, then type the same username and password (or API key) below.',
+      'Pull API credential: copy the Pull API (call report) URL and its login below, so missed pushes are picked up every few minutes.',
+      'Schema credential: if Vi asks for a username and password for pushing to your URL, make one up, type it in both places.',
+      'OBD time: type the same calling hours you set in Vi. AES key & IV: copy both, and switch on encryption if your Vi account requires it.',
+      'Switch it On, then call a lead from the CRM and call your Vi number from a mobile. Both show in Call Tracking.',
     ],
   },
   {

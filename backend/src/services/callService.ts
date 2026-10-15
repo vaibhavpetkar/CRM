@@ -14,6 +14,7 @@ import { getVoiceProvider, providerKey, CallUpdate, VoiceProvider, VoiceProvider
 import { formatIndianNumber, normalizeIndianNumber } from '../utils/indianPhone';
 import logger from '../utils/logger';
 import { assignCallerNumber, describeMyCallerNumber, hasCallerNumbers } from './callerNumbers';
+import { viSwitchedOn } from './voice/viSettings';
 
 export const RECORDINGS_DIR = path.join(UPLOAD_DIR, 'recordings');
 
@@ -57,8 +58,18 @@ const STATUS_LABEL: Record<string, string> = {
 
 // ─── Setup / config ─────────────────────────────────────────────────────────
 
+/**
+ * The provider this company calls through: Vi CPaaS when it is switched on in
+ * Settings > Integrations, else the server's VOICE_PROVIDER.
+ */
+export const activeProvider = async (): Promise<VoiceProvider | null> => {
+  const provider = (await viSwitchedOn()) ? getVoiceProvider('vi') : getVoiceProvider();
+  await provider?.prepare?.();
+  return provider;
+};
+
 export const getConfig = async (user: any) => {
-  const provider = getVoiceProvider();
+  const provider = await activeProvider();
   const missingEnvVars = provider ? provider.missingEnvVars() : ['VOICE_PROVIDER'];
   // A caller ID comes from the numbers added in Settings, or the provider's default.
   const hasNumbers = await hasCallerNumbers();
@@ -79,7 +90,7 @@ export const getConfig = async (user: any) => {
 };
 
 const requireProvider = async (): Promise<VoiceProvider> => {
-  const provider = getVoiceProvider();
+  const provider = await activeProvider();
   if (!provider) throw new AppError(`Unknown calling provider "${providerKey()}". Check VOICE_PROVIDER.`, 503);
   if (provider.missingEnvVars().length || (!provider.defaultCallerId() && !(await hasCallerNumbers()))) {
     throw new AppError('Calling is not set up yet. Ask your administrator to add the calling provider details.', 503);
@@ -168,6 +179,7 @@ export const startCall = async (user: any, input: Target & { number?: string }) 
       callerId,
       statusCallbackUrl: `${callbackBaseUrl()}/api/webhooks/voice/${callbackToken}`,
       record: true,
+      reference: `crm${call.id}`,
     });
     await call.update({
       providerCallId: placed.providerCallId,
@@ -316,6 +328,7 @@ const refresh = async (call: Call) => {
   if (!needsStatus && call.endedAt && Date.now() - new Date(call.endedAt).getTime() > 24 * 3600 * 1000) return;
 
   const provider = getVoiceProvider(call.provider);
+  await provider?.prepare?.();
   if (!provider || provider.missingEnvVars().length) return;
   await call.update({ lastPolledAt: new Date() });
   try {
@@ -334,12 +347,15 @@ export const handleCallback = async (token: string, body: Record<string, any>) =
   if (!call) return false;
   const provider = getVoiceProvider(call.provider);
   if (!provider) return false;
-  const update = provider.parseCallback(body);
-  if (update.providerCallId && call.providerCallId && update.providerCallId !== call.providerCallId) return false;
   const companyId = call.get('companyId') as number | null;
-  const run = () => applyUpdate(call, update, provider);
-  await (companyId ? runWithTenant(companyId, run) : run());
-  return true;
+  const run = async () => {
+    await provider.prepare?.(); // e.g. the company's AES key, to open an encrypted body
+    const update = provider.parseCallback(body);
+    if (update.providerCallId && call.providerCallId && update.providerCallId !== call.providerCallId) return false;
+    await applyUpdate(call, update, provider);
+    return true;
+  };
+  return companyId ? runWithTenant(companyId, run) : run();
 };
 
 // ─── Reading / notes ────────────────────────────────────────────────────────

@@ -9,6 +9,7 @@ import { applyUpdate } from './callService';
 import { takeNextAgent } from './leadRotation';
 import { getVoiceProvider, providerKey } from './voice';
 import { mapViCall, pick } from './voice/vi';
+import { decryptViPayload, loadViSettings, viSwitchedOn, ViSettings } from './voice/viSettings';
 import { formatIndianNumber, normalizeIndianNumber } from '../utils/indianPhone';
 import { notifyUser } from '../utils/notificationService';
 import { runUnscoped, runWithTenant } from '../tenancy/context';
@@ -60,7 +61,7 @@ const serializeSettings = async (row: Integration) => {
     createLeads: config.createLeads,
     lastCallAt: row.lastSyncAt,
     callsLast7Days: received,
-    provider: providerKey(),
+    provider: (await viSwitchedOn()) ? 'vi' : providerKey(),
   };
 };
 
@@ -154,7 +155,7 @@ const isTerminal = (s: string) => (TERMINAL_CALL_STATUSES as string[]).includes(
 
 /** Finds this call (by the provider's id, else the caller's open call) or creates it. */
 const upsertCall = async (event: InboundEvent, createLeads: boolean): Promise<Call | null> => {
-  const provider = providerKey();
+  const provider = (await viSwitchedOn()) ? 'vi' : providerKey();
   let call: Call | null = null;
   if (event.providerCallId) {
     call = await Call.findOne({ where: { direction: 'inbound', providerCallId: event.providerCallId } as any });
@@ -212,8 +213,86 @@ const upsertCall = async (event: InboundEvent, createLeads: boolean): Promise<Ca
   });
 };
 
+/**
+ * A report about one of our own click-to-call calls, sent to the company's
+ * events URL (Vi CPaaS posts CTC status to one fixed URL) or read from the
+ * Pull API: found by the reference we sent ("crm123") or Vi's call id.
+ */
+export const findOutboundCall = async (body: Record<string, any>): Promise<Call | null> => {
+  const ref = String(pick(body, ['reference', 'crm_ref', 'client_ref', 'clientRef', 'custom_ref', 'customer_ref', 'udf1', 'uniqueid', 'ref_id', 'reference_id']) ?? '');
+  const m = ref.match(/^crm(\d+)$/i);
+  if (m) {
+    const call = await Call.findByPk(Number(m[1]));
+    if (call && call.direction !== 'inbound') return call;
+  }
+  const id = mapViCall(body).providerCallId;
+  if (!id) return null;
+  return Call.findOne({ where: { direction: { [Op.ne]: 'inbound' }, providerCallId: id } as any });
+};
+
+/** Does this call report say it was an incoming call? (null when it doesn't say) */
+export const isInboundReport = (body: Record<string, any>): boolean | null => {
+  const d = String(pick(body, ['direction', 'call_direction', 'callDirection', 'call_type', 'callType', 'CallType', 'calltype', 'Direction', 'type']) ?? '').trim();
+  if (!d) return null;
+  if (/out|obd|ctc|c2c|click|dial/i.test(d)) return false;
+  if (/^(in|ib|ibd)$|inbound|incoming/i.test(d)) return true;
+  return null;
+};
+
+/** Handles one call event for the current company. `body` is already decrypted. */
+export const processCallEvent = async (body: Record<string, any>, createLeads: boolean, opts: { fromPull?: boolean } = {}) => {
+  // Status of a call we placed ourselves.
+  const outbound = await findOutboundCall(body);
+  if (outbound) {
+    const provider = getVoiceProvider(outbound.provider) || getVoiceProvider('vi')!;
+    await provider.prepare?.();
+    await applyUpdate(outbound, mapViCall(body), provider);
+    return { ok: true, callId: outbound.id, status: outbound.status, leadId: outbound.leadId, direction: 'outbound' as const };
+  }
+  // A pulled report of an outgoing call we don't know (placed outside the CRM) isn't a buyer calling in.
+  if (opts.fromPull && isInboundReport(body) !== true) return { ok: false, reason: 'Not an incoming call.' };
+
+  const event = readInboundEvent(body);
+  const call = await upsertCall(event, createLeads);
+  if (!call) return { ok: false, reason: 'No caller number in the event.' };
+  const before = call.status;
+  const provider = getVoiceProvider(call.provider) || getVoiceProvider('vi')!;
+  await provider.prepare?.();
+  const update = mapViCall(body);
+  if (!update.status && !isTerminal(call.status)) update.status = 'ringing';
+  await applyUpdate(call, update, provider);
+
+  // A missed incoming call is a buyer waiting: tell whoever owns it.
+  if (!isTerminal(before) && isTerminal(call.status) && call.status !== 'completed') {
+    await notifyUser({
+      userId: call.userId,
+      type: 'missed_call',
+      title: `Missed call from ${formatIndianNumber(call.customerNumber)}`,
+      message: 'Call them back from the lead page.',
+      entityType: call.leadId ? 'Lead' : undefined,
+      entityId: call.leadId ?? undefined,
+      sendEmail: false,
+    } as any).catch((err) => logger.warn(`[voice] Missed-call notice failed: ${err}`));
+  }
+  return { ok: true, callId: call.id, status: call.status, leadId: call.leadId, direction: 'inbound' as const };
+};
+
+/** The "Schema credential" Vi sends with its pushes, when one is saved: HTTP Basic, or username/password fields. */
+export const viPushAllowed = (s: Pick<ViSettings, 'webhookUsername' | 'webhookPassword'>, authorization: string | undefined, body: Record<string, any>) => {
+  if (!s.webhookUsername && !s.webhookPassword) return true;
+  const same = (a: string, b: string) => a.length === b.length && crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
+  const basic = /^Basic\s+(.+)$/i.exec(authorization || '');
+  if (basic) {
+    const [u, ...rest] = Buffer.from(basic[1], 'base64').toString('utf8').split(':');
+    if (same(u, s.webhookUsername) && same(rest.join(':'), s.webhookPassword)) return true;
+  }
+  const u = String(pick(body, ['username', 'user', 'userName', 'user_name']) ?? '');
+  const p = String(pick(body, ['password', 'pass', 'pwd']) ?? '');
+  return same(u, s.webhookUsername) && same(p, s.webhookPassword);
+};
+
 /** Webhook (public). Returns null when the token matches no company. */
-export const receiveIncomingCall = async (token: string, body: Record<string, any>) => {
+export const receiveIncomingCall = async (token: string, rawBody: Record<string, any> | string, authorization?: string) => {
   if (!/^[a-f0-9]{48}$/.test(token)) return null;
   const row = await runUnscoped(() => Integration.findOne({ where: { provider: PROVIDER, config: { [Op.like]: `%"token":"${token}"%` } } }));
   const companyId = row?.get('companyId') as number | null | undefined;
@@ -222,28 +301,14 @@ export const receiveIncomingCall = async (token: string, body: Record<string, an
   if (config.token !== token) return null;
 
   return runWithTenant(companyId, async () => {
-    const event = readInboundEvent(body || {});
-    const call = await upsertCall(event, config.createLeads);
-    if (!call) return { ok: false, reason: 'No caller number in the event.' };
-    const before = call.status;
-    const provider = getVoiceProvider(call.provider) || getVoiceProvider('vi')!;
-    const update = mapViCall(body || {});
-    if (!update.status && !isTerminal(call.status)) update.status = 'ringing';
-    await applyUpdate(call, update, provider);
-    await row.update({ lastSyncAt: new Date() });
-
-    // A missed incoming call is a buyer waiting: tell whoever owns it.
-    if (!isTerminal(before) && isTerminal(call.status) && call.status !== 'completed') {
-      await notifyUser({
-        userId: call.userId,
-        type: 'missed_call',
-        title: `Missed call from ${formatIndianNumber(call.customerNumber)}`,
-        message: 'Call them back from the lead page.',
-        entityType: call.leadId ? 'Lead' : undefined,
-        entityId: call.leadId ?? undefined,
-        sendEmail: false,
-      } as any).catch((err) => logger.warn(`[voice] Missed-call notice failed: ${err}`));
-    }
-    return { ok: true, callId: call.id, status: call.status, leadId: call.leadId };
+    const vi = await loadViSettings();
+    const body = decryptViPayload(rawBody, vi);
+    if (!viPushAllowed(vi, authorization, body)) return { ok: false, unauthorized: true, reason: 'Wrong username or password.' };
+    const result = await processCallEvent(body, config.createLeads);
+    if (result.ok) await row.update({ lastSyncAt: new Date() });
+    return result;
   });
 };
+
+/** The company's incoming-call settings (token, createLeads), for the Pull API. */
+export const inboundConfig = async () => parse((await settingsRow()).config);

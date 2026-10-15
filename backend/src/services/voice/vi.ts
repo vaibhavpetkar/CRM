@@ -1,8 +1,12 @@
 import type { CallStatus } from '../../models/Call';
 import { CallUpdate, PlaceCallInput, PlaceCallResult, RecordingDownload, VoiceProvider, VoiceProviderError } from './types';
+import { DEFAULT_ENCRYPTED_TEMPLATE, ViSettings, decryptViPayload, loadViSettings, peekViSettings } from './viSettings';
+import { aesEncrypt } from '../../utils/aesCbc';
 
 /**
- * Vi (Vodafone Idea) Business cloud calling, VOICE_PROVIDER=vi.
+ * Vi (Vodafone Idea) CPaaS cloud calling. Used when a company switches it on
+ * under Settings > Integrations > Vi CPaaS (see ./viSettings.ts), or for
+ * everyone with VOICE_PROVIDER=vi and the env vars below.
  *
  * Vi Business sells click-to-call / "Smart Call Connect" on enterprise
  * contracts and hands each customer its own API document, so there is no
@@ -21,6 +25,13 @@ import { CallUpdate, PlaceCallInput, PlaceCallResult, RecordingDownload, VoicePr
  *                       numbers are 10 digits (use {{agentE164}} / {{customerE164}} for +91...)
  *   VI_STATUS_URL       optional URL to read one call, with {{callId}}, used to poll
  *                       status when a webhook is missed
+ *   VI_AES_KEY / VI_AES_IV / VI_ENCRYPT_REQUESTS / VI_ENCRYPTED_TEMPLATE
+ *                       AES-256-CBC payload encryption (OBD encryption key & IV)
+ *   VI_PULL_URL / VI_PULL_USERNAME / VI_PULL_PASSWORD   Pull API for call reports
+ *   VI_CALL_START / VI_CALL_END   OBD calling hours, "09:00" / "21:00" IST
+ *
+ * The request template can also use {{username}}, {{password}} (OBD API
+ * credential) and {{reference}} (our call reference, echoed back by Vi).
  *
  * Vi should be set to post call events (answered, ended, recording) to the
  * per-call callback URL we send as {{callbackUrl}}.
@@ -126,50 +137,104 @@ export const mapViCall = (body: Record<string, any>): CallUpdate => {
   };
 };
 
+const authHeaders = (s: ViSettings, which: 'api' | 'pull'): Record<string, string> => {
+  const type = which === 'api' ? s.authType : s.pullAuthType;
+  const user = which === 'api' ? s.username : s.pullUsername;
+  const secret = which === 'api' ? s.password : s.pullPassword;
+  if (type === 'none' || (!secret && !user)) return {};
+  if (type === 'basic') return { Authorization: `Basic ${Buffer.from(`${user}:${secret}`).toString('base64')}` };
+  if (type === 'header') return { [s.authHeader || 'Authorization']: s.authScheme ? `${s.authScheme} ${secret}` : secret };
+  return { Authorization: `Bearer ${secret}` };
+};
+
+/** India time now, as minutes after midnight. */
+const istMinutes = (now = new Date()) => {
+  const ist = new Date(now.getTime() + 330 * 60000);
+  return ist.getUTCHours() * 60 + ist.getUTCMinutes();
+};
+const toMinutes = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
+
+/** Vi CPaaS only connects calls inside the OBD time set on its portal; say so before trying. */
+export const outsideCallingHours = (s: Pick<ViSettings, 'callStart' | 'callEnd'>, now = new Date()) => {
+  if (!s.callStart || !s.callEnd) return null;
+  const m = istMinutes(now);
+  const [a, b] = [toMinutes(s.callStart), toMinutes(s.callEnd)];
+  const inside = a <= b ? m >= a && m < b : m >= a || m < b;
+  return inside ? null : `Vi only connects calls between ${s.callStart} and ${s.callEnd} (India time). Try again then.`;
+};
+
+/** The body sent to Vi: the filled template, AES-256-CBC encrypted when that is switched on. */
+export const buildViBody = (s: ViSettings, values: Record<string, string>) => {
+  const body = fillTemplate(s.requestTemplate || DEFAULT_TEMPLATE, values);
+  if (!s.encryptRequests) return body;
+  if (!s.aesKey || !s.aesIv) throw new VoiceProviderError('Vi encryption is on but the AES key or IV is missing.', 400);
+  let encrypted: string;
+  try {
+    encrypted = aesEncrypt(JSON.stringify(body), s.aesKey, s.aesIv);
+  } catch (err) {
+    throw new VoiceProviderError((err as Error).message, 400);
+  }
+  return fillTemplate(s.encryptedTemplate || DEFAULT_ENCRYPTED_TEMPLATE, { encrypted });
+};
+
+/** Sends a request to Vi with these settings and reads the (maybe encrypted) answer. */
+export const viRequest = async (s: ViSettings, which: 'api' | 'pull', url: string, init: RequestInit = {}) => {
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      ...init,
+      headers: { Accept: 'application/json', ...authHeaders(s, which), ...((init.headers as Record<string, string>) || {}) },
+      signal: AbortSignal.timeout(20000),
+    });
+  } catch (err) {
+    throw new VoiceProviderError(`Could not reach Vi: ${(err as Error).message}`);
+  }
+  const text = await res.text();
+  let body: any = null;
+  try {
+    body = text ? JSON.parse(text) : null;
+  } catch {
+    body = text ? { raw: text } : null;
+  }
+  body = decryptViPayload(body || {}, s);
+  const failed = body && (body.success === false || /^(error|fail)/i.test(String(body.status ?? '')));
+  if (!res.ok || failed) {
+    const message = body?.message || body?.error?.message || body?.error || body?.raw?.slice?.(0, 200) || `HTTP ${res.status}`;
+    throw new VoiceProviderError(`Vi refused the request: ${message}`, res.status === 401 || res.status === 403 ? 502 : 400);
+  }
+  return body || {};
+};
+
 export class ViProvider implements VoiceProvider {
   readonly key = 'vi';
-  readonly label = 'Vi Business (Vodafone Idea)';
+  readonly label = 'Vi CPaaS (Vodafone Idea)';
+
+  /** Loads this company's Vi settings so the quick checks below can read them. */
+  async prepare() {
+    await loadViSettings();
+  }
+
+  private get settings() {
+    return peekViSettings();
+  }
 
   missingEnvVars() {
-    return ['VI_API_URL', 'VI_API_KEY'].filter((n) => !env(n));
+    const s = this.settings;
+    if (s.source === 'saved') return [];
+    return [!s.ctcUrl && 'VI_API_URL', !s.password && 'VI_API_KEY'].filter(Boolean) as string[];
   }
 
   defaultCallerId() {
-    return env('VI_CALLER_ID') || null;
-  }
-
-  private headers(extra: Record<string, string> = {}) {
-    const scheme = env('VI_AUTH_SCHEME') || 'Bearer';
-    const value = scheme.toLowerCase() === 'none' ? env('VI_API_KEY') : `${scheme} ${env('VI_API_KEY')}`;
-    return { [env('VI_AUTH_HEADER') || 'Authorization']: value, Accept: 'application/json', ...extra };
-  }
-
-  private async request(url: string, init: RequestInit = {}) {
-    let res: Response;
-    try {
-      res = await fetch(url, { ...init, headers: { ...this.headers(), ...((init.headers as Record<string, string>) || {}) } });
-    } catch (err) {
-      throw new VoiceProviderError(`Could not reach Vi: ${(err as Error).message}`);
-    }
-    const text = await res.text();
-    let body: any = null;
-    try {
-      body = text ? JSON.parse(text) : null;
-    } catch {
-      body = { raw: text };
-    }
-    const failed = body && (body.success === false || /^(error|fail)/i.test(String(body.status ?? '')));
-    if (!res.ok || failed) {
-      const message = body?.message || body?.error?.message || body?.error || text.slice(0, 200) || `HTTP ${res.status}`;
-      throw new VoiceProviderError(`Vi refused the call: ${message}`, res.status === 401 || res.status === 403 ? 502 : 400);
-    }
-    return body || {};
+    return this.settings.callerId || null;
   }
 
   async placeCall(input: PlaceCallInput): Promise<PlaceCallResult> {
-    const callerId = input.callerId || (env('VI_CALLER_ID') ? env('VI_CALLER_ID') : '');
-    if (!callerId) throw new VoiceProviderError('No calling number is set up. Add your Vi number under Settings > Integrations > Calling numbers, or set VI_CALLER_ID.', 400);
-    const body = fillTemplate(env('VI_REQUEST_TEMPLATE') || DEFAULT_TEMPLATE, {
+    const s = await loadViSettings();
+    const callerId = input.callerId || s.callerId || '';
+    if (!callerId) throw new VoiceProviderError('No calling number is set up. Add your Vi number under Settings > Integrations > Vi CPaaS or Calling numbers.', 400);
+    const closed = outsideCallingHours(s);
+    if (closed) throw new VoiceProviderError(closed, 400);
+    const body = buildViBody(s, {
       agent: toNational(input.agentNumber),
       customer: toNational(input.customerNumber),
       agentE164: input.agentNumber,
@@ -177,32 +242,36 @@ export class ViProvider implements VoiceProvider {
       callerId: toNational(callerId),
       callbackUrl: input.statusCallbackUrl,
       record: input.record ? 'true' : 'false',
-      accountId: env('VI_ACCOUNT_ID'),
+      accountId: s.accountId,
+      username: s.username,
+      password: s.password,
+      reference: input.reference || '',
     });
-    const res = await this.request(env('VI_API_URL'), {
+    const res = await viRequest(s, 'api', s.ctcUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
     const mapped = mapViCall(res);
-    if (!mapped.providerCallId) throw new VoiceProviderError('Vi accepted the request but did not return a call id. Check VI_API_URL against your Vi API document.');
+    if (!mapped.providerCallId) throw new VoiceProviderError('Vi accepted the request but did not return a call id. Check the CTC API URL against your Vi API document.');
     return { providerCallId: mapped.providerCallId, status: mapped.status && mapped.status !== 'completed' ? mapped.status : 'queued', callerId };
   }
 
   async getCall(providerCallId: string): Promise<CallUpdate> {
-    const template = env('VI_STATUS_URL');
-    // Without a status URL we rely on Vi's webhooks alone.
-    if (!template) return {};
-    return mapViCall(await this.request(template.replace(/\{\{callId\}\}/g, encodeURIComponent(providerCallId))));
+    const s = await loadViSettings();
+    // Without a status URL we rely on Vi's pushes and the Pull API.
+    if (!s.statusUrl) return {};
+    return mapViCall(await viRequest(s, 'api', s.statusUrl.replace(/\{\{callId\}\}/g, encodeURIComponent(providerCallId))));
   }
 
   parseCallback(body: Record<string, any>): CallUpdate {
-    return mapViCall(body || {});
+    return mapViCall(decryptViPayload(body || {}, this.settings));
   }
 
   async downloadRecording(url: string): Promise<RecordingDownload> {
-    let res = await fetch(url);
-    if (res.status === 401 || res.status === 403) res = await fetch(url, { headers: this.headers() });
+    const s = await loadViSettings();
+    let res = await fetch(url, { signal: AbortSignal.timeout(60000) });
+    if (res.status === 401 || res.status === 403) res = await fetch(url, { headers: authHeaders(s, 'api'), signal: AbortSignal.timeout(60000) });
     if (!res.ok) throw new VoiceProviderError(`Recording download failed (HTTP ${res.status}).`);
     return { data: Buffer.from(await res.arrayBuffer()), contentType: res.headers.get('content-type') || 'audio/mpeg' };
   }

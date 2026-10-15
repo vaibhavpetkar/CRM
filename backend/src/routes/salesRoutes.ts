@@ -31,4 +31,8 @@ router.get('/integrations/:key/activity', ...manage, salesController.integration
 router.get('/incoming-calls', ...manage, salesController.getIncomingCalls);
 router.put('/incoming-calls', ...manage, salesController.saveIncomingCalls);
 
+router.get('/vi-cpaas', ...manage, salesController.getViCpaas);
+router.put('/vi-cpaas', ...manage, salesController.saveViCpaas);
+router.post('/vi-cpaas/pull', ...manage, salesController.pullViCpaas);
+
 export default router;

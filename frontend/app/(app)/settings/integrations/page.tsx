@@ -18,12 +18,14 @@ import {
   PortalConnectionRow,
   RotationSettings,
   salesApi,
+  ViCpaasSettings,
 } from '@/lib/api';
 import { CATEGORY_LABEL, findIntegration, INTEGRATIONS, IntegrationApp, IntegrationCategory, matchesSearch } from '@/lib/integration-catalog';
 import MetaLeadsCard from '@/components/integrations/meta-leads-card';
 import CallerNumbersCard from '@/components/integrations/caller-numbers-card';
 import LeadRotationCard from '@/components/integrations/lead-rotation-card';
 import IncomingCallsCard from '@/components/integrations/incoming-calls-card';
+import ViCpaasCard from '@/components/integrations/vi-cpaas-card';
 import PortalSetup from '@/components/integrations/portal-setup';
 import ImportSetup from '@/components/integrations/import-setup';
 import IntegrationActivityPanel from '@/components/integrations/integration-activity';
@@ -87,6 +89,7 @@ export default function IntegrationsSettingsPage() {
   const [rotation, setRotation] = useState<RotationSettings | null>(null);
   const [incoming, setIncoming] = useState<IncomingCallSettings | null>(null);
   const [numbers, setNumbers] = useState<number>(0);
+  const [viCpaas, setViCpaas] = useState<ViCpaasSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [acting, setActing] = useState<string | null>(null);
@@ -106,6 +109,7 @@ export default function IntegrationsSettingsPage() {
       googleBusinessApi.getStatus().then(setBusinessStatus).catch(() => setBusinessStatus(null)),
       salesApi.getRotation().then(setRotation).catch(() => setRotation(null)),
       salesApi.getIncomingCalls().then(setIncoming).catch(() => setIncoming(null)),
+      salesApi.getViCpaas().then(setViCpaas).catch(() => setViCpaas(null)),
       callsApi.listNumbers().then((r) => setNumbers(r.filter((n) => n.isActive).length)).catch(() => setNumbers(0)),
     ])
       .then(() => setError(null))
@@ -169,6 +173,9 @@ export default function IntegrationsSettingsPage() {
         if (!metaStatus.configured) return { tone: 'off', label: 'Server setup needed' };
         return { tone: 'off', label: metaStatus.connected ? 'Choose Pages' : 'Not connected' };
       }
+      case 'vi-cpaas':
+        if (!viCpaas?.isEnabled) return { tone: 'off', label: 'Not set up' };
+        return viCpaas.lastError ? { tone: 'warn', label: 'Needs attention' } : { tone: 'ok', label: 'On' };
       case 'incoming-calls':
         return incoming?.callsLast7Days ? { tone: 'ok', label: `${incoming.callsLast7Days} calls this week` } : { tone: 'off', label: 'No calls yet' };
       case 'caller-numbers':
@@ -199,7 +206,7 @@ export default function IntegrationsSettingsPage() {
         return true;
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [search, filter, portals, metaStatus, meetStatus, businessStatus, rotation, incoming, numbers, integrations]
+    [search, filter, portals, metaStatus, meetStatus, businessStatus, rotation, incoming, viCpaas, numbers, integrations]
   );
   const connectedCount = INTEGRATIONS.filter((a) => healthOf(a).tone === 'ok').length;
 
@@ -257,6 +264,8 @@ export default function IntegrationsSettingsPage() {
         return <ImportSetup onImported={changed} />;
       case 'meta':
         return <MetaLeadsCard bare status={metaStatus} onChange={changed} />;
+      case 'vi-cpaas':
+        return <ViCpaasCard onChange={setViCpaas} />;
       case 'incoming-calls':
         return <IncomingCallsCard bare />;
       case 'caller-numbers':

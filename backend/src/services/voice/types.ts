@@ -16,6 +16,8 @@ export interface PlaceCallInput {
   callerId?: string | null; // E.164, the company number the customer sees; null = provider default
   statusCallbackUrl: string;
   record: boolean;
+  /** Our own reference for the call ("crm123"), for providers that echo one back. */
+  reference?: string;
 }
 
 export interface PlaceCallResult {
@@ -42,6 +44,8 @@ export interface RecordingDownload {
 export interface VoiceProvider {
   readonly key: string;
   readonly label: string;
+  /** Loads per-company settings before the quick checks below are used. */
+  prepare?(): Promise<void>;
   /** Env vars this provider still needs; empty when it is ready to call. */
   missingEnvVars(): string[];
   /** The caller ID used when the company has no numbers set up in the CRM. */

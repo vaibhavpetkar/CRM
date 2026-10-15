@@ -14,15 +14,15 @@ router.post('/rotation/:token', routeIncomingCallWebhook);
 
 // Incoming call events (ringing, answered, ended, recording) for the company
 // whose secret token this is. Some providers send them as a GET query string.
-const parseBody = [express.json({ limit: '200kb' }), express.urlencoded({ extended: true, limit: '200kb' })];
+const parseBody = [
+  express.json({ limit: '200kb' }),
+  express.urlencoded({ extended: true, limit: '200kb' }),
+  // An AES-encrypted body (Vi CPaaS) arrives as plain text.
+  express.text({ type: ['text/*', 'application/octet-stream'], limit: '200kb' }),
+];
 router.get('/incoming/:token', receiveIncomingCallWebhook);
 router.post('/incoming/:token', ...parseBody, receiveIncomingCallWebhook);
 
-router.post(
-  '/:token',
-  express.json({ limit: '200kb' }),
-  express.urlencoded({ extended: true, limit: '200kb' }),
-  receiveVoiceWebhook
-);
+router.post('/:token', ...parseBody, receiveVoiceWebhook);
 
 export default router;

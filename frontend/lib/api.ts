@@ -1341,6 +1341,11 @@ export const salesApi = {
   getIncomingCalls: async () => request<IncomingCallSettings>('/sales/incoming-calls'),
   saveIncomingCalls: async (payload: { createLeads?: boolean; regenerate?: boolean }) =>
     request<IncomingCallSettings>('/sales/incoming-calls', { method: 'PUT', body: JSON.stringify(payload) }),
+  getViCpaas: async () => request<ViCpaasSettings>('/sales/vi-cpaas'),
+  saveViCpaas: async (payload: Partial<ViCpaasForm> & { isEnabled?: boolean }) =>
+    request<ViCpaasSettings>('/sales/vi-cpaas', { method: 'PUT', body: JSON.stringify(payload) }),
+  pullViCpaas: async () =>
+    request<{ records: number; outgoing: number; incoming: number; skipped: number; settings: ViCpaasSettings }>('/sales/vi-cpaas/pull', { method: 'POST' }),
 };
 
 export interface PortalImportCounts {
@@ -1389,6 +1394,46 @@ export interface IntegrationActivity {
   stats: { leads: number; today: number; last7Days: number; last30Days: number };
   bySubSource: { subSource: string; leads: number }[];
   items: IntegrationActivityRow[];
+}
+
+export type ViAuthType = 'bearer' | 'basic' | 'header' | 'none';
+
+/** What the admin types on Settings > Integrations > Vi CPaaS. Secrets are write-only. */
+export interface ViCpaasForm {
+  ctcUrl: string;
+  callerId: string;
+  requestTemplate: string;
+  statusUrl: string;
+  authType: ViAuthType;
+  authHeader: string;
+  username: string;
+  password: string;
+  accountId: string;
+  pullUrl: string;
+  pullBody: string;
+  pullAuthType: ViAuthType;
+  pullUsername: string;
+  pullPassword: string;
+  webhookUsername: string;
+  webhookPassword: string;
+  callStart: string;
+  callEnd: string;
+  aesKey: string;
+  aesIv: string;
+  encryptRequests: boolean;
+  encryptedTemplate: string;
+}
+
+export type ViSecretField = 'password' | 'pullPassword' | 'webhookPassword' | 'aesKey' | 'aesIv';
+
+export interface ViCpaasSettings extends Omit<ViCpaasForm, ViSecretField> {
+  isEnabled: boolean;
+  status: string;
+  lastError: string | null;
+  lastPullAt: string | null;
+  pullEveryMinutes: number;
+  eventsUrl: string | null;
+  secretsSet: Record<ViSecretField, boolean>;
 }
 
 export interface IncomingCallSettings {
