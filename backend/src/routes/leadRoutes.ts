@@ -35,6 +35,9 @@ router.delete('/:id', protect, authorize('leads:delete'), leadController.deleteL
 // Conversion
 router.post('/:id/convert', protect, authorize('leads:update'), validate(convertLeadValidation), leadController.convertLead);
 
+// Follow-up dates and remarks, newest first
+router.get('/:id/follow-ups', protect, authorize('leads:read'), leadController.getLeadFollowUps);
+
 // Activity timeline
 router.get('/:id/timeline', protect, authorize('leads:read'), leadController.getLeadTimeline);
 router.post('/:id/timeline/:logId/revert', protect, authorize('leads:update'), leadController.revertLeadChange);

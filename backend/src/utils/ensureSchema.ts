@@ -154,6 +154,12 @@ const SCHEMA_PATCHES: { name: string; sql: string }[] = [
     sql: `ALTER TABLE "leads" ADD COLUMN IF NOT EXISTS "subSource" VARCHAR(255);`,
   },
   {
+    // Remark written with the current Next Follow-up (older ones are rows in
+    // lead_follow_ups, which sync creates).
+    name: 'leads.followUpRemark',
+    sql: `ALTER TABLE "leads" ADD COLUMN IF NOT EXISTS "followUpRemark" TEXT;`,
+  },
+  {
     // Incoming calls (a customer calling the company's Vi / Exotel number)
     // are logged next to click-to-call ones.
     name: 'calls.direction',

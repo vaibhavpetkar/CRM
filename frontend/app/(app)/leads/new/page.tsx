@@ -19,6 +19,7 @@ import {
   BuildingOffice2Icon,
   MapPinIcon,
   CurrencyRupeeIcon,
+  ChatBubbleBottomCenterTextIcon,
 } from '@heroicons/react/24/outline';
 import UserAutocomplete from '@/components/ui/user-autocomplete';
 import { useToast } from '@/components/ui/toast';
@@ -26,6 +27,12 @@ import { useKeyboardShortcuts } from '@/lib/hooks/useKeyboardShortcuts';
 import { leadsApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { CONFIGURATION_OPTIONS, DESIGNATION_OPTIONS, LEAD_SOURCE_OPTIONS, PROPERTY_TYPE_OPTIONS } from '@/lib/lead-options';
+
+// Today as YYYY-MM-DD in the browser's time zone.
+const todayStr = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
 
 const tenDigits = (label: string) =>
   z.string().optional().refine((v) => !v || /^\d{10}$/.test(v), `${label} must be 10 digits`);
@@ -41,8 +48,10 @@ const leadSchema = z.object({
   phone: z.string().optional(),
   jobTitle: z.string().optional(),
   leadSource: z.string().optional(),
-  nextFollowUp: z.string().optional(),
+  nextFollowUp: z.string().optional().refine((v) => !v || v >= todayStr(), "Follow-up date can't be before today"),
+  followUpRemark: z.string().optional(),
   assignedToId: z.union([z.string(), z.number()]).optional(),
+  // Address
   street: z.string().optional(),
   city: z.string().optional(),
   state: z.string().optional(),
@@ -247,9 +256,6 @@ export default function NewLeadPage() {
             ))}
           </IconSelect>
         </Field>
-        <Field label="Next Follow-up Schedule">
-          <IconInput icon={<CalendarDaysIcon />} type="date" {...register('nextFollowUp')} />
-        </Field>
         <Field label="Assigned To (Lead Owner)">
           <UserAutocomplete
             value={watch('assignedToId') || ''}
@@ -260,20 +266,11 @@ export default function NewLeadPage() {
           />
           <p className="mt-1 text-[11px] text-slate-500">Left blank, lead rotation (if on) picks the next sales person.</p>
         </Field>
-        <Field label="Address" className="sm:col-span-2 lg:col-span-3">
-          <textarea rows={2} {...register('street')} placeholder="House / building, street, area" className={PLAIN_INPUT} />
+        <Field label="Next Follow-up Schedule" error={errors.nextFollowUp?.message}>
+          <IconInput icon={<CalendarDaysIcon />} type="date" min={todayStr()} invalid={!!errors.nextFollowUp} {...register('nextFollowUp')} />
         </Field>
-        <Field label="City">
-          <input {...register('city')} className={PLAIN_INPUT} />
-        </Field>
-        <Field label="State">
-          <input {...register('state')} className={PLAIN_INPUT} />
-        </Field>
-        <Field label="Pincode">
-          <input {...register('zipCode')} inputMode="numeric" className={PLAIN_INPUT} />
-        </Field>
-        <Field label="Country">
-          <input {...register('country')} placeholder="India" className={PLAIN_INPUT} />
+        <Field label="Remark">
+          <IconInput icon={<ChatBubbleBottomCenterTextIcon />} placeholder="What to discuss on the follow-up" {...register('followUpRemark')} />
         </Field>
       </Section>
 
@@ -305,6 +302,24 @@ export default function NewLeadPage() {
         </Field>
         <Field label="Budget To (₹)">
           <IconInput icon={<CurrencyRupeeIcon />} type="number" min={0} step={100000} placeholder="e.g. 7500000" {...register('budgetMax')} />
+        </Field>
+      </Section>
+
+      <Section n={3} title="Address" subtitle="Where the customer lives or can be reached.">
+        <Field label="Address" className="sm:col-span-2 lg:col-span-3">
+          <textarea rows={2} {...register('street')} placeholder="House / building, street, area" className={PLAIN_INPUT} />
+        </Field>
+        <Field label="City">
+          <input {...register('city')} className={PLAIN_INPUT} />
+        </Field>
+        <Field label="State">
+          <input {...register('state')} className={PLAIN_INPUT} />
+        </Field>
+        <Field label="Pincode">
+          <input {...register('zipCode')} inputMode="numeric" className={PLAIN_INPUT} />
+        </Field>
+        <Field label="Country">
+          <input {...register('country')} placeholder="India" className={PLAIN_INPUT} />
         </Field>
       </Section>
 
