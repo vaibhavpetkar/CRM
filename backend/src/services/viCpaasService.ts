@@ -55,7 +55,10 @@ export const saveViSettings = async (input: Record<string, unknown>) => {
   const { config, errors } = buildStoredConfig(row.config, input || {});
   if (errors.length) throw new ValidationError(errors.join(' '));
   const isEnabled = input.isEnabled === undefined ? row.isEnabled : !!input.isEnabled;
-  if (isEnabled && !config.ctcUrl) throw new ValidationError('Add the CTC API URL from your Vi API document before switching Vi CPaaS on.');
+  const saved = fromRow({ config: JSON.stringify(config), isEnabled } as Integration)!;
+  if (isEnabled && (!saved.callerId || (!saved.password && saved.authType !== 'none'))) {
+    throw new ValidationError('Add your Vi number and the CTC username and password before switching Vi CPaaS on.');
+  }
   await row.update({
     config: JSON.stringify(config),
     isEnabled,

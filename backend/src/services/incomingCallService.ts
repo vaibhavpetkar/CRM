@@ -219,15 +219,17 @@ const upsertCall = async (event: InboundEvent, createLeads: boolean): Promise<Ca
  * Pull API: found by the reference we sent ("crm123") or Vi's call id.
  */
 export const findOutboundCall = async (body: Record<string, any>): Promise<Call | null> => {
-  const ref = String(pick(body, ['reference', 'crm_ref', 'client_ref', 'clientRef', 'custom_ref', 'customer_ref', 'udf1', 'uniqueid', 'ref_id', 'reference_id']) ?? '');
-  const m = ref.match(/^crm(\d+)$/i);
-  if (m) {
-    const call = await Call.findByPk(Number(m[1]));
-    if (call && call.direction !== 'inbound') return call;
-  }
   const id = mapViCall(body).providerCallId;
-  if (!id) return null;
-  return Call.findOne({ where: { direction: { [Op.ne]: 'inbound' }, providerCallId: id } as any });
+  if (id) {
+    const call = await Call.findOne({ where: { direction: { [Op.ne]: 'inbound' }, providerCallId: id } as any });
+    if (call) return call;
+  }
+  // Vi echoes the reference_id we sent (our call's id) before it has given us its own call id.
+  const ref = String(pick(body, ['reference_id', 'referenceId', 'reference', 'ref_id', 'refid']) ?? '');
+  const m = ref.match(/^(?:crm)?(\d{1,12})$/i);
+  if (!m) return null;
+  const call = await Call.findByPk(Number(m[1]));
+  return call && call.direction !== 'inbound' && call.provider === 'vi' ? call : null;
 };
 
 /** Does this call report say it was an incoming call? (null when it doesn't say) */

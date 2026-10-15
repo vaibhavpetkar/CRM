@@ -33,8 +33,8 @@ sections follow the Vi CPaaS portal's Configuration menu:
 
 | Vi portal section | What to copy into the CRM |
 | --- | --- |
-| CTC configuration | CTC API URL, your Vi number (DID), and the request body field names from the Vi API document. Paste the CRM's **Call events URL** into Vi as the callback / status URL. |
-| OBD API credential | The API username and password (or key/token) you create there, and how it is sent (Basic, Bearer, custom header, or inside the body as `{{username}}`/`{{password}}`). |
+| CTC configuration | Your Vi number (the Callee / CLI). Vi's `https://cts.myvi.in:8443/Cpaas/api/v1/clicktocall/initiate-call` is built in (`cli`, `apartyno` = sales person, `bpartyno` = customer, `reference_id` = CRM call id, normal recording); the URL and body boxes are only overrides. Paste the CRM's **Call events URL** into Vi's *Click To Call Pingback*. |
+| OBD API credential | The Username and Password from *Click To Call > CTC Configuration > Configure Click To Call API*, sent as HTTP Basic (the default). |
 | Pull API credential | Pull API username, password and DNI (Vi service number). The CRM logs in at `https://cts.myvi.in:8443/Cpaas/api/v1/pullcalldetails/authenticatepullreport` (`username`, `password`, `dni`; bearer token valid 10 h) and reads `pullreport` (`dni`, `fromdate`/`todate` as DD/MM/YYYY, `calltype` 1 inbound and 3 click-to-call) every `VI_PULL_MINUTES` (default 5). |
 | Schema credential | Only if Vi asks for a login for pushing to your URL: make one up and type it in both places. The CRM then rejects pushes without it. |
 | OBD time | The same calling hours (India time). Calls outside them are stopped with a clear message. |

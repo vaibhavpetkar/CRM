@@ -59,7 +59,7 @@ const asAuth = (v: unknown, fallback: ViAuthType): ViAuthType => (AUTH_TYPES.inc
 const env = (name: string) => (process.env[name] || '').trim();
 
 const empty = (): ViSettings => ({
-  source: 'env', enabled: false, ctcUrl: '', callerId: '', requestTemplate: '', statusUrl: '', authType: 'bearer',
+  source: 'env', enabled: false, ctcUrl: '', callerId: '', requestTemplate: '', statusUrl: '', authType: 'basic',
   authHeader: '', authScheme: '', username: '', password: '', accountId: '', pullUrl: '',
   pullUsername: '', pullPassword: '', dni: '', webhookUsername: '', webhookPassword: '', callStart: '', callEnd: '',
   aesKey: '', aesIv: '', encryptRequests: false, encryptedTemplate: DEFAULT_ENCRYPTED_TEMPLATE,
@@ -116,11 +116,11 @@ export const fromRow = (row: Integration | null): ViSettings | null => {
   const s = empty();
   for (const f of PLAIN_FIELDS) if (typeof c[f] === 'string') (s as any)[f] = c[f];
   for (const f of SECRET_FIELDS) s[f] = openSecret(c.secrets?.[f]);
-  s.authType = asAuth(c.authType, 'bearer');
+  s.authType = asAuth(c.authType, 'basic');
   s.encryptRequests = !!c.encryptRequests;
   s.encryptedTemplate = s.encryptedTemplate || DEFAULT_ENCRYPTED_TEMPLATE;
   s.source = 'saved';
-  s.enabled = row.isEnabled && !!s.ctcUrl;
+  s.enabled = row.isEnabled; // an empty CTC URL means Vi's own initiate-call
   return s;
 };
 
