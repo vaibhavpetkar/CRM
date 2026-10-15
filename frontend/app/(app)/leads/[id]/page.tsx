@@ -577,16 +577,6 @@ export default function LeadDetailsPage() {
           <form onSubmit={handleSave} className="space-y-6">
             <div className="grid grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-slate-700">Interested In — Our Products</label>
-                <input
-                  type="text"
-                  value={formData.interestedInProducts || ''}
-                  onChange={(e) => setFormData({ ...formData, interestedInProducts: e.target.value })}
-                  placeholder="e.g. Product names or SKUs"
-                  className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
-                />
-              </div>
-              <div>
                 <label className="block text-sm font-medium text-slate-700">Timeline to Purchase</label>
                 <select
                   value={formData.timelineToPurchase || ''}
