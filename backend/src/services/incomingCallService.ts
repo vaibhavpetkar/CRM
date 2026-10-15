@@ -240,7 +240,7 @@ export const isInboundReport = (body: Record<string, any>): boolean | null => {
 };
 
 /** Handles one call event for the current company. `body` is already decrypted. */
-export const processCallEvent = async (body: Record<string, any>, createLeads: boolean, opts: { fromPull?: boolean } = {}) => {
+export const processCallEvent = async (body: Record<string, any>, createLeads: boolean, opts: { fromPull?: boolean; inbound?: boolean } = {}) => {
   // Status of a call we placed ourselves.
   const outbound = await findOutboundCall(body);
   if (outbound) {
@@ -250,7 +250,7 @@ export const processCallEvent = async (body: Record<string, any>, createLeads: b
     return { ok: true, callId: outbound.id, status: outbound.status, leadId: outbound.leadId, direction: 'outbound' as const };
   }
   // A pulled report of an outgoing call we don't know (placed outside the CRM) isn't a buyer calling in.
-  if (opts.fromPull && isInboundReport(body) !== true) return { ok: false, reason: 'Not an incoming call.' };
+  if (opts.fromPull && (opts.inbound ?? isInboundReport(body)) !== true) return { ok: false, reason: 'Not an incoming call.' };
 
   const event = readInboundEvent(body);
   const call = await upsertCall(event, createLeads);

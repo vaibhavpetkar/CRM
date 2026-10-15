@@ -137,10 +137,8 @@ export const mapViCall = (body: Record<string, any>): CallUpdate => {
   };
 };
 
-const authHeaders = (s: ViSettings, which: 'api' | 'pull'): Record<string, string> => {
-  const type = which === 'api' ? s.authType : s.pullAuthType;
-  const user = which === 'api' ? s.username : s.pullUsername;
-  const secret = which === 'api' ? s.password : s.pullPassword;
+const authHeaders = (s: ViSettings): Record<string, string> => {
+  const { authType: type, username: user, password: secret } = s;
   if (type === 'none' || (!secret && !user)) return {};
   if (type === 'basic') return { Authorization: `Basic ${Buffer.from(`${user}:${secret}`).toString('base64')}` };
   if (type === 'header') return { [s.authHeader || 'Authorization']: s.authScheme ? `${s.authScheme} ${secret}` : secret };
@@ -177,13 +175,17 @@ export const buildViBody = (s: ViSettings, values: Record<string, string>) => {
   return fillTemplate(s.encryptedTemplate || DEFAULT_ENCRYPTED_TEMPLATE, { encrypted });
 };
 
-/** Sends a request to Vi with these settings and reads the (maybe encrypted) answer. */
-export const viRequest = async (s: ViSettings, which: 'api' | 'pull', url: string, init: RequestInit = {}) => {
+/**
+ * Sends a request to Vi and reads the (maybe encrypted) answer. The CTC
+ * credential goes in the headers unless `headers` already carries an
+ * Authorization (the Pull API sends its own bearer token).
+ */
+export const viRequest = async (s: ViSettings, url: string, init: RequestInit = {}) => {
   let res: Response;
   try {
     res = await fetch(url, {
       ...init,
-      headers: { Accept: 'application/json', ...authHeaders(s, which), ...((init.headers as Record<string, string>) || {}) },
+      headers: { Accept: 'application/json', ...authHeaders(s), ...((init.headers as Record<string, string>) || {}) },
       signal: AbortSignal.timeout(20000),
     });
   } catch (err) {
@@ -197,10 +199,11 @@ export const viRequest = async (s: ViSettings, which: 'api' | 'pull', url: strin
     body = text ? { raw: text } : null;
   }
   body = decryptViPayload(body || {}, s);
-  const failed = body && (body.success === false || /^(error|fail)/i.test(String(body.status ?? '')));
+  // Vi CPaaS answers failures as {"status": 0, "message": "..."}.
+  const failed = body && (body.success === false || /^(error|fail)/i.test(String(body.status ?? '')) || (body.status === 0 && body.message));
   if (!res.ok || failed) {
     const message = body?.message || body?.error?.message || body?.error || body?.raw?.slice?.(0, 200) || `HTTP ${res.status}`;
-    throw new VoiceProviderError(`Vi refused the request: ${message}`, res.status === 401 || res.status === 403 ? 502 : 400);
+    throw new VoiceProviderError(`Vi refused the request: ${message}`, [401, 403, 406].includes(res.status) ? 502 : 400);
   }
   return body || {};
 };
@@ -247,7 +250,7 @@ export class ViProvider implements VoiceProvider {
       password: s.password,
       reference: input.reference || '',
     });
-    const res = await viRequest(s, 'api', s.ctcUrl, {
+    const res = await viRequest(s, s.ctcUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -261,7 +264,7 @@ export class ViProvider implements VoiceProvider {
     const s = await loadViSettings();
     // Without a status URL we rely on Vi's pushes and the Pull API.
     if (!s.statusUrl) return {};
-    return mapViCall(await viRequest(s, 'api', s.statusUrl.replace(/\{\{callId\}\}/g, encodeURIComponent(providerCallId))));
+    return mapViCall(await viRequest(s, s.statusUrl.replace(/\{\{callId\}\}/g, encodeURIComponent(providerCallId))));
   }
 
   parseCallback(body: Record<string, any>): CallUpdate {
@@ -271,7 +274,7 @@ export class ViProvider implements VoiceProvider {
   async downloadRecording(url: string): Promise<RecordingDownload> {
     const s = await loadViSettings();
     let res = await fetch(url, { signal: AbortSignal.timeout(60000) });
-    if (res.status === 401 || res.status === 403) res = await fetch(url, { headers: authHeaders(s, 'api'), signal: AbortSignal.timeout(60000) });
+    if (res.status === 401 || res.status === 403) res = await fetch(url, { headers: authHeaders(s), signal: AbortSignal.timeout(60000) });
     if (!res.ok) throw new VoiceProviderError(`Recording download failed (HTTP ${res.status}).`);
     return { data: Buffer.from(await res.arrayBuffer()), contentType: res.headers.get('content-type') || 'audio/mpeg' };
   }

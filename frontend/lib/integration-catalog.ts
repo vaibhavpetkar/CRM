@@ -284,7 +284,7 @@ export const INTEGRATIONS: IntegrationApp[] = [
       'Open the API document in your Vi CPaaS portal (Tools) and keep the Configuration menu open next to this page.',
       'CTC configuration: copy the CTC API URL and your Vi number below. In Vi, set the call status / callback URL to the Call events URL shown here.',
       'OBD API credential: create the API user in Vi, then type the same username and password (or API key) below.',
-      'Pull API credential: copy the Pull API (call report) URL and its login below, so missed pushes are picked up every few minutes.',
+      'Pull API credential: type the Pull API username, password and your DNI (Vi service number) below. Call reports are then read every few minutes, so calls Vi could not push still arrive.',
       'Schema credential: if Vi asks for a username and password for pushing to your URL, make one up, type it in both places.',
       'OBD time: type the same calling hours you set in Vi. AES key & IV: copy both, and switch on encryption if your Vi account requires it.',
       'Switch it On, then call a lead from the CRM and call your Vi number from a mobile. Both show in Call Tracking.',

@@ -4,7 +4,7 @@ import crypto from 'crypto';
 import { aesDecrypt, aesEncrypt, openSecret, parseAesBytes, sealSecret } from '../src/utils/aesCbc';
 import { buildStoredConfig, decryptViPayload, envSettings, fromRow } from '../src/services/voice/viSettings';
 import { buildViBody, outsideCallingHours } from '../src/services/voice/vi';
-import { findRecords, pullWindowValues } from '../src/services/viCpaasService';
+import { findRecords, viDate, viDni } from '../src/services/viCpaasService';
 import { isInboundReport, viPushAllowed } from '../src/services/incomingCallService';
 
 const KEY = '0123456789abcdef0123456789abcdef'; // 32 characters
@@ -78,13 +78,15 @@ test('the settings form checks URLs, JSON, hours and the AES key length', () => 
   assert.equal(bad.errors.length, 5, bad.errors.join(' | '));
 });
 
-test('Pull API: records are found wherever they sit, and the window is in IST', () => {
+test('Pull Report: records are found wherever they sit, dates are DD/MM/YYYY in IST', () => {
   assert.equal(findRecords({ status: 'ok', data: { cdr: [{ call_id: 1 }, { call_id: 2 }] } }).length, 2);
+  assert.equal(findRecords({ report: [{ a: 1 }] }).length, 1);
+  assert.equal(findRecords({ report: '[{"a":1},{"a":2}]' }).length, 2);
   assert.equal(findRecords([{ a: 1 }]).length, 1);
-  assert.deepEqual(findRecords({ status: 'ok' }), []);
-  const w = pullWindowValues(new Date('2026-10-15T04:00:00Z'), new Date('2026-10-15T05:00:00Z'));
-  assert.equal(w.from, '2026-10-15 09:30:00');
-  assert.equal(w.toDate, '2026-10-15');
+  assert.deepEqual(findRecords({ report: 'report JSON will be out' }), []);
+  assert.equal(viDate(new Date('2026-10-14T20:00:00Z')), '15/10/2026'); // 01:30 IST
+  assert.equal(viDni({ dni: '', callerId: '+919712345642' }), '9712345642');
+  assert.equal(viDni({ dni: '97123 45642', callerId: '' }), '9712345642');
 });
 
 test('a pulled report says whether it was an incoming call', () => {

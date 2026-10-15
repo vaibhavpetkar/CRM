@@ -8,7 +8,7 @@ import { salesApi, ViAuthType, ViCpaasForm, ViCpaasSettings, ViSecretField } fro
 import { copyText, when } from '@/components/integrations/portal-setup';
 
 type Field = { key: keyof ViCpaasForm; label: string; placeholder?: string; secret?: boolean; multiline?: boolean; help?: string };
-type Section = { title: string; help: string; fields: Field[]; auth?: 'authType' | 'pullAuthType' };
+type Section = { title: string; help: string; fields: Field[]; auth?: 'authType'; pull?: boolean };
 
 // Same order and names as the Vi CPaaS portal's Configuration menu.
 const SECTIONS: Section[] = [
@@ -40,13 +40,13 @@ const SECTIONS: Section[] = [
   },
   {
     title: 'Pull API credential',
-    help: 'The call report (CDR) API. The CRM reads it every few minutes so calls Vi could not push still arrive.',
-    auth: 'pullAuthType',
+    help: "Vi's Pull Report API (incoming and click-to-call reports). The CRM reads it every few minutes so calls Vi could not push still arrive.",
+    pull: true,
     fields: [
-      { key: 'pullUrl', label: 'Pull API URL', placeholder: 'https://.../cdr?from={{from}}&to={{to}}', help: 'Placeholders: {{from}}, {{to}} (2026-10-15 09:30:00), {{fromDate}}, {{toDate}}, {{fromEpoch}}, {{toEpoch}}.' },
-      { key: 'pullBody', label: 'Pull API body (JSON, only if it is a POST)', multiline: true },
       { key: 'pullUsername', label: 'Pull API username' },
-      { key: 'pullPassword', label: 'Pull API password / key', secret: true },
+      { key: 'pullPassword', label: 'Pull API password', secret: true },
+      { key: 'dni', label: 'DNI (your Vi service number)', placeholder: '97xxxxxx42', help: 'Leave empty to use the Vi number above.' },
+      { key: 'pullUrl', label: 'Pull API address (leave empty)', placeholder: 'https://cts.myvi.in:8443/Cpaas/api/v1/pullcalldetails' },
     ],
   },
   {
@@ -221,12 +221,12 @@ export default function ViCpaasCard({ onChange }: { onChange?: (s: ViCpaasSettin
                 Encrypt the requests the CRM sends to Vi
               </label>
             )}
-            {section.auth === 'pullAuthType' && (
+            {section.pull && (
               <div className="pt-1">
                 <Button
                   size="sm"
                   variant="secondary"
-                  disabled={!settings.pullUrl || dirty || acting === 'pull'}
+                  disabled={!settings.pullUsername || !settings.secretsSet.pullPassword || dirty || acting === 'pull'}
                   onClick={() =>
                     run('pull', async () => {
                       const res = await salesApi.pullViCpaas();

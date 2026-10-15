@@ -29,11 +29,10 @@ export interface ViSettings {
   password: string; // API key / token / password
   accountId: string;
   // Pull API credential
-  pullUrl: string;
-  pullBody: string; // JSON to POST; empty = GET
-  pullAuthType: ViAuthType;
+  pullUrl: string; // base of Vi's pullcalldetails API; empty = Vi's own (VI_PULL_BASE)
   pullUsername: string;
   pullPassword: string;
+  dni: string; // Vi service number the reports are for; empty = the Vi number above
   // Schema credential: what Vi sends with its pushes to our URL (Basic auth)
   webhookUsername: string;
   webhookPassword: string;
@@ -51,7 +50,7 @@ export const SECRET_FIELDS = ['password', 'pullPassword', 'webhookPassword', 'ae
 type SecretField = (typeof SECRET_FIELDS)[number];
 const PLAIN_FIELDS = [
   'ctcUrl', 'callerId', 'requestTemplate', 'statusUrl', 'authType', 'authHeader', 'username', 'accountId',
-  'pullUrl', 'pullBody', 'pullAuthType', 'pullUsername', 'webhookUsername', 'callStart', 'callEnd', 'encryptedTemplate',
+  'pullUrl', 'pullUsername', 'dni', 'webhookUsername', 'callStart', 'callEnd', 'encryptedTemplate',
 ] as const;
 
 export const DEFAULT_ENCRYPTED_TEMPLATE = '{"data":"{{encrypted}}"}';
@@ -61,8 +60,8 @@ const env = (name: string) => (process.env[name] || '').trim();
 
 const empty = (): ViSettings => ({
   source: 'env', enabled: false, ctcUrl: '', callerId: '', requestTemplate: '', statusUrl: '', authType: 'bearer',
-  authHeader: '', authScheme: '', username: '', password: '', accountId: '', pullUrl: '', pullBody: '', pullAuthType: 'basic',
-  pullUsername: '', pullPassword: '', webhookUsername: '', webhookPassword: '', callStart: '', callEnd: '',
+  authHeader: '', authScheme: '', username: '', password: '', accountId: '', pullUrl: '',
+  pullUsername: '', pullPassword: '', dni: '', webhookUsername: '', webhookPassword: '', callStart: '', callEnd: '',
   aesKey: '', aesIv: '', encryptRequests: false, encryptedTemplate: DEFAULT_ENCRYPTED_TEMPLATE,
 });
 
@@ -87,6 +86,7 @@ export const envSettings = (): ViSettings => {
     pullUrl: env('VI_PULL_URL'),
     pullUsername: env('VI_PULL_USERNAME'),
     pullPassword: env('VI_PULL_PASSWORD'),
+    dni: env('VI_DNI'),
     aesKey: env('VI_AES_KEY'),
     aesIv: env('VI_AES_IV'),
     encryptRequests: /^(1|true|yes)$/i.test(env('VI_ENCRYPT_REQUESTS')),
@@ -117,7 +117,6 @@ export const fromRow = (row: Integration | null): ViSettings | null => {
   for (const f of PLAIN_FIELDS) if (typeof c[f] === 'string') (s as any)[f] = c[f];
   for (const f of SECRET_FIELDS) s[f] = openSecret(c.secrets?.[f]);
   s.authType = asAuth(c.authType, 'bearer');
-  s.pullAuthType = asAuth(c.pullAuthType, 'basic');
   s.encryptRequests = !!c.encryptRequests;
   s.encryptedTemplate = s.encryptedTemplate || DEFAULT_ENCRYPTED_TEMPLATE;
   s.source = 'saved';
@@ -179,14 +178,14 @@ export const buildStoredConfig = (previous: string | null | undefined, input: Re
 
   const errors: string[] = [];
   for (const f of ['ctcUrl', 'statusUrl', 'pullUrl'] as const) {
-    if (next[f] && !/^https?:\/\//i.test(next[f]!)) errors.push(`${f === 'ctcUrl' ? 'CTC API URL' : f === 'statusUrl' ? 'Call status URL' : 'Pull API URL'} must start with https://`);
+    if (next[f] && !/^https?:\/\//i.test(next[f]!)) errors.push(`${f === 'ctcUrl' ? 'CTC API URL' : f === 'statusUrl' ? 'Call status URL' : 'Pull API address'} must start with https://`);
   }
-  for (const f of ['requestTemplate', 'encryptedTemplate', 'pullBody'] as const) {
+  for (const f of ['requestTemplate', 'encryptedTemplate'] as const) {
     if (!next[f]) continue;
     try {
       JSON.parse(next[f]!);
     } catch {
-      errors.push(`${f === 'requestTemplate' ? 'CTC request body' : f === 'pullBody' ? 'Pull API body' : 'Encrypted body'} is not valid JSON.`);
+      errors.push(`${f === 'requestTemplate' ? 'CTC request body' : 'Encrypted body'} is not valid JSON.`);
     }
   }
   for (const f of ['callStart', 'callEnd'] as const) if (next[f] && !TIME.test(next[f]!)) errors.push('Calling hours must look like 09:00 and 21:00.');
@@ -198,6 +197,7 @@ export const buildStoredConfig = (previous: string | null | undefined, input: Re
   } catch (err) {
     errors.push((err as Error).message);
   }
+  if (next.dni && !/^\+?\d[\d\s-]{5,20}$/.test(next.dni)) errors.push('The DNI must be a phone number, e.g. 97xxxxxx42.');
   if (next.encryptRequests && (!key || !iv)) errors.push('Add the AES key and IV before switching on encryption.');
   return { config: next, errors: [...new Set(errors)] };
 };
@@ -208,7 +208,6 @@ export const describeForAdmin = (s: ViSettings | null) => {
   return {
     ...Object.fromEntries(PLAIN_FIELDS.map((f) => [f, (v as any)[f] || ''])),
     authType: v.authType,
-    pullAuthType: v.pullAuthType,
     encryptRequests: v.encryptRequests,
     secretsSet: Object.fromEntries(SECRET_FIELDS.map((f) => [f, !!v[f]])) as Record<SecretField, boolean>,
   };

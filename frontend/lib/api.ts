@@ -1410,10 +1410,9 @@ export interface ViCpaasForm {
   password: string;
   accountId: string;
   pullUrl: string;
-  pullBody: string;
-  pullAuthType: ViAuthType;
   pullUsername: string;
   pullPassword: string;
+  dni: string;
   webhookUsername: string;
   webhookPassword: string;
   callStart: string;
