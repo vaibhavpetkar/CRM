@@ -12,6 +12,7 @@ import { isModuleEnabled } from '@/lib/modules';
 
 const DEALS_ON = isModuleEnabled('deals');
 const TASKS_ON = isModuleEnabled('tasks');
+const CONTACTS_ON = isModuleEnabled('contacts');
 const OFF = () => Promise.reject(new Error('module off'));
 import { leadSourceLabel } from '@/lib/lead-options';
 import {
@@ -219,13 +220,13 @@ export default function DashboardPage() {
     const [leadStats, dealStats, contactStats, leadsRes, tasksRes, dealsRes, leadDaily, contactsRes] = await Promise.allSettled([
       leadsApi.getStats(),
       DEALS_ON ? dealsApi.getStats() : OFF(),
-      contactsApi.getStats(),
+      CONTACTS_ON ? contactsApi.getStats() : OFF(),
       leadsApi.getLeads({ limit: 5 }),
       TASKS_ON ? tasksApi.getTasks({ status: 'pending' }) : OFF(),
       DEALS_ON ? dealsApi.getAllDeals() : OFF(),
       salesApi.getLeadSources({ from: isoDay(from), to: isoDay(new Date()) }),
       // Newest contacts, for the activity feed and the contacts trend.
-      contactsApi.getContacts({ limit: 200 }),
+      CONTACTS_ON ? contactsApi.getContacts({ limit: 200 }) : OFF(),
     ]);
 
     const next = { totalLeads: 0, totalContacts: 0, pipelineValue: 0, winRate: 0 };
@@ -412,16 +413,18 @@ export default function DashboardPage() {
             href="/deals"
           />
         )}
-        <KpiCard
-          label="Contacts"
-          value={stats.totalContacts.toLocaleString()}
-          icon={<IdentificationIcon className="h-6 w-6" />}
-          tone="violet"
-          change={trends.contacts.change}
-          changeLabel={compareLabel}
-          spark={trends.contacts.spark}
-          href="/contacts"
-        />
+        {CONTACTS_ON && (
+          <KpiCard
+            label="Contacts"
+            value={stats.totalContacts.toLocaleString()}
+            icon={<IdentificationIcon className="h-6 w-6" />}
+            tone="violet"
+            change={trends.contacts.change}
+            changeLabel={compareLabel}
+            spark={trends.contacts.spark}
+            href="/contacts"
+          />
+        )}
         {DEALS_ON && (
           <>
         <KpiCard

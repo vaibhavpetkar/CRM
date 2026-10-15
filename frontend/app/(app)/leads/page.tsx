@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, forwardRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import PageHeader from '@/components/ui/page-header';
 import SearchInput from '@/components/ui/search-input';
 import StatusBadge from '@/components/ui/status-badge';
@@ -8,11 +8,8 @@ import Button from '@/components/ui/button';
 import Card from '@/components/ui/card';
 import DataTable, { DataTableColumn } from '@/components/ui/data-table';
 import ImportExportButtons from '@/components/ui/import-export-buttons';
-import CompanyAutocomplete from '@/components/ui/company-autocomplete';
-import UserAutocomplete from '@/components/ui/user-autocomplete';
-import TerritoryAutocomplete from '@/components/ui/territory-autocomplete';
 import { LEAD_FIELDS } from '@/lib/import-export/field-configs';
-import { cn, formatCurrency } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils';
 import { leadsApi, usersApi, salesApi, getStoredUser, PresenceState } from '@/lib/api';
 import { TERRITORY_OPTIONS, LEAD_SOURCE_OPTIONS, CONFIGURATION_OPTIONS, PROPERTY_TYPE_OPTIONS, BUDGET_OPTIONS, leadSourceLabel, budgetRange } from '@/lib/lead-options';
 import { AgentStatusDot } from '@/components/sales/agent-status';
@@ -20,129 +17,8 @@ import { hasPermission } from '@/lib/permissions';
 import { useKeyboardShortcuts } from '@/lib/hooks/useKeyboardShortcuts';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { PlusIcon, FunnelIcon, XMarkIcon, PencilSquareIcon, TrashIcon, EyeIcon, Squares2X2Icon, ListBulletIcon, UserPlusIcon, UserIcon, UsersIcon, EnvelopeIcon, PhoneIcon, BuildingOffice2Icon, MegaphoneIcon, MapPinIcon, CalendarDaysIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
+import { PlusIcon, FunnelIcon, PencilSquareIcon, TrashIcon, EyeIcon, Squares2X2Icon, ListBulletIcon } from '@heroicons/react/24/outline';
 import { useToast } from '@/components/ui/toast';
-
-const emptyForm = {
-  // Lead Information
-  prefix: '',
-  firstName: '',
-  lastName: '',
-  email: '',
-  phone: '',
-  fax: '',
-  mobile: '',
-  company: '',
-  website: '',
-  jobTitle: '',
-  leadSource: 'website',
-  status: 'new',
-  industry: '',
-  noOfEmployees: '',
-  annualRevenue: '',
-  rating: '',
-  emailOptOut: false,
-  skypeId: '',
-  secondaryEmail: '',
-  leadImage: '',
-  leadOwnerId: '',
-  // Address Information
-  country: '',
-  state: '',
-  city: '',
-  street: '',
-  zipCode: '',
-  latitude: '',
-  longitude: '',
-  // Description
-  description: '',
-  // Scoring & Value
-  score: '',
-  value: '',
-  // System fields
-  notes: '',
-  assignedToId: '',
-  sourceDetails: '',
-  lastContacted: '',
-  nextFollowUp: '',
-  // New fields
-  territory: '',
-  qualifiedById: '',
-  alternateMobile: '',
-};
-
-const leadSchema = z.object({
-  firstName: z.string().min(1, 'First name is required'),
-  lastName: z.string().min(1, 'Last name is required'),
-  email: z.string().email('Valid email is required'),
-  mobile: z.string().min(10, 'Mobile number must be 10 digits').max(10, 'Mobile number must be 10 digits').regex(/^\d{10}$/, 'Mobile number must be 10 digits'),
-  company: z.string().optional(),
-  leadSource: z.string().optional(),
-  assignedToId: z.union([z.string(), z.number()]).optional(),
-  // Additional fields for auto-populate
-  phone: z.string().optional(),
-  street: z.string().optional(),
-  website: z.string().optional(),
-  industry: z.string().optional(),
-  jobTitle: z.string().optional(),
-  territory: z.string().optional(),
-  qualifiedById: z.union([z.string(), z.number()]).optional(),
-  alternateMobile: z.string().optional().refine(val => !val || /^\d{10}$/.test(val), 'Alternate mobile must be 10 digits'),
-  meetingStatus: z.string().optional(),
-  // Real-estate requirement
-  propertyType: z.string().optional(),
-  configuration: z.string().optional(),
-  preferredLocation: z.string().optional(),
-  projectName: z.string().optional(),
-  subSource: z.string().optional(),
-  budgetMin: z.string().optional(),
-  budgetMax: z.string().optional(),
-});
-type LeadFormValues = z.infer<typeof leadSchema>;
-
-// Add Lead popup building blocks.
-const POPUP_INPUT =
-  'w-full rounded-lg border border-slate-200 bg-slate-50/60 py-2.5 pl-10 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[var(--primary)] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20 transition-all';
-
-function LeadFormStep({ n, title, subtitle }: { n: number; title: string; subtitle: string }) {
-  return (
-    <div className="flex items-center gap-3">
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50">
-        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--primary)] text-xs font-bold text-white">{n}</span>
-      </span>
-      <div>
-        <h4 className="text-[15px] font-semibold text-slate-900">{title}</h4>
-        <p className="text-xs text-slate-500">{subtitle}</p>
-      </div>
-    </div>
-  );
-}
-
-function LeadField({ label, required, error, hint, children }: { label: string; required?: boolean; error?: string; hint?: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label className="mb-1.5 block text-[13px] font-medium text-slate-800">
-        {label} {required && <span className="text-red-500">*</span>}
-      </label>
-      {children}
-      {error ? <p className="mt-1 text-[11px] text-red-500">{error}</p> : hint ? <p className="mt-1 text-[11px] text-slate-500">{hint}</p> : null}
-    </div>
-  );
-}
-
-const IconInput = forwardRef<HTMLInputElement, React.ComponentProps<'input'> & { icon: React.ReactNode; invalid?: boolean }>(
-  function IconInput({ icon, invalid, className = '', ...props }, ref) {
-    return (
-      <div className="relative">
-        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 [&_svg]:h-4 [&_svg]:w-4">{icon}</span>
-        <input ref={ref} {...props} className={cn(POPUP_INPUT, invalid && 'border-red-400 bg-red-50/40 focus:border-red-400 focus:ring-red-200', className)} />
-      </div>
-    );
-  }
-);
 
 export default function LeadsPage() {
   const toast = useToast();
@@ -167,8 +43,6 @@ export default function LeadsPage() {
   const [leads, setLeads] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingId, setEditingId] = useState<string | number | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
   // Drives the "Edit Disabled (No Permission)" warning in the quick-edit context
@@ -179,34 +53,6 @@ export default function LeadsPage() {
   const [draggedLeadId, setDraggedLeadId] = useState<string | number | null>(null);
   const [dragOverStatus, setDragOverStatus] = useState<string | null>(null);
   const [selectedLeadIds, setSelectedLeadIds] = useState<(string | number)[]>([]);
-  // Task 2.6: duplicate-lead warning popup state. `pendingPayload` holds the
-  // lead the user is trying to create while they decide what to do about the
-  // match found in `duplicateMatch`.
-  const [duplicateMatch, setDuplicateMatch] = useState<any | null>(null);
-  const [pendingPayload, setPendingPayload] = useState<Record<string, any> | null>(null);
-
-  const {
-    register,
-    handleSubmit: hookFormSubmit,
-    reset,
-    watch,
-    setValue,
-    formState: { errors, isSubmitting },
-  } = useForm<LeadFormValues>({
-    resolver: zodResolver(leadSchema),
-    defaultValues: {
-      firstName: '',
-      lastName: '',
-      email: '',
-      mobile: '',
-      company: '',
-      leadSource: 'website',
-      assignedToId: '',
-    },
-  });
-
-  // Watch company field for auto-populate
-  const watchedCompany = watch('company');
   // Users available to assign leads to (name typeahead datalist)
   const [assignableUsers, setAssignableUsers] = useState<{ id: number; name: string }[]>([]);
 
@@ -253,26 +99,9 @@ export default function LeadsPage() {
     return () => clearTimeout(t);
   }, [locationFilter]);
 
-  // Support deep-linking from the topbar's Quick Create menu (/leads?quickCreate=1)
+  // The topbar's Quick Create menu links here with ?quickCreate=1; Add Lead is a full page now.
   useEffect(() => {
-    if (searchParams.get('quickCreate')) {
-      setEditingId(null);
-      reset({
-        firstName: '',
-        lastName: '',
-        email: '',
-        mobile: '',
-        company: '',
-        leadSource: 'website',
-        assignedToId: '',
-        territory: '',
-        qualifiedById: '',
-        alternateMobile: '',
-        meetingStatus: '',
-      });
-      setIsModalOpen(true);
-      router.replace('/leads');
-    }
+    if (searchParams.get('quickCreate')) router.replace('/leads/new');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
@@ -370,132 +199,8 @@ export default function LeadsPage() {
     fetchLeads();
   }, [fetchLeads]);
 
-  const openCreate = () => {
-    setEditingId(null);
-    reset({
-      firstName: '',
-      lastName: '',
-      email: '',
-      mobile: '',
-      company: '',
-      leadSource: 'website',
-      assignedToId: '',
-    });
-    setIsModalOpen(true);
-  };
-
   const openEdit = (lead: any) => {
     router.push(`/leads/${lead.id}`);
-  };
-
-  // Task 2.6 — duplicate warning popup actions
-  const handleViewExistingLead = () => {
-    if (duplicateMatch) router.push(`/leads/${duplicateMatch.id}`);
-    setDuplicateMatch(null);
-    setPendingPayload(null);
-  };
-
-  // Handle company selection from autocomplete
-  const handleCompanySelect = (company: any) => {
-    // Auto-populate related fields
-    if (company.email) setValue('email', company.email);
-    if (company.phone) setValue('phone', company.phone);
-    if (company.address) setValue('street', company.address);
-    if (company.website) setValue('website', company.website);
-    if (company.industry) setValue('industry', company.industry);
-    // If it's a contact, also populate contact person fields
-    if (company.contactName) {
-      const [firstName, ...lastNameParts] = company.contactName.split(' ');
-      setValue('firstName', firstName);
-      setValue('lastName', lastNameParts.join(' '));
-      if (company.contactTitle) setValue('jobTitle', company.contactTitle);
-    }
-  };
-
-  const handleContinueAnyway = async () => {
-    if (!pendingPayload) return;
-    try {
-      await leadsApi.createLead({ ...pendingPayload, allowDuplicate: true });
-      setDuplicateMatch(null);
-      setPendingPayload(null);
-      setIsModalOpen(false);
-      reset();
-      setEditingId(null);
-      fetchLeads();
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to save lead');
-    }
-  };
-
-  const handleCancelDuplicate = () => {
-    setDuplicateMatch(null);
-    setPendingPayload(null);
-  };
-
-  const onSubmitForm = async (data: LeadFormValues) => {
-    // assignedToId and qualifiedById are now stored as IDs directly from UserAutocomplete
-    const resolvedAssignedToId = data.assignedToId ? Number(data.assignedToId) : null;
-    const resolvedQualifiedById = data.qualifiedById ? Number(data.qualifiedById) : null;
-
-    const payload = {
-      ...emptyForm,
-      firstName: data.firstName,
-      lastName: data.lastName,
-      email: data.email,
-      mobile: data.mobile,
-      company: data.company,
-      leadSource: (data.leadSource || 'website').toLowerCase().replace(/\s+/g, '-'),
-      assignedToId: resolvedAssignedToId,
-      qualifiedById: resolvedQualifiedById,
-      territory: data.territory,
-      alternateMobile: data.alternateMobile,
-      meetingStatus: data.meetingStatus,
-      propertyType: data.propertyType || null,
-      configuration: data.configuration || null,
-      preferredLocation: data.preferredLocation || null,
-      projectName: data.projectName || null,
-      subSource: data.subSource || null,
-      budgetMin: data.budgetMin ? Number(data.budgetMin) : null,
-      budgetMax: data.budgetMax ? Number(data.budgetMax) : null,
-    } as Record<string, any>;
-
-    // emptyForm defaults numeric fields to '' so the inputs render blank —
-    // but '' sent to a Postgres INTEGER column 500s ("invalid input syntax
-    // for type integer"). Convert to a number when filled, or drop the key
-    // (-> backend defaults it to null) when left blank. Mirrors the same
-    // sanitization already applied on the CSV import path below.
-    // null must be checked too: Number(null) is 0, which reached the API as
-    // the user id "0" and blocked saving a lead with Assigned To or
-    // Qualified By left blank. A blank picker is sent as null so lead
-    // rotation can pick the assignee (and an edit can clear the field).
-    ['noOfEmployees', 'latitude', 'longitude', 'leadOwnerId'].forEach((key) => {
-      if (payload[key] !== undefined && payload[key] !== null && payload[key] !== '') payload[key] = Number(payload[key]);
-      else delete payload[key];
-    });
-
-    try {
-      if (editingId) {
-        await leadsApi.updateLead(editingId, payload);
-      } else {
-        // Task 2.6: check for a duplicate by email/mobile before creating.
-        // If found, hold the payload and show the warning popup instead of
-        // creating immediately — the popup's "Continue Anyway" resubmits
-        // with allowDuplicate: true.
-        const { duplicate } = await leadsApi.checkDuplicate(data.email, data.mobile);
-        if (duplicate) {
-          setDuplicateMatch(duplicate);
-          setPendingPayload(payload);
-          return;
-        }
-        await leadsApi.createLead(payload);
-      }
-      setIsModalOpen(false);
-      reset();
-      setEditingId(null);
-      fetchLeads();
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to save lead');
-    }
   };
 
   const importPayload = (row: Record<string, any>) => {
@@ -526,14 +231,7 @@ export default function LeadsPage() {
   };
 
   useKeyboardShortcuts({
-    onEscape: () => {
-      if (isModalOpen) setIsModalOpen(false);
-    },
-    onSave: () => {
-      if (isModalOpen) hookFormSubmit(onSubmitForm)();
-    },
     onDelete: () => {
-      if (isModalOpen) return;
       if (selectedLeadIds.length === 1) {
         const lead = leads.find((l) => l.id === selectedLeadIds[0]);
         if (lead) handleDelete(lead);
@@ -698,7 +396,7 @@ export default function LeadsPage() {
                 onImportComplete: fetchLeads,
               }}
             />
-            <Button size="sm" onClick={openCreate}><PlusIcon className="h-4 w-4" /> Add Lead</Button>
+            <Button size="sm" onClick={() => router.push('/leads/new')}><PlusIcon className="h-4 w-4" /> Add Lead</Button>
           </>
         }
       />
@@ -904,162 +602,6 @@ export default function LeadsPage() {
       </Card>
       )}
 
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-[2px]">
-          <div className="flex max-h-[92vh] w-full max-w-[720px] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
-            <div className="flex items-start justify-between gap-4 px-6 pt-6 sm:px-8">
-              <div className="flex items-center gap-4">
-                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-[var(--primary)]">
-                  <UserPlusIcon className="h-6 w-6" />
-                </span>
-                <div>
-                  <h3 className="text-xl font-bold text-slate-900">{editingId ? 'Edit Lead' : 'Add New Lead'}</h3>
-                  <p className="mt-0.5 text-sm text-slate-500">Create a new lead and assign it to your sales team.</p>
-                </div>
-              </div>
-              <button type="button" onClick={() => setIsModalOpen(false)} aria-label="Close" className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
-                <XMarkIcon className="h-5 w-5" />
-              </button>
-            </div>
-
-            <form onSubmit={hookFormSubmit(onSubmitForm)} className="flex min-h-0 flex-1 flex-col">
-              <div className="flex-1 overflow-y-auto px-6 pb-6 sm:px-8">
-                <div className="mt-4 border-t border-slate-100 pt-4">
-                  <LeadFormStep n={1} title="Mandatory Lead Details" subtitle="Enter the basic information about the lead." />
-                  <div className="mt-4 grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
-                    <LeadField label="First Name" required error={errors.firstName?.message}>
-                      <IconInput icon={<UserIcon />} placeholder="Enter first name" invalid={!!errors.firstName} {...register('firstName')} />
-                    </LeadField>
-                    <LeadField label="Last Name" required error={errors.lastName?.message}>
-                      <IconInput icon={<UserIcon />} placeholder="Enter last name" invalid={!!errors.lastName} {...register('lastName')} />
-                    </LeadField>
-                    <LeadField label="Email" required error={errors.email?.message}>
-                      <IconInput icon={<EnvelopeIcon />} type="email" placeholder="Enter email address" invalid={!!errors.email} {...register('email')} />
-                    </LeadField>
-                    <LeadField label="Mobile Number" required error={errors.mobile?.message}>
-                      <IconInput icon={<PhoneIcon />} type="tel" inputMode="numeric" maxLength={10} placeholder="10-digit mobile number" invalid={!!errors.mobile} {...register('mobile')} />
-                    </LeadField>
-                    <LeadField label="Company">
-                      <CompanyAutocomplete
-                        value={watchedCompany || ''}
-                        onChange={(val) => setValue('company', val, { shouldValidate: true })}
-                        onSelect={handleCompanySelect}
-                        placeholder="Search or enter company name"
-                        icon={<BuildingOffice2Icon />}
-                        inputClassName={POPUP_INPUT}
-                      />
-                    </LeadField>
-                    <LeadField label="Lead Source">
-                      <div className="relative">
-                        <MegaphoneIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-                        <select {...register('leadSource')} className={`${POPUP_INPUT} appearance-none pr-9 font-medium text-slate-800`}>
-                          {LEAD_SOURCE_OPTIONS.map((o) => (
-                            <option key={o.value} value={o.value}>{o.label}</option>
-                          ))}
-                        </select>
-                        <ChevronDownIcon className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-                      </div>
-                    </LeadField>
-                    <LeadField label="Territory">
-                      <TerritoryAutocomplete
-                        value={watch('territory') || ''}
-                        onChange={(val) => setValue('territory', val)}
-                        placeholder="Search territory..."
-                        icon={<MapPinIcon />}
-                        inputClassName={POPUP_INPUT}
-                      />
-                    </LeadField>
-                    <LeadField label="Qualified By">
-                      <UserAutocomplete
-                        value={watch('qualifiedById') || ''}
-                        onChange={(val) => setValue('qualifiedById', val)}
-                        placeholder="Search team member..."
-                        icon={<UsersIcon />}
-                        inputClassName={POPUP_INPUT}
-                      />
-                    </LeadField>
-                  </div>
-                </div>
-
-                <div className="mt-6 border-t border-slate-100 pt-4">
-                  <LeadFormStep n={2} title="Assignment & Scheduling" subtitle="Set ownership and follow-up details." />
-                  <div className="mt-4 grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
-                    <LeadField label="Assigned To (Lead Owner)" hint="The assignee is notified automatically when assigned.">
-                      <UserAutocomplete
-                        value={watch('assignedToId') || ''}
-                        onChange={(val) => setValue('assignedToId', val)}
-                        placeholder="Search team member..."
-                        icon={<UserIcon />}
-                        inputClassName={POPUP_INPUT}
-                      />
-                    </LeadField>
-                    <LeadField label="Schedule Meeting">
-                      <div className="relative">
-                        <CalendarDaysIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-                        <select {...register('meetingStatus')} className={`${POPUP_INPUT} appearance-none pr-9 font-medium text-slate-800`}>
-                          <option value="">None</option>
-                          <option value="pending">Pending</option>
-                          <option value="scheduled">Scheduled</option>
-                          <option value="completed">Completed</option>
-                          <option value="rescheduled">Rescheduled</option>
-                          <option value="cancelled">Cancelled</option>
-                          <option value="no-show">No Show</option>
-                        </select>
-                        <ChevronDownIcon className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-                      </div>
-                    </LeadField>
-                    <LeadField label="Alternate Mobile" error={errors.alternateMobile?.message}>
-                      <IconInput icon={<PhoneIcon />} type="tel" inputMode="numeric" maxLength={10} placeholder="10-digit mobile number" invalid={!!errors.alternateMobile} {...register('alternateMobile')} />
-                    </LeadField>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-3 border-t border-slate-100 bg-white px-6 py-4 sm:px-8">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="rounded-lg border border-slate-200 bg-white px-6 py-2.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50">
-                  Cancel
-                </button>
-                <button type="submit" disabled={isSubmitting} className="inline-flex items-center gap-2 rounded-lg bg-[var(--primary)] px-6 py-2.5 text-sm font-medium text-white shadow-md shadow-blue-600/20 hover:bg-[var(--primary-hover)] disabled:opacity-60">
-                  <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
-                    <path d="M5 4h11l3 3v12a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4Z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
-                    <path d="M8 4v5h7V4M8 20v-6h8v6" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
-                  </svg>
-                  {isSubmitting ? 'Saving...' : editingId ? 'Update Lead' : 'Save Lead'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {duplicateMatch && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
-            <h3 className="text-base font-semibold text-slate-900">Possible Duplicate Lead</h3>
-            <p className="mt-2 text-sm text-slate-600">
-              A lead with this email address or mobile number already exists.
-            </p>
-            <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
-              <p className="font-medium text-slate-800">
-                {duplicateMatch.name || `${duplicateMatch.firstName || ''} ${duplicateMatch.lastName || ''}`.trim()}
-              </p>
-              <p className="text-slate-500">{duplicateMatch.company || 'No company'}</p>
-              <p className="text-slate-500">{duplicateMatch.email || duplicateMatch.mobile}</p>
-            </div>
-            <div className="mt-5 flex flex-wrap justify-end gap-2">
-              <Button type="button" variant="secondary" size="sm" onClick={handleCancelDuplicate}>
-                Cancel
-              </Button>
-              <Button type="button" variant="secondary" size="sm" onClick={handleContinueAnyway}>
-                Continue Anyway
-              </Button>
-              <Button type="button" size="sm" onClick={handleViewExistingLead}>
-                View Existing Lead
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 }

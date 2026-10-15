@@ -9,8 +9,6 @@ import {
   PlusIcon,
   ChevronDownIcon,
   UserPlusIcon,
-  BriefcaseIcon,
-  UsersIcon,
   CheckCircleIcon,
   CalendarIcon,
   XMarkIcon,
@@ -31,9 +29,7 @@ import ThemeToggle from '@/components/ui/theme-toggle';
 import { isPathDisabled } from '@/lib/modules';
 
 const QUICK_CREATE_OPTIONS = [
-  { label: 'New Lead', href: '/leads?quickCreate=1', icon: UserPlusIcon },
-  { label: 'New Deal', href: '/deals?quickCreate=1', icon: BriefcaseIcon },
-  { label: 'New Contact', href: '/contacts?quickCreate=1', icon: UsersIcon },
+  { label: 'New Lead', href: '/leads/new', icon: UserPlusIcon },
   { label: 'New Task', href: '/tasks?quickCreate=1', icon: CheckCircleIcon },
   { label: 'New Meeting', href: '/meetings?quickCreate=1', icon: CalendarIcon },
 ];

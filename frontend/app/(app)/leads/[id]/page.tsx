@@ -3,16 +3,13 @@
 import { useState, useEffect } from 'react';
 import type { FormEvent } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { leadsApi, contactsApi, usersApi, quotesApi, itemsApi, aiApi, getStoredUser } from '@/lib/api';
+import { leadsApi, usersApi, itemsApi, aiApi, getStoredUser } from '@/lib/api';
 import { isModuleEnabled } from '@/lib/modules';
 import { hasPermission } from '@/lib/permissions';
-import { ANNUAL_TURNOVER_OPTIONS, INDUSTRY_OPTIONS, DESIGNATION_OPTIONS, TERRITORY_OPTIONS, LEAD_SOURCE_OPTIONS, CONFIGURATION_OPTIONS, PROPERTY_TYPE_OPTIONS, leadSourceLabel, budgetRange } from '@/lib/lead-options';
+import { DESIGNATION_OPTIONS, LEAD_SOURCE_OPTIONS, CONFIGURATION_OPTIONS, PROPERTY_TYPE_OPTIONS, leadSourceLabel, budgetRange } from '@/lib/lead-options';
 import Button from '@/components/ui/button';
 import Card from '@/components/ui/card';
 import DataTable from '@/components/ui/data-table';
-import Link from 'next/link';
-import CompanyAutocomplete from '@/components/ui/company-autocomplete';
-import { companyHref } from '@/components/contacts/related-records';
 import AISummaryPanel from '@/components/ui/ai-summary-panel';
 import SearchableSelect from '@/components/ui/searchable-select';
 import { ArrowLeftIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
@@ -57,21 +54,6 @@ export default function LeadDetailsPage() {
   >([]);
 
   // Handle company selection from autocomplete
-  const handleCompanySelect = (company: any) => {
-    // Auto-populate related fields
-    if (company.email) setFormData({ ...formData, email: company.email });
-    if (company.phone) setFormData({ ...formData, phone: company.phone });
-    if (company.address) setFormData({ ...formData, street: company.address });
-    if (company.website) setFormData({ ...formData, website: company.website });
-    if (company.industry) setFormData({ ...formData, industry: company.industry });
-    // If it's a contact, also populate contact person fields
-    if (company.contactName) {
-      const [firstName, ...lastNameParts] = company.contactName.split(' ');
-      setFormData({ ...formData, firstName, lastName: lastNameParts.join(' ') });
-      if (company.contactTitle) setFormData({ ...formData, jobTitle: company.contactTitle });
-    }
-  };
-
   useEffect(() => {
     if (!isModuleEnabled('inventory')) return;
     itemsApi
@@ -248,40 +230,6 @@ export default function LeadDetailsPage() {
   if (error) return <div className="p-8 text-center text-red-500">{error}</div>;
   if (!lead) return <div className="p-8 text-center text-slate-500">Lead not found</div>;
 
-  const handleConvertToDeal = async () => {
-    if (lead?.isConverted) {
-      toast.warning('This lead has already been converted.');
-      return;
-    }
-    setSaving(true);
-    try {
-      const result = await leadsApi.convertLead(leadId, { createDeal: true });
-      toast.success('Lead converted to a deal.');
-      if (result.deal?.id) {
-        router.push('/pipeline');
-      } else {
-        fetchLead();
-      }
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to convert lead');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleSendQuotation = async () => {
-    setSaving(true);
-    try {
-      const res = await quotesApi.createQuoteFromLead(leadId);
-      toast.success(`Quotation ${res.quote?.quoteNumber || ''} created.`);
-      router.push(`/quotes/${res.quote.id}`);
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to create quotation');
-    } finally {
-      setSaving(false);
-    }
-  };
-
   return (
     <div className="space-y-6 pb-12">
       <div className="flex items-center gap-4">
@@ -291,16 +239,6 @@ export default function LeadDetailsPage() {
         <h1 className="text-2xl font-bold text-slate-900 flex-1">
           {lead.firstName} {lead.lastName}
         </h1>
-        {isModuleEnabled('quotes') && (
-          <Button type="button" variant="secondary" size="sm" onClick={handleSendQuotation} disabled={saving}>
-            Create Quotation
-          </Button>
-        )}
-        {isModuleEnabled('deals') && (
-          <Button type="button" variant="secondary" size="sm" onClick={handleConvertToDeal} disabled={saving || lead?.isConverted}>
-            {lead?.isConverted ? 'Converted to Deal' : 'Convert to Deal'}
-          </Button>
-        )}
         <Button
           type="button"
           size="sm"
@@ -395,152 +333,9 @@ export default function LeadDetailsPage() {
               </div>
             </div>
 
-            {/* Property Requirement (real estate) */}
+            {/* Customer Details */}
             <div>
-              <h4 className="mb-3 flex items-center justify-between border-b border-slate-100 pb-2 text-sm font-semibold text-slate-900">
-                Property Requirement
-                {budgetRange(formData.budgetMin, formData.budgetMax) && (
-                  <span className="text-xs font-medium text-slate-500">{budgetRange(formData.budgetMin, formData.budgetMax)}</span>
-                )}
-              </h4>
-              <div className="grid grid-cols-3 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700">Configuration</label>
-                  <select value={formData.configuration || ''} onChange={(e) => setFormData({ ...formData, configuration: e.target.value || null })} className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none">
-                    <option value="">— Select —</option>
-                    {CONFIGURATION_OPTIONS.map((opt) => (
-                      <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700">Property Type</label>
-                  <select value={formData.propertyType || ''} onChange={(e) => setFormData({ ...formData, propertyType: e.target.value || null })} className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none">
-                    <option value="">— Select —</option>
-                    {PROPERTY_TYPE_OPTIONS.map((opt) => (
-                      <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700">Preferred Area</label>
-                  <input type="text" value={formData.preferredLocation || ''} onChange={(e) => setFormData({ ...formData, preferredLocation: e.target.value })} placeholder="e.g. Baner, Pune" className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700">Project / Listing</label>
-                  <input type="text" value={formData.projectName || ''} onChange={(e) => setFormData({ ...formData, projectName: e.target.value })} className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700">Budget From (₹)</label>
-                  <input type="number" min={0} step={100000} value={formData.budgetMin ?? ''} onChange={(e) => setFormData({ ...formData, budgetMin: e.target.value })} className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700">Budget To (₹)</label>
-                  <input type="number" min={0} step={100000} value={formData.budgetMax ?? ''} onChange={(e) => setFormData({ ...formData, budgetMax: e.target.value })} className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none" />
-                </div>
-              </div>
-            </div>
-
-            {/* Company Details */}
-            <div>
-              <h4 className="mb-3 border-b border-slate-100 pb-2 text-sm font-semibold text-slate-900">Company Details</h4>
-              <div className="grid grid-cols-3 gap-6">
-                <div>
-                  <label className="flex items-center justify-between text-sm font-medium text-slate-700">
-                    Company Name
-                    {formData.company && (
-                      <Link href={companyHref(formData.company)} className="text-xs font-medium text-[var(--primary)] hover:underline">
-                        View company →
-                      </Link>
-                    )}
-                  </label>
-                  <CompanyAutocomplete
-                    value={formData.company || ''}
-                    onChange={(val) => setFormData({ ...formData, company: val })}
-                    onSelect={handleCompanySelect}
-                    placeholder="Type company name to search..."
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700">Website</label>
-                  <input
-                    type="text"
-                    value={formData.website || ''}
-                    onChange={(e) => setFormData({ ...formData, website: e.target.value })}
-                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700">Annual Turnover</label>
-                  <select
-                    value={formData.annualRevenue || ''}
-                    onChange={(e) => setFormData({ ...formData, annualRevenue: e.target.value })}
-                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
-                  >
-                    <option value="">— Select —</option>
-                    {ANNUAL_TURNOVER_OPTIONS.map((opt) => (
-                      <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700">Source</label>
-                  <select
-                    value={formData.leadSource || ''}
-                    onChange={(e) => setFormData({ ...formData, leadSource: e.target.value })}
-                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
-                  >
-                    {formData.leadSource && !LEAD_SOURCE_OPTIONS.some((o) => o.value === formData.leadSource) && (
-                      <option value={formData.leadSource}>{leadSourceLabel(formData.leadSource)}</option>
-                    )}
-                    {LEAD_SOURCE_OPTIONS.map((o) => (
-                      <option key={o.value} value={o.value}>{o.label}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700">Sub Source</label>
-                  <input type="text" value={formData.subSource || ''} onChange={(e) => setFormData({ ...formData, subSource: e.target.value })} placeholder="Campaign, form or listing" className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700">Industry</label>
-                  <select
-                    value={formData.industry || ''}
-                    onChange={(e) => setFormData({ ...formData, industry: e.target.value })}
-                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
-                  >
-                    <option value="">— Select —</option>
-                    {INDUSTRY_OPTIONS.map((opt) => (
-                      <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700">Next Follow-up Schedule</label>
-                  <input
-                    type="date"
-                    value={formData.nextFollowUp ? String(formData.nextFollowUp).slice(0, 10) : ''}
-                    onChange={(e) => setFormData({ ...formData, nextFollowUp: e.target.value })}
-                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
-                  />
-                  <p className="mt-1 text-[11px] text-slate-400">Saving a new date auto-creates a follow-up task for the lead owner.</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700">Territory</label>
-                  <SearchableSelect
-                    value={formData.territory || ''}
-                    onChange={(v) => setFormData({ ...formData, territory: v })}
-                    options={TERRITORY_OPTIONS.map((opt) => ({ value: opt }))}
-                    placeholder="Search district..."
-                    className="mt-1"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Personal Details */}
-            <div>
-              <h4 className="mb-3 border-b border-slate-100 pb-2 text-sm font-semibold text-slate-900">Personal Details</h4>
+              <h4 className="mb-3 border-b border-slate-100 pb-2 text-sm font-semibold text-slate-900">Customer Details</h4>
               <div className="grid grid-cols-3 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-slate-700">Salutation</label>
@@ -650,6 +445,30 @@ export default function LeadDetailsPage() {
                   />
                   <p className="mt-1 text-[11px] text-slate-400">The owner is notified automatically when assigned or follow-up tasks are created.</p>
                 </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">Lead Source</label>
+                  <select
+                    value={formData.leadSource || ''}
+                    onChange={(e) => setFormData({ ...formData, leadSource: e.target.value })}
+                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
+                  >
+                    {formData.leadSource && !LEAD_SOURCE_OPTIONS.some((o) => o.value === formData.leadSource) && (
+                      <option value={formData.leadSource}>{leadSourceLabel(formData.leadSource)}</option>
+                    )}
+                    {LEAD_SOURCE_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">Next Follow-up Schedule</label>
+                  <input
+                    type="date"
+                    value={formData.nextFollowUp ? String(formData.nextFollowUp).slice(0, 10) : ''}
+                    onChange={(e) => setFormData({ ...formData, nextFollowUp: e.target.value })}
+                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
+                  />
+                                  </div>
                 <div className="col-span-3">
                   <label className="block text-sm font-medium text-slate-700">Address (Multi-line)</label>
                   <textarea
@@ -698,6 +517,52 @@ export default function LeadDetailsPage() {
               </div>
             </div>
 
+            {/* Property Requirement (real estate) */}
+            <div>
+              <h4 className="mb-3 flex items-center justify-between border-b border-slate-100 pb-2 text-sm font-semibold text-slate-900">
+                Property Requirement
+                {budgetRange(formData.budgetMin, formData.budgetMax) && (
+                  <span className="text-xs font-medium text-slate-500">{budgetRange(formData.budgetMin, formData.budgetMax)}</span>
+                )}
+              </h4>
+              <div className="grid grid-cols-3 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">Configuration</label>
+                  <select value={formData.configuration || ''} onChange={(e) => setFormData({ ...formData, configuration: e.target.value || null })} className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none">
+                    <option value="">— Select —</option>
+                    {CONFIGURATION_OPTIONS.map((opt) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">Property Type</label>
+                  <select value={formData.propertyType || ''} onChange={(e) => setFormData({ ...formData, propertyType: e.target.value || null })} className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none">
+                    <option value="">— Select —</option>
+                    {PROPERTY_TYPE_OPTIONS.map((opt) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">Preferred Area</label>
+                  <input type="text" value={formData.preferredLocation || ''} onChange={(e) => setFormData({ ...formData, preferredLocation: e.target.value })} placeholder="e.g. Baner, Pune" className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">Project / Listing</label>
+                  <input type="text" value={formData.projectName || ''} onChange={(e) => setFormData({ ...formData, projectName: e.target.value })} className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">Budget From (₹)</label>
+                  <input type="number" min={0} step={100000} value={formData.budgetMin ?? ''} onChange={(e) => setFormData({ ...formData, budgetMin: e.target.value })} className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">Budget To (₹)</label>
+                  <input type="number" min={0} step={100000} value={formData.budgetMax ?? ''} onChange={(e) => setFormData({ ...formData, budgetMax: e.target.value })} className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none" />
+                </div>
+              </div>
+            </div>
+
             <div className="flex justify-end pt-4">
               <Button type="submit" disabled={saving}>
                 {saving ? 'Saving...' : 'Save Changes'}
@@ -711,16 +576,6 @@ export default function LeadDetailsPage() {
         <Card>
           <form onSubmit={handleSave} className="space-y-6">
             <div className="grid grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-slate-700">Interested In — Our Services</label>
-                <input
-                  type="text"
-                  value={formData.interestedInServices || ''}
-                  onChange={(e) => setFormData({ ...formData, interestedInServices: e.target.value })}
-                  placeholder="e.g. Implementation, Support, Consulting"
-                  className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
-                />
-              </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700">Interested In — Our Products</label>
                 <input
