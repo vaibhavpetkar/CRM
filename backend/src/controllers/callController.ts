@@ -65,7 +65,7 @@ export const getCallRecording = asyncHandler(async (req: AuthRequest, res: Respo
 export const receiveVoiceWebhook = (req: Request, res: Response) => {
   // Answer straight away; anything missed here is caught by status polling.
   res.sendStatus(200);
-  const body = req.body && typeof req.body === 'object' ? req.body : {};
+  const body = typeof req.body === 'string' && req.body.trim() ? { raw: req.body.trim() } : req.body && typeof req.body === 'object' ? req.body : {};
   callService
     .handleCallback(String(req.params.token || ''), body)
     .then((ok) => {

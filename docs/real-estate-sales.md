@@ -25,7 +25,29 @@ everyone else sees only their own calls and visits.
 - New lead fields (lead form and lead page): configuration, property type,
   preferred area, project, budget from / to.
 
-## Vi Business (Vodafone Idea) calling
+## Vi CPaaS two-way calling (recommended)
+
+Settings > Integrations > **Vi CPaaS (two-way calling)** holds each company's
+own Vi CPaaS account, so nothing goes in `.env` and no restart is needed. The
+sections follow the Vi CPaaS portal's Configuration menu:
+
+| Vi portal section | What to copy into the CRM |
+| --- | --- |
+| CTC configuration | CTC API URL, your Vi number (DID), and the request body field names from the Vi API document. Paste the CRM's **Call events URL** into Vi as the callback / status URL. |
+| OBD API credential | The API username and password (or key/token) you create there, and how it is sent (Basic, Bearer, custom header, or inside the body as `{{username}}`/`{{password}}`). |
+| Pull API credential | Pull API username, password and DNI (Vi service number). The CRM logs in at `https://cts.myvi.in:8443/Cpaas/api/v1/pullcalldetails/authenticatepullreport` (`username`, `password`, `dni`; bearer token valid 10 h) and reads `pullreport` (`dni`, `fromdate`/`todate` as DD/MM/YYYY, `calltype` 1 inbound and 3 click-to-call) every `VI_PULL_MINUTES` (default 5). |
+| Schema credential | Only if Vi asks for a login for pushing to your URL: make one up and type it in both places. The CRM then rejects pushes without it. |
+| OBD time | The same calling hours (India time). Calls outside them are stopped with a clear message. |
+| OBD encryption key & IV for AES 256 CBC | Key (32 chars / 64 hex / base64) and IV (16 chars / 32 hex / base64). Encrypted pushes and replies are opened automatically; tick *Encrypt the requests* if Vi requires encrypted requests (sent as `{"data":"<base64>"}` by default). |
+
+One Call events URL carries both directions: status of CRM click-to-calls
+(matched by Vi's call id or the `{{reference}}` we send, `crm<id>`) and
+incoming calls. Secrets are stored encrypted with `SETTINGS_ENCRYPTION_KEY`
+(falls back to `JWT_SECRET`; changing it means re-entering them) and never sent
+back to the browser. The `VI_*` env vars below still work when a company has
+not switched Vi CPaaS on.
+
+## Vi Business (Vodafone Idea) calling (env vars)
 
 Set `VOICE_PROVIDER=vi` in the server's `.env` and fill in the values from the
 API document Vi gives you with your Vi Business cloud-calling / click-to-call

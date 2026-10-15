@@ -4,6 +4,7 @@ import { asyncHandler } from '../utils/errorHandler';
 import * as salesService from '../services/salesService';
 import * as leadRotation from '../services/leadRotation';
 import * as portalLeads from '../services/portalLeadsService';
+import * as viCpaas from '../services/viCpaasService';
 import * as incomingCalls from '../services/incomingCallService';
 import { getIntegrationActivity } from '../services/integrationActivityService';
 import { getOnlineUserIds } from '../realtime/presence';
@@ -136,6 +137,20 @@ export const receivePortalLeads = async (req: Request, res: Response) => {
   }
 };
 
+// ─── Vi CPaaS ────────────────────────────────────────────────────────────────
+
+export const getViCpaas = asyncHandler(async (_req: AuthRequest, res: Response) => {
+  return res.json(await viCpaas.getViSettings());
+});
+
+export const saveViCpaas = asyncHandler(async (req: AuthRequest, res: Response) => {
+  return res.json(await viCpaas.saveViSettings(req.body || {}));
+});
+
+export const pullViCpaas = asyncHandler(async (_req: AuthRequest, res: Response) => {
+  return res.json(await viCpaas.pullViReports());
+});
+
 // ─── Incoming calls ──────────────────────────────────────────────────────────
 
 export const getIncomingCalls = asyncHandler(async (_req: AuthRequest, res: Response) => {
@@ -149,9 +164,14 @@ export const saveIncomingCalls = asyncHandler(async (req: AuthRequest, res: Resp
 // Public: the provider reports an incoming call (JSON, form fields or query string).
 export const receiveIncomingCallWebhook = async (req: Request, res: Response) => {
   try {
-    const body = { ...(req.query as Record<string, any>), ...(req.body && typeof req.body === 'object' ? req.body : {}) };
-    const result = await incomingCalls.receiveIncomingCall(String(req.params.token || ''), body);
+    // Vi CPaaS can send the whole body AES-encrypted, as plain text.
+    const body =
+      typeof req.body === 'string' && req.body.trim()
+        ? { ...(req.query as Record<string, any>), raw: req.body.trim() }
+        : { ...(req.query as Record<string, any>), ...(req.body && typeof req.body === 'object' ? req.body : {}) };
+    const result = await incomingCalls.receiveIncomingCall(String(req.params.token || ''), body, req.headers.authorization);
     if (!result) return res.sendStatus(404);
+    if ('unauthorized' in result) return res.status(401).json({ ok: false, message: result.reason });
     return res.json(result);
   } catch (err) {
     logger.error(`[voice] Incoming call event failed: ${err}`);
