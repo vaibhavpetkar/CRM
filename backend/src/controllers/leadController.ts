@@ -98,6 +98,11 @@ export const getLeadStats = asyncHandler(async (req: AuthRequest, res: Response)
   return res.json(stats);
 });
 
+export const getLeadFollowUps = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const followUps = await leadService.getFollowUps(req.params.id);
+  return res.json({ followUps });
+});
+
 export const getLeadTimeline = asyncHandler(async (req: AuthRequest, res: Response) => {
   const timeline = await leadService.getTimeline(req.params.id);
   return res.json({ timeline });

@@ -12,12 +12,19 @@ import Card from '@/components/ui/card';
 import DataTable from '@/components/ui/data-table';
 import AISummaryPanel from '@/components/ui/ai-summary-panel';
 import SearchableSelect from '@/components/ui/searchable-select';
-import { ArrowLeftIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, ChevronRightIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { useToast } from '@/components/ui/toast';
 import { useKeyboardShortcuts } from '@/lib/hooks/useKeyboardShortcuts';
 import CallButton from '@/components/calls/call-button';
 import CallHistory from '@/components/calls/call-history';
 import SiteVisitsCard from '@/components/sales/site-visits-card';
+import FollowUpHistoryDrawer from '@/components/leads/follow-up-history-drawer';
+
+// Today as YYYY-MM-DD in the browser's time zone, for the follow-up date picker's minimum.
+const todayStr = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
 
 export default function LeadDetailsPage() {
   const toast = useToast();
@@ -36,6 +43,7 @@ export default function LeadDetailsPage() {
   const [timeline, setTimeline] = useState<any[]>([]);
   const [timelineLoading, setTimelineLoading] = useState(false);
   const [revertingId, setRevertingId] = useState<number | string | null>(null);
+  const [remarksOpen, setRemarksOpen] = useState(false);
 
   // Assign To — name typeahead datalist, resolved back to a user ID on save.
   const [assignableUsers, setAssignableUsers] = useState<{ id: number; name: string }[]>([]);
@@ -181,6 +189,13 @@ export default function LeadDetailsPage() {
       resolvedQualifiedById = match.id;
     } else {
       resolvedQualifiedById = null;
+    }
+
+    const newFollowUp = formData.nextFollowUp ? String(formData.nextFollowUp).slice(0, 10) : '';
+    const savedFollowUp = lead?.nextFollowUp ? String(lead.nextFollowUp).slice(0, 10) : '';
+    if (newFollowUp && newFollowUp !== savedFollowUp && newFollowUp < todayStr()) {
+      toast.warning("Next Follow-up date can't be before today.");
+      return;
     }
 
     setSaving(true);
@@ -464,55 +479,42 @@ export default function LeadDetailsPage() {
                   <label className="block text-sm font-medium text-slate-700">Next Follow-up Schedule</label>
                   <input
                     type="date"
+                    min={todayStr()}
                     value={formData.nextFollowUp ? String(formData.nextFollowUp).slice(0, 10) : ''}
-                    onChange={(e) => setFormData({ ...formData, nextFollowUp: e.target.value })}
-                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
-                  />
-                                  </div>
-                <div className="col-span-3">
-                  <label className="block text-sm font-medium text-slate-700">Address (Multi-line)</label>
-                  <textarea
-                    value={formData.street || ''}
-                    onChange={(e) => setFormData({ ...formData, street: e.target.value })}
-                    rows={2}
-                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700">City</label>
-                  <input
-                    type="text"
-                    value={formData.city || ''}
-                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                    onChange={(e) => {
+                      // A new date starts a new follow-up: clear the remark box. The old
+                      // date and remark stay in the follow-up history.
+                      const savedDay = lead?.nextFollowUp ? String(lead.nextFollowUp).slice(0, 10) : '';
+                      const changed = e.target.value !== savedDay;
+                      setFormData({
+                        ...formData,
+                        nextFollowUp: e.target.value,
+                        followUpRemark: changed ? '' : lead?.followUpRemark || '',
+                      });
+                    }}
                     className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700">State</label>
-                  <input
-                    type="text"
-                    value={formData.state || ''}
-                    onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700">Pincode</label>
-                  <input
-                    type="text"
-                    value={formData.zipCode || ''}
-                    onChange={(e) => setFormData({ ...formData, zipCode: e.target.value })}
-                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700">Country</label>
-                  <input
-                    type="text"
-                    value={formData.country || ''}
-                    onChange={(e) => setFormData({ ...formData, country: e.target.value })}
-                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
-                  />
+                  <label className="block text-sm font-medium text-slate-700">Remark</label>
+                  <div className="mt-1 flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={formData.followUpRemark || ''}
+                      onChange={(e) => setFormData({ ...formData, followUpRemark: e.target.value })}
+                      placeholder="What to discuss on the follow-up"
+                      className="w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setRemarksOpen(true)}
+                      title="See all follow-up remarks"
+                      aria-label="See all follow-up remarks"
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition-colors hover:border-[var(--primary)] hover:bg-blue-50 hover:text-[var(--primary)]"
+                    >
+                      <ChevronRightIcon className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -559,6 +561,58 @@ export default function LeadDetailsPage() {
                 <div>
                   <label className="block text-sm font-medium text-slate-700">Budget To (₹)</label>
                   <input type="number" min={0} step={100000} value={formData.budgetMax ?? ''} onChange={(e) => setFormData({ ...formData, budgetMax: e.target.value })} className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none" />
+                </div>
+              </div>
+            </div>
+
+            {/* Address */}
+            <div>
+              <h4 className="mb-3 border-b border-slate-100 pb-2 text-sm font-semibold text-slate-900">Address</h4>
+              <div className="grid grid-cols-3 gap-6">
+                <div className="col-span-3">
+                  <label className="block text-sm font-medium text-slate-700">Address</label>
+                  <textarea
+                    value={formData.street || ''}
+                    onChange={(e) => setFormData({ ...formData, street: e.target.value })}
+                    rows={2}
+                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">City</label>
+                  <input
+                    type="text"
+                    value={formData.city || ''}
+                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">State</label>
+                  <input
+                    type="text"
+                    value={formData.state || ''}
+                    onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">Pincode</label>
+                  <input
+                    type="text"
+                    value={formData.zipCode || ''}
+                    onChange={(e) => setFormData({ ...formData, zipCode: e.target.value })}
+                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">Country</label>
+                  <input
+                    type="text"
+                    value={formData.country || ''}
+                    onChange={(e) => setFormData({ ...formData, country: e.target.value })}
+                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
+                  />
                 </div>
               </div>
             </div>
@@ -709,6 +763,8 @@ export default function LeadDetailsPage() {
           lead={{ id: Number(leadId), name: leadName, projectName: lead.projectName, preferredLocation: lead.preferredLocation }}
         />
       )}
+
+      <FollowUpHistoryDrawer leadId={leadId} leadName={leadName} open={remarksOpen} onClose={() => setRemarksOpen(false)} />
     </div>
   );
 }

@@ -29,6 +29,7 @@ import ItemCategory from './ItemCategory';
 import TaxMaster from './TaxMaster';
 import LeadProduct from './LeadProduct';
 import LeadTax from './LeadTax';
+import LeadFollowUp from './LeadFollowUp';
 import QuoteProduct from './QuoteProduct';
 import QuoteTax from './QuoteTax';
 import InvoiceProduct from './InvoiceProduct';
@@ -168,6 +169,9 @@ ItemCategory.hasMany(ItemCategory, { foreignKey: 'parentCategoryId', as: 'subCat
 Lead.hasMany(LeadProduct, { foreignKey: 'leadId', as: 'products', onDelete: 'CASCADE' });
 LeadProduct.belongsTo(Lead, { foreignKey: 'leadId', as: 'lead' });
 LeadProduct.belongsTo(Item, { foreignKey: 'itemId', as: 'item' });
+Lead.hasMany(LeadFollowUp, { foreignKey: 'leadId', as: 'followUps', onDelete: 'CASCADE' });
+LeadFollowUp.belongsTo(Lead, { foreignKey: 'leadId', as: 'lead' });
+LeadFollowUp.belongsTo(User, { foreignKey: 'createdById', as: 'createdBy' });
 
 Lead.hasMany(LeadTax, { foreignKey: 'leadId', as: 'taxes', onDelete: 'CASCADE' });
 LeadTax.belongsTo(Lead, { foreignKey: 'leadId', as: 'lead' });

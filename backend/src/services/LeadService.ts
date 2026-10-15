@@ -20,6 +20,30 @@ import { getOrSetCache } from '../utils/cache';
 import { assigneeForNewLead } from './leadRotation';
 import { NotFoundError, ConflictError, ValidationError } from '../errors/AppError';
 import { isModuleEnabled } from '../middleware/moduleGate';
+import LeadFollowUp from '../models/LeadFollowUp';
+import { localDay } from '../utils/reportTime';
+
+/** The calendar day ("2026-10-20") a follow-up date falls on, in the CRM's local time. */
+const followUpDay = (value: unknown): string | null => {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const d = value instanceof Date ? value : new Date(String(value));
+  return Number.isNaN(d.getTime()) ? null : localDay(d);
+};
+
+/** A newly set Next Follow-up can't be in the past. */
+const assertFollowUpNotPast = (value: unknown) => {
+  const day = followUpDay(value);
+  if (day && day < localDay(new Date())) {
+    throw new ValidationError("Next follow-up date can't be before today");
+  }
+};
+
+const cleanRemark = (value: unknown) => {
+  if (value === null || value === undefined) return null;
+  const text = String(value).trim();
+  return text ? text : null;
+};
 
 interface ProductInput {
   itemId?: number | null;
@@ -163,6 +187,7 @@ class LeadService {
       'latitude', 'longitude', 'value', 'score', 'budgetMin', 'budgetMax',
     ]);
     await validateUserReferences(data);
+    assertFollowUpNotPast(data.nextFollowUp);
 
     // '' is falsy but not null/undefined, so the `??` defaults below wouldn't
     // catch it — Sequelize's isEmail validator rejects an empty string even
@@ -240,6 +265,7 @@ class LeadService {
           sourceDetails: data.sourceDetails ?? null,
           lastContacted: data.lastContacted ?? null,
           nextFollowUp: data.nextFollowUp ?? null,
+          followUpRemark: cleanRemark(data.followUpRemark),
           interestedIn: data.interestedIn ?? null,
           interestedInServices: data.interestedInServices ?? null,
           interestedInProducts: data.interestedInProducts ?? null,
@@ -263,6 +289,13 @@ class LeadService {
       await this.replaceProducts(lead.id, data.products || [], t);
       await this.replaceTaxes(lead.id, data.taxes || [], t);
       await this.recalculateTotals(lead.id, t);
+
+      if (lead.nextFollowUp || lead.followUpRemark) {
+        await LeadFollowUp.create(
+          { leadId: lead.id, followUpDate: lead.nextFollowUp ?? null, remark: lead.followUpRemark ?? null, createdById: userId ?? null },
+          { transaction: t }
+        );
+      }
 
       await logActivity(
         {
@@ -307,6 +340,11 @@ class LeadService {
 
     if (data.email === '') data.email = null;
     if (data.secondaryEmail === '') data.secondaryEmail = null;
+
+    // Only a changed date is checked, so leads with an overdue follow-up can still be saved.
+    const followUpDateChanged =
+      data.nextFollowUp !== undefined && followUpDay(data.nextFollowUp) !== followUpDay(lead.nextFollowUp);
+    if (followUpDateChanged) assertFollowUpNotPast(data.nextFollowUp);
 
     // Case-insensitive duplicate check (email column has no unique index).
     const normalizedEmail = data.email && data.email !== lead.email
@@ -364,6 +402,7 @@ class LeadService {
         sourceDetails: data.sourceDetails !== undefined ? data.sourceDetails : lead.sourceDetails,
         lastContacted: data.lastContacted !== undefined ? data.lastContacted : lead.lastContacted,
         nextFollowUp: data.nextFollowUp !== undefined ? data.nextFollowUp : lead.nextFollowUp,
+        followUpRemark: data.followUpRemark !== undefined ? cleanRemark(data.followUpRemark) : lead.followUpRemark,
         interestedIn: data.interestedIn !== undefined ? data.interestedIn : lead.interestedIn,
         interestedInServices: data.interestedInServices !== undefined ? data.interestedInServices : lead.interestedInServices,
         interestedInProducts: data.interestedInProducts !== undefined ? data.interestedInProducts : lead.interestedInProducts,
@@ -381,6 +420,27 @@ class LeadService {
       };
 
       await leadRepository.update(lead, updatable, t);
+
+      // Follow-up history: a new date starts a new entry (the old date and
+      // remark stay in lead_follow_ups); a remark edited on the same date
+      // updates the latest entry.
+      const remarkChanged = (before.followUpRemark ?? null) !== (updatable.followUpRemark ?? null);
+      if (followUpDateChanged && (updatable.nextFollowUp || updatable.followUpRemark)) {
+        await LeadFollowUp.create(
+          { leadId: lead.id, followUpDate: (updatable.nextFollowUp as Date) ?? null, remark: updatable.followUpRemark ?? null, createdById: userId ?? null },
+          { transaction: t }
+        );
+      } else if (!followUpDateChanged && remarkChanged) {
+        const latest = await LeadFollowUp.findOne({ where: { leadId: lead.id }, order: [['createdAt', 'DESC'], ['id', 'DESC']], transaction: t });
+        if (latest && followUpDay(latest.followUpDate) === followUpDay(lead.nextFollowUp)) {
+          await latest.update({ remark: updatable.followUpRemark ?? null }, { transaction: t });
+        } else {
+          await LeadFollowUp.create(
+            { leadId: lead.id, followUpDate: lead.nextFollowUp ?? null, remark: updatable.followUpRemark ?? null, createdById: userId ?? null },
+            { transaction: t }
+          );
+        }
+      }
 
       if (data.products !== undefined) {
         await this.replaceProducts(lead.id, (data.products as ProductInput[]) || [], t);
@@ -403,7 +463,7 @@ class LeadService {
         'company', 'website', 'jobTitle', 'prefix', 'industry', 'annualRevenue', 'leadSource',
         'sourceDetails', 'territory', 'status', 'score', 'value', 'notes',
         'street', 'city', 'state', 'zipCode', 'country', 'assignedToId', 'leadOwnerId',
-        'nextFollowUp', 'lastContacted', 'interestedIn', 'interestedInServices', 'interestedInProducts', 'timelineToPurchase', 'qualifiedById', 'meetingStatus',
+        'nextFollowUp', 'followUpRemark', 'lastContacted', 'interestedIn', 'interestedInServices', 'interestedInProducts', 'timelineToPurchase', 'qualifiedById', 'meetingStatus',
       ];
       const fieldChanges = computeChanges(before, after, REVERTABLE_FIELDS);
 
@@ -684,6 +744,27 @@ class LeadService {
         leadsBySource,
         averageScore: parseFloat(String(avgScoreResult?.get('averageScore') ?? '0')),
         totalValue: parseFloat(String(totalValueResult?.get('totalValue') ?? '0')),
+      };
+    });
+  }
+
+  /** Every follow-up date and remark on a lead, newest first. */
+  async getFollowUps(id: number | string) {
+    const lead = await leadRepository.findById(id);
+    if (!lead) throw new NotFoundError('Lead', id);
+    const rows = await LeadFollowUp.findAll({
+      where: { leadId: lead.id },
+      include: [{ model: User, as: 'createdBy', attributes: ['id', 'firstName', 'lastName'] }],
+      order: [['createdAt', 'DESC'], ['id', 'DESC']],
+    });
+    return rows.map((r) => {
+      const createdBy = (r as unknown as { createdBy?: { firstName?: string; lastName?: string } }).createdBy;
+      return {
+        id: r.id,
+        followUpDate: r.followUpDate ?? null,
+        remark: r.remark ?? null,
+        createdAt: r.createdAt,
+        createdBy: createdBy ? `${createdBy.firstName || ''} ${createdBy.lastName || ''}`.trim() || null : null,
       };
     });
   }

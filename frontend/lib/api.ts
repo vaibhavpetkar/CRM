@@ -410,6 +410,8 @@ export const leadsApi = {
   },
 
   getLeadTimeline: async (id: string | number) => request<{ timeline: any[] }>(`/leads/${id}/timeline`),
+  getLeadFollowUps: async (id: string | number) =>
+    request<{ followUps: LeadFollowUpEntry[] }>(`/leads/${id}/follow-ups`),
 
   revertLeadChange: async (id: string | number, logId: string | number) =>
     request<{ message: string; lead: any }>(`/leads/${id}/timeline/${logId}/revert`, { method: 'POST' }),
@@ -1514,4 +1516,12 @@ export async function openPrintWindow(html: Promise<string>): Promise<void> {
     win.close();
     throw err;
   }
+}
+
+export interface LeadFollowUpEntry {
+  id: number;
+  followUpDate: string | null;
+  remark: string | null;
+  createdAt: string;
+  createdBy: string | null;
 }

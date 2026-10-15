@@ -81,6 +81,7 @@ interface LeadAttributes {
   preferredLocation?: string | null; // area / locality the buyer wants
   projectName?: string | null; // project or listing the enquiry came for
   subSource?: string | null; // finer than leadSource: the campaign, form, project or listing it came from (set automatically by integrations)
+  followUpRemark?: string | null; // remark for the current Next Follow-up; earlier ones live in lead_follow_ups
   budgetMin?: number | null; // rupees
   budgetMax?: number | null;
 
@@ -169,6 +170,7 @@ class Lead extends Model<LeadAttributes, LeadCreationAttributes> implements Lead
   public preferredLocation?: string | null;
   public projectName?: string | null;
   public subSource?: string | null;
+  public followUpRemark?: string | null;
   public budgetMin?: number | null;
   public budgetMax?: number | null;
   public createdById?: number | null;
@@ -439,6 +441,7 @@ Lead.init(
     preferredLocation: { type: DataTypes.STRING(255), allowNull: true },
     projectName: { type: DataTypes.STRING(255), allowNull: true },
     subSource: { type: DataTypes.STRING(255), allowNull: true },
+    followUpRemark: { type: DataTypes.TEXT, allowNull: true },
     budgetMin: { type: DataTypes.DECIMAL(15, 2), allowNull: true },
     budgetMax: { type: DataTypes.DECIMAL(15, 2), allowNull: true },
     assignedToId: {
