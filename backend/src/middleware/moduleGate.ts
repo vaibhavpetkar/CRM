@@ -9,9 +9,9 @@ import { Request, Response, NextFunction } from 'express';
  * DISABLED_MODULES env: comma separated keys, or "none". Unset means all of
  * them are off, matching the frontend default (frontend/lib/modules.ts).
  */
-export type ModuleKey = 'deals' | 'quotes' | 'tasks' | 'meetings' | 'invoices' | 'marketing' | 'inventory' | 'finance';
+export type ModuleKey = 'deals' | 'quotes' | 'tasks' | 'meetings' | 'invoices' | 'marketing' | 'inventory' | 'finance' | 'contacts';
 
-const ALL_MODULES: ModuleKey[] = ['deals', 'quotes', 'tasks', 'meetings', 'invoices', 'marketing', 'inventory', 'finance'];
+const ALL_MODULES: ModuleKey[] = ['deals', 'quotes', 'tasks', 'meetings', 'invoices', 'marketing', 'inventory', 'finance', 'contacts'];
 
 const parseDisabled = (raw: string | undefined): ModuleKey[] =>
   raw === undefined
@@ -35,6 +35,7 @@ const MODULE_API_PREFIXES: Record<ModuleKey, string[]> = {
   marketing: ['/api/campaigns', '/api/templates'],
   inventory: ['/api/items', '/api/item-categories', '/api/taxes'],
   finance: ['/api/expenses'],
+  contacts: ['/api/contacts'],
 };
 
 const blockedPrefixes = DISABLED_MODULES.flatMap((key) => MODULE_API_PREFIXES[key]);

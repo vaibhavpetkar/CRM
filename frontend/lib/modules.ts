@@ -6,10 +6,13 @@
  *
  * To bring a module back, remove it from DISABLED_MODULES here and in the
  * backend's DISABLED_MODULES env var. Nothing in the database is deleted.
+ * Deals, Pipeline, Quotes, Invoices, Contacts and Tax Master pages were
+ * removed from the app entirely; bringing those back means restoring their
+ * pages from git history.
  */
-export type ModuleKey = 'deals' | 'quotes' | 'tasks' | 'meetings' | 'invoices' | 'marketing' | 'inventory' | 'finance';
+export type ModuleKey = 'deals' | 'quotes' | 'tasks' | 'meetings' | 'invoices' | 'marketing' | 'inventory' | 'finance' | 'contacts';
 
-const ALL_MODULES: ModuleKey[] = ['deals', 'quotes', 'tasks', 'meetings', 'invoices', 'marketing', 'inventory', 'finance'];
+const ALL_MODULES: ModuleKey[] = ['deals', 'quotes', 'tasks', 'meetings', 'invoices', 'marketing', 'inventory', 'finance', 'contacts'];
 
 // NEXT_PUBLIC_DISABLED_MODULES (comma separated, "none" for none) overrides the default.
 const fromEnv = process.env.NEXT_PUBLIC_DISABLED_MODULES;
@@ -31,6 +34,7 @@ const MODULE_PATHS: Record<ModuleKey, string[]> = {
   marketing: ['/marketing'],
   inventory: ['/items'],
   finance: ['/expenses'],
+  contacts: ['/contacts'],
 };
 
 export const isModuleEnabled = (key: ModuleKey) => !DISABLED_MODULES.includes(key);

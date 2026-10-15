@@ -43,7 +43,7 @@ export const globalSearch = async (req: Request, res: Response) => {
         limit: RESULT_LIMIT_PER_TYPE,
         order: [['createdAt', 'DESC']],
       }) : Promise.resolve([]),
-      Contact.findAll({
+      isModuleEnabled('contacts') ? Contact.findAll({
         where: {
           [Op.or]: [
             { firstName: like },
@@ -54,7 +54,7 @@ export const globalSearch = async (req: Request, res: Response) => {
         },
         limit: RESULT_LIMIT_PER_TYPE,
         order: [['createdAt', 'DESC']],
-      }),
+      }) : Promise.resolve([]),
     ]);
 
     const leadResults = leads.map((l: any) => ({
