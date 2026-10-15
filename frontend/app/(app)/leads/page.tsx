@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, forwardRef } from 'react';
 import PageHeader from '@/components/ui/page-header';
 import SearchInput from '@/components/ui/search-input';
 import StatusBadge from '@/components/ui/status-badge';
@@ -12,7 +12,7 @@ import CompanyAutocomplete from '@/components/ui/company-autocomplete';
 import UserAutocomplete from '@/components/ui/user-autocomplete';
 import TerritoryAutocomplete from '@/components/ui/territory-autocomplete';
 import { LEAD_FIELDS } from '@/lib/import-export/field-configs';
-import { formatCurrency } from '@/lib/utils';
+import { cn, formatCurrency } from '@/lib/utils';
 import { leadsApi, usersApi, salesApi, getStoredUser, PresenceState } from '@/lib/api';
 import { TERRITORY_OPTIONS, LEAD_SOURCE_OPTIONS, CONFIGURATION_OPTIONS, PROPERTY_TYPE_OPTIONS, BUDGET_OPTIONS, leadSourceLabel, budgetRange } from '@/lib/lead-options';
 import { AgentStatusDot } from '@/components/sales/agent-status';
@@ -20,7 +20,7 @@ import { hasPermission } from '@/lib/permissions';
 import { useKeyboardShortcuts } from '@/lib/hooks/useKeyboardShortcuts';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { PlusIcon, FunnelIcon, XMarkIcon, PencilSquareIcon, TrashIcon, EyeIcon, Squares2X2Icon, ListBulletIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, FunnelIcon, XMarkIcon, PencilSquareIcon, TrashIcon, EyeIcon, Squares2X2Icon, ListBulletIcon, UserPlusIcon, UserIcon, UsersIcon, EnvelopeIcon, PhoneIcon, BuildingOffice2Icon, MegaphoneIcon, MapPinIcon, CalendarDaysIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -102,6 +102,47 @@ const leadSchema = z.object({
   budgetMax: z.string().optional(),
 });
 type LeadFormValues = z.infer<typeof leadSchema>;
+
+// Add Lead popup building blocks.
+const POPUP_INPUT =
+  'w-full rounded-lg border border-slate-200 bg-slate-50/60 py-2.5 pl-10 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[var(--primary)] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20 transition-all';
+
+function LeadFormStep({ n, title, subtitle }: { n: number; title: string; subtitle: string }) {
+  return (
+    <div className="flex items-center gap-3">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50">
+        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--primary)] text-xs font-bold text-white">{n}</span>
+      </span>
+      <div>
+        <h4 className="text-[15px] font-semibold text-slate-900">{title}</h4>
+        <p className="text-xs text-slate-500">{subtitle}</p>
+      </div>
+    </div>
+  );
+}
+
+function LeadField({ label, required, error, hint, children }: { label: string; required?: boolean; error?: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="mb-1.5 block text-[13px] font-medium text-slate-800">
+        {label} {required && <span className="text-red-500">*</span>}
+      </label>
+      {children}
+      {error ? <p className="mt-1 text-[11px] text-red-500">{error}</p> : hint ? <p className="mt-1 text-[11px] text-slate-500">{hint}</p> : null}
+    </div>
+  );
+}
+
+const IconInput = forwardRef<HTMLInputElement, React.ComponentProps<'input'> & { icon: React.ReactNode; invalid?: boolean }>(
+  function IconInput({ icon, invalid, className = '', ...props }, ref) {
+    return (
+      <div className="relative">
+        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 [&_svg]:h-4 [&_svg]:w-4">{icon}</span>
+        <input ref={ref} {...props} className={cn(POPUP_INPUT, invalid && 'border-red-400 bg-red-50/40 focus:border-red-400 focus:ring-red-200', className)} />
+      </div>
+    );
+  }
+);
 
 export default function LeadsPage() {
   const toast = useToast();
@@ -864,188 +905,127 @@ export default function LeadsPage() {
       )}
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-lg font-semibold text-slate-900">{editingId ? 'Edit Lead' : 'Add New Lead'}</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-[2px]">
+          <div className="flex max-h-[92vh] w-full max-w-[720px] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-start justify-between gap-4 px-6 pt-6 sm:px-8">
+              <div className="flex items-center gap-4">
+                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-[var(--primary)]">
+                  <UserPlusIcon className="h-6 w-6" />
+                </span>
+                <div>
+                  <h3 className="text-xl font-bold text-slate-900">{editingId ? 'Edit Lead' : 'Add New Lead'}</h3>
+                  <p className="mt-0.5 text-sm text-slate-500">Create a new lead and assign it to your sales team.</p>
+                </div>
+              </div>
+              <button type="button" onClick={() => setIsModalOpen(false)} aria-label="Close" className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
                 <XMarkIcon className="h-5 w-5" />
               </button>
             </div>
 
-            <form onSubmit={hookFormSubmit(onSubmitForm)} className="mt-4 space-y-4">
-              <div className="border-b border-slate-200 pb-4">
-                <h4 className="text-sm font-medium text-slate-700 mb-3">Mandatory Lead Details</h4>
-                
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700">First Name *</label>
-                    <input
-                      type="text"
-                      {...register('firstName')}
-                      className={`mt-1 w-full rounded-lg border-0 bg-slate-100/50 p-2 text-sm focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)] ${errors.firstName ? 'ring-1 ring-red-500 bg-red-50' : ''}`}
-                    />
-                    {errors.firstName && <p className="mt-1 text-[10px] text-red-500">{errors.firstName.message}</p>}
+            <form onSubmit={hookFormSubmit(onSubmitForm)} className="flex min-h-0 flex-1 flex-col">
+              <div className="flex-1 overflow-y-auto px-6 pb-6 sm:px-8">
+                <div className="mt-4 border-t border-slate-100 pt-4">
+                  <LeadFormStep n={1} title="Mandatory Lead Details" subtitle="Enter the basic information about the lead." />
+                  <div className="mt-4 grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
+                    <LeadField label="First Name" required error={errors.firstName?.message}>
+                      <IconInput icon={<UserIcon />} placeholder="Enter first name" invalid={!!errors.firstName} {...register('firstName')} />
+                    </LeadField>
+                    <LeadField label="Last Name" required error={errors.lastName?.message}>
+                      <IconInput icon={<UserIcon />} placeholder="Enter last name" invalid={!!errors.lastName} {...register('lastName')} />
+                    </LeadField>
+                    <LeadField label="Email" required error={errors.email?.message}>
+                      <IconInput icon={<EnvelopeIcon />} type="email" placeholder="Enter email address" invalid={!!errors.email} {...register('email')} />
+                    </LeadField>
+                    <LeadField label="Mobile Number" required error={errors.mobile?.message}>
+                      <IconInput icon={<PhoneIcon />} type="tel" inputMode="numeric" maxLength={10} placeholder="10-digit mobile number" invalid={!!errors.mobile} {...register('mobile')} />
+                    </LeadField>
+                    <LeadField label="Company">
+                      <CompanyAutocomplete
+                        value={watchedCompany || ''}
+                        onChange={(val) => setValue('company', val, { shouldValidate: true })}
+                        onSelect={handleCompanySelect}
+                        placeholder="Search or enter company name"
+                        icon={<BuildingOffice2Icon />}
+                        inputClassName={POPUP_INPUT}
+                      />
+                    </LeadField>
+                    <LeadField label="Lead Source">
+                      <div className="relative">
+                        <MegaphoneIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                        <select {...register('leadSource')} className={`${POPUP_INPUT} appearance-none pr-9 font-medium text-slate-800`}>
+                          {LEAD_SOURCE_OPTIONS.map((o) => (
+                            <option key={o.value} value={o.value}>{o.label}</option>
+                          ))}
+                        </select>
+                        <ChevronDownIcon className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                      </div>
+                    </LeadField>
+                    <LeadField label="Territory">
+                      <TerritoryAutocomplete
+                        value={watch('territory') || ''}
+                        onChange={(val) => setValue('territory', val)}
+                        placeholder="Search territory..."
+                        icon={<MapPinIcon />}
+                        inputClassName={POPUP_INPUT}
+                      />
+                    </LeadField>
+                    <LeadField label="Qualified By">
+                      <UserAutocomplete
+                        value={watch('qualifiedById') || ''}
+                        onChange={(val) => setValue('qualifiedById', val)}
+                        placeholder="Search team member..."
+                        icon={<UsersIcon />}
+                        inputClassName={POPUP_INPUT}
+                      />
+                    </LeadField>
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700">Last Name *</label>
-                    <input
-                      type="text"
-                      {...register('lastName')}
-                      className={`mt-1 w-full rounded-lg border-0 bg-slate-100/50 p-2 text-sm focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)] ${errors.lastName ? 'ring-1 ring-red-500 bg-red-50' : ''}`}
-                    />
-                    {errors.lastName && <p className="mt-1 text-[10px] text-red-500">{errors.lastName.message}</p>}
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700">Email *</label>
-                    <input
-                      type="email"
-                      {...register('email')}
-                      className={`mt-1 w-full rounded-lg border-0 bg-slate-100/50 p-2 text-sm focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)] ${errors.email ? 'ring-1 ring-red-500 bg-red-50' : ''}`}
-                    />
-                    {errors.email && <p className="mt-1 text-[10px] text-red-500">{errors.email.message}</p>}
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700">Mobile Number *</label>
-                    <input
-                      type="tel"
-                      {...register('mobile')}
-                      placeholder="10-digit number"
-                      className={`mt-1 w-full rounded-lg border-0 bg-slate-100/50 p-2 text-sm focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)] ${errors.mobile ? 'ring-1 ring-red-500 bg-red-50' : ''}`}
-                    />
-                    {errors.mobile && <p className="mt-1 text-[10px] text-red-500">{errors.mobile.message}</p>}
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700">Company</label>
-                    <CompanyAutocomplete
-                      value={watchedCompany || ''}
-                      onChange={(val) => setValue('company', val, { shouldValidate: true })}
-                      onSelect={handleCompanySelect}
-                      placeholder="Type company name to search..."
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700">Lead Source</label>
-                    <select
-                      {...register('leadSource')}
-                      className="mt-1 w-full rounded-lg border-0 bg-slate-100/50 p-2 text-sm focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
-                    >
-                      {LEAD_SOURCE_OPTIONS.map((o) => (
-                        <option key={o.value} value={o.value}>{o.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700">Sub Source</label>
-                    <input type="text" {...register('subSource')} placeholder="Campaign, form or listing" className="mt-1 w-full rounded-lg border-0 bg-slate-100/50 p-2 text-sm focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)]" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700">Territory</label>
-                    <TerritoryAutocomplete
-                      value={watch('territory') || ''}
-                      onChange={(val) => setValue('territory', val)}
-                      placeholder="Type territory to search..."
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700">Qualified By</label>
-                    <UserAutocomplete
-                      value={watch('qualifiedById') || ''}
-                      onChange={(val) => setValue('qualifiedById', val)}
-                      placeholder="Type user name to search..."
-                    />
+                </div>
+
+                <div className="mt-6 border-t border-slate-100 pt-4">
+                  <LeadFormStep n={2} title="Assignment & Scheduling" subtitle="Set ownership and follow-up details." />
+                  <div className="mt-4 grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
+                    <LeadField label="Assigned To (Lead Owner)" hint="The assignee is notified automatically when assigned.">
+                      <UserAutocomplete
+                        value={watch('assignedToId') || ''}
+                        onChange={(val) => setValue('assignedToId', val)}
+                        placeholder="Search team member..."
+                        icon={<UserIcon />}
+                        inputClassName={POPUP_INPUT}
+                      />
+                    </LeadField>
+                    <LeadField label="Schedule Meeting">
+                      <div className="relative">
+                        <CalendarDaysIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                        <select {...register('meetingStatus')} className={`${POPUP_INPUT} appearance-none pr-9 font-medium text-slate-800`}>
+                          <option value="">None</option>
+                          <option value="pending">Pending</option>
+                          <option value="scheduled">Scheduled</option>
+                          <option value="completed">Completed</option>
+                          <option value="rescheduled">Rescheduled</option>
+                          <option value="cancelled">Cancelled</option>
+                          <option value="no-show">No Show</option>
+                        </select>
+                        <ChevronDownIcon className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                      </div>
+                    </LeadField>
+                    <LeadField label="Alternate Mobile" error={errors.alternateMobile?.message}>
+                      <IconInput icon={<PhoneIcon />} type="tel" inputMode="numeric" maxLength={10} placeholder="10-digit mobile number" invalid={!!errors.alternateMobile} {...register('alternateMobile')} />
+                    </LeadField>
                   </div>
                 </div>
               </div>
 
-              <div className="border-b border-slate-200 pb-4">
-                <h4 className="text-sm font-medium text-slate-700 mb-3">Property Requirement</h4>
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700">Configuration</label>
-                    <select {...register('configuration')} className="mt-1 w-full rounded-lg border-0 bg-slate-100/50 p-2 text-sm focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)]">
-                      <option value="">— Select —</option>
-                      {CONFIGURATION_OPTIONS.map((o) => (
-                        <option key={o} value={o}>{o}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700">Property Type</label>
-                    <select {...register('propertyType')} className="mt-1 w-full rounded-lg border-0 bg-slate-100/50 p-2 text-sm focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)]">
-                      <option value="">— Select —</option>
-                      {PROPERTY_TYPE_OPTIONS.map((o) => (
-                        <option key={o} value={o}>{o}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700">Preferred Area</label>
-                    <input type="text" {...register('preferredLocation')} placeholder="e.g. Baner, Pune" className="mt-1 w-full rounded-lg border-0 bg-slate-100/50 p-2 text-sm focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)]" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700">Project / Listing</label>
-                    <input type="text" {...register('projectName')} className="mt-1 w-full rounded-lg border-0 bg-slate-100/50 p-2 text-sm focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)]" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700">Budget From (₹)</label>
-                    <input type="number" min={0} step={100000} {...register('budgetMin')} placeholder="e.g. 5000000" className="mt-1 w-full rounded-lg border-0 bg-slate-100/50 p-2 text-sm focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)]" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700">Budget To (₹)</label>
-                    <input type="number" min={0} step={100000} {...register('budgetMax')} placeholder="e.g. 7500000" className="mt-1 w-full rounded-lg border-0 bg-slate-100/50 p-2 text-sm focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)]" />
-                  </div>
-                </div>
-              </div>
-
-              <div className="border-b border-slate-200 pb-4">
-                <h4 className="text-sm font-medium text-slate-700 mb-3">Assignment & Scheduling</h4>
-                
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700">Assigned To (Lead Owner)</label>
-                    <UserAutocomplete
-                      value={watch('assignedToId') || ''}
-                      onChange={(val) => setValue('assignedToId', val)}
-                      placeholder="Type user name to search..."
-                    />
-                    <p className="mt-1 text-[11px] text-slate-400">The assignee is notified automatically. Left blank, lead rotation (if on) picks the next sales person.</p>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700">Schedule Meeting</label>
-                    <select
-                      {...register('meetingStatus')}
-                      className="mt-1 w-full rounded-lg border-0 bg-slate-100/50 p-2 text-sm focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
-                    >
-                      <option value="">None</option>
-                      <option value="pending">Pending</option>
-                      <option value="scheduled">Scheduled</option>
-                      <option value="completed">Completed</option>
-                      <option value="rescheduled">Rescheduled</option>
-                      <option value="cancelled">Cancelled</option>
-                      <option value="no-show">No Show</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700">Alternate Mobile</label>
-                    <input
-                      type="tel"
-                      {...register('alternateMobile')}
-                      placeholder="10-digit number"
-                      className={`mt-1 w-full rounded-lg border-0 bg-slate-100/50 p-2 text-sm focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)] ${errors.alternateMobile ? 'ring-1 ring-red-500 bg-red-50' : ''}`}
-                    />
-                    {errors.alternateMobile && <p className="mt-1 text-[10px] text-red-500">{errors.alternateMobile.message}</p>}
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-4 flex justify-end gap-2 pt-2">
-                <Button type="button" variant="secondary" size="sm" onClick={() => setIsModalOpen(false)}>
+              <div className="flex justify-end gap-3 border-t border-slate-100 bg-white px-6 py-4 sm:px-8">
+                <button type="button" onClick={() => setIsModalOpen(false)} className="rounded-lg border border-slate-200 bg-white px-6 py-2.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50">
                   Cancel
-                </Button>
-                <Button type="submit" size="sm" disabled={isSubmitting}>
+                </button>
+                <button type="submit" disabled={isSubmitting} className="inline-flex items-center gap-2 rounded-lg bg-[var(--primary)] px-6 py-2.5 text-sm font-medium text-white shadow-md shadow-blue-600/20 hover:bg-[var(--primary-hover)] disabled:opacity-60">
+                  <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
+                    <path d="M5 4h11l3 3v12a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4Z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+                    <path d="M8 4v5h7V4M8 20v-6h8v6" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+                  </svg>
                   {isSubmitting ? 'Saving...' : editingId ? 'Update Lead' : 'Save Lead'}
-                </Button>
+                </button>
               </div>
             </form>
           </div>

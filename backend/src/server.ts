@@ -99,6 +99,7 @@ applyTenantScoping();
 
 // Import middleware
 import { protect } from './middleware/authMiddleware';
+import { moduleGate } from './middleware/moduleGate';
 
 dotenv.config();
 
@@ -164,6 +165,9 @@ app.use((req: Request, res: Response, next: express.NextFunction) => {
 });
 
 // ─── Routes ──────────────────────────────────────────────────────────────────
+
+// Switched-off modules (deals, quotes, tasks, ...) answer 404; see middleware/moduleGate.ts.
+app.use(moduleGate);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/leads', leadRoutes);

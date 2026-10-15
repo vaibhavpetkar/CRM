@@ -8,6 +8,11 @@ import { KpiCard, Panel, PanelLink, PeriodSelect, SelectPill, OwnerChip } from '
 import { DAY_MS as DAY, dayEnds, dailyCounts, dealMeasures, dealTrend, parseDeals, percentChange } from '@/lib/analytics';
 import { formatCurrency, getCurrencySymbol } from '@/lib/utils';
 import { leadsApi, dealsApi, contactsApi, tasksApi, salesApi, getStoredUser } from '@/lib/api';
+import { isModuleEnabled } from '@/lib/modules';
+
+const DEALS_ON = isModuleEnabled('deals');
+const TASKS_ON = isModuleEnabled('tasks');
+const OFF = () => Promise.reject(new Error('module off'));
 import { leadSourceLabel } from '@/lib/lead-options';
 import {
   UsersIcon,
@@ -213,11 +218,11 @@ export default function DashboardPage() {
     const from = new Date(Date.now() - (windowDays * 2 - 1) * DAY);
     const [leadStats, dealStats, contactStats, leadsRes, tasksRes, dealsRes, leadDaily, contactsRes] = await Promise.allSettled([
       leadsApi.getStats(),
-      dealsApi.getStats(),
+      DEALS_ON ? dealsApi.getStats() : OFF(),
       contactsApi.getStats(),
       leadsApi.getLeads({ limit: 5 }),
-      tasksApi.getTasks({ status: 'pending' }),
-      dealsApi.getAllDeals(),
+      TASKS_ON ? tasksApi.getTasks({ status: 'pending' }) : OFF(),
+      DEALS_ON ? dealsApi.getAllDeals() : OFF(),
       salesApi.getLeadSources({ from: isoDay(from), to: isoDay(new Date()) }),
       // Newest contacts, for the activity feed and the contacts trend.
       contactsApi.getContacts({ limit: 200 }),
@@ -384,7 +389,7 @@ export default function DashboardPage() {
 
       {error && <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+      <div className={`grid grid-cols-1 gap-4 sm:grid-cols-2 ${DEALS_ON ? 'lg:grid-cols-3 xl:grid-cols-5' : ''}`}>
         <KpiCard
           label="Total Leads"
           value={stats.totalLeads.toLocaleString()}
@@ -395,16 +400,18 @@ export default function DashboardPage() {
           spark={trends.leads.spark}
           href="/leads"
         />
-        <KpiCard
-          label="Active Deals"
-          value={trends.deals.value.toLocaleString()}
-          icon={<BriefcaseIcon className="h-6 w-6" />}
-          tone="sky"
-          change={trends.deals.change}
-          changeLabel={compareLabel}
-          spark={trends.deals.spark}
-          href="/deals"
-        />
+        {DEALS_ON && (
+          <KpiCard
+            label="Active Deals"
+            value={trends.deals.value.toLocaleString()}
+            icon={<BriefcaseIcon className="h-6 w-6" />}
+            tone="sky"
+            change={trends.deals.change}
+            changeLabel={compareLabel}
+            spark={trends.deals.spark}
+            href="/deals"
+          />
+        )}
         <KpiCard
           label="Contacts"
           value={stats.totalContacts.toLocaleString()}
@@ -415,6 +422,8 @@ export default function DashboardPage() {
           spark={trends.contacts.spark}
           href="/contacts"
         />
+        {DEALS_ON && (
+          <>
         <KpiCard
           label="Pipeline Value"
           value={formatCurrency(stats.pipelineValue)}
@@ -435,14 +444,16 @@ export default function DashboardPage() {
           spark={trends.winRate.spark}
           href="/reports"
         />
+          </>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-12">
         <Panel
-          className="xl:col-span-7"
-          title="Sales Pipeline"
-          subtitle="Track your opportunities across every stage."
-          action={<PanelLink href="/pipeline">View Pipeline</PanelLink>}
+          className={DEALS_ON ? 'xl:col-span-7' : 'xl:col-span-12'}
+          title={DEALS_ON ? 'Sales Pipeline' : 'Lead Pipeline'}
+          subtitle={DEALS_ON ? 'Track your opportunities across every stage.' : 'Your leads across every stage.'}
+          action={DEALS_ON ? <PanelLink href="/pipeline">View Pipeline</PanelLink> : <PanelLink href="/leads">View Leads</PanelLink>}
           bodyClassName="flex items-center"
         >
           <div className="w-full">
@@ -450,6 +461,7 @@ export default function DashboardPage() {
           </div>
         </Panel>
 
+        {DEALS_ON && (
         <Panel
           className="xl:col-span-5"
           title="Pipeline Overview"
@@ -507,6 +519,7 @@ export default function DashboardPage() {
             )}
           </div>
         </Panel>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 xl:grid-cols-[1.2fr_1fr_1fr]">

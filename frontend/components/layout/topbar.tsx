@@ -28,6 +28,7 @@ import { getSocket, disconnectSocket } from '@/lib/socket';
 import { useToast } from '@/components/ui/toast';
 import AIChatWidget from './ai-chat-widget';
 import ThemeToggle from '@/components/ui/theme-toggle';
+import { isPathDisabled } from '@/lib/modules';
 
 const QUICK_CREATE_OPTIONS = [
   { label: 'New Lead', href: '/leads?quickCreate=1', icon: UserPlusIcon },
@@ -253,7 +254,7 @@ export default function Topbar({ onMobileMenuClick }: { onMobileMenuClick?: () =
             setSearchOpen(true);
           }}
           onFocus={() => setSearchOpen(true)}
-          placeholder="Search leads, deals, contacts..."
+          placeholder="Search leads, contacts..."
           className="w-full rounded-full border border-slate-200 bg-slate-50 py-2 pl-9 pr-8 text-sm text-slate-800 placeholder:text-slate-400 transition-all focus:bg-white focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/50"
         />
         {query && (
@@ -317,7 +318,7 @@ export default function Topbar({ onMobileMenuClick }: { onMobileMenuClick?: () =
               <div className="fixed inset-0 z-10" onClick={() => setQuickCreateOpen(false)} />
               <div className="absolute right-0 z-20 mt-2 w-48 rounded-xl border border-slate-200 bg-white py-2 shadow-lg animate-fadeIn">
                 <p className="px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-slate-400">Create new</p>
-                {QUICK_CREATE_OPTIONS.map(({ label, href, icon: Icon }) => (
+                {QUICK_CREATE_OPTIONS.filter((o) => !isPathDisabled(o.href)).map(({ label, href, icon: Icon }) => (
                   <button
                     key={href}
                     onClick={() => handleQuickCreate(href)}

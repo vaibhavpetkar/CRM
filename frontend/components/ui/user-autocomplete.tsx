@@ -14,6 +14,10 @@ export interface UserSuggestion {
 }
 
 interface UserAutocompleteProps {
+  /** Icon shown inside the box on the left (defaults to a search glass). */
+  icon?: React.ReactNode;
+  /** Extra classes for the text box itself. */
+  inputClassName?: string;
   value: string | number | '';
   onChange: (value: string | number | '') => void;
   onSelect?: (user: UserSuggestion) => void;
@@ -28,6 +32,8 @@ export default function UserAutocomplete({
   onSelect,
   placeholder = 'Type user name to search...',
   className,
+  icon,
+  inputClassName,
   disabled = false,
 }: UserAutocompleteProps) {
   const [suggestions, setSuggestions] = useState<UserSuggestion[]>([]);
@@ -193,7 +199,11 @@ export default function UserAutocomplete({
   return (
     <div className={cn('relative', className)}>
       <div className="relative">
-        <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        {icon ? (
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 [&_svg]:h-4 [&_svg]:w-4">{icon}</span>
+        ) : (
+          <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        )}
         <input
           ref={inputRef}
           type="text"
@@ -207,7 +217,8 @@ export default function UserAutocomplete({
           className={cn(
             'w-full rounded-lg border-0 bg-slate-100/50 py-2 pl-9 pr-10 text-sm text-slate-900 placeholder:text-slate-400',
             'focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)] transition-all',
-            disabled && 'opacity-50 cursor-not-allowed'
+            disabled && 'opacity-50 cursor-not-allowed',
+            inputClassName
           )}
           autoComplete="off"
           role="combobox"

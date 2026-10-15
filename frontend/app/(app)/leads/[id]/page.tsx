@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import type { FormEvent } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { leadsApi, contactsApi, usersApi, quotesApi, itemsApi, aiApi, getStoredUser } from '@/lib/api';
+import { isModuleEnabled } from '@/lib/modules';
 import { hasPermission } from '@/lib/permissions';
 import { ANNUAL_TURNOVER_OPTIONS, INDUSTRY_OPTIONS, DESIGNATION_OPTIONS, TERRITORY_OPTIONS, LEAD_SOURCE_OPTIONS, CONFIGURATION_OPTIONS, PROPERTY_TYPE_OPTIONS, leadSourceLabel, budgetRange } from '@/lib/lead-options';
 import Button from '@/components/ui/button';
@@ -72,6 +73,7 @@ export default function LeadDetailsPage() {
   };
 
   useEffect(() => {
+    if (!isModuleEnabled('inventory')) return;
     itemsApi
       .getItems({ limit: 500, isActive: true })
       .then((res) =>
@@ -289,12 +291,16 @@ export default function LeadDetailsPage() {
         <h1 className="text-2xl font-bold text-slate-900 flex-1">
           {lead.firstName} {lead.lastName}
         </h1>
-        <Button type="button" variant="secondary" size="sm" onClick={handleSendQuotation} disabled={saving}>
-          Create Quotation
-        </Button>
-        <Button type="button" variant="secondary" size="sm" onClick={handleConvertToDeal} disabled={saving || lead?.isConverted}>
-          {lead?.isConverted ? 'Converted to Deal' : 'Convert to Deal'}
-        </Button>
+        {isModuleEnabled('quotes') && (
+          <Button type="button" variant="secondary" size="sm" onClick={handleSendQuotation} disabled={saving}>
+            Create Quotation
+          </Button>
+        )}
+        {isModuleEnabled('deals') && (
+          <Button type="button" variant="secondary" size="sm" onClick={handleConvertToDeal} disabled={saving || lead?.isConverted}>
+            {lead?.isConverted ? 'Converted to Deal' : 'Convert to Deal'}
+          </Button>
+        )}
         <Button
           type="button"
           size="sm"

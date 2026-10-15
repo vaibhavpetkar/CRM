@@ -8,6 +8,7 @@ import Button from '@/components/ui/button';
 import Card from '@/components/ui/card';
 import { contactsApi } from '@/lib/api';
 import { ContactRows, LeadRows, DealRows } from '@/components/contacts/related-records';
+import { isModuleEnabled } from '@/lib/modules';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 
 /**
@@ -37,7 +38,7 @@ export default function CompanyPage() {
     <>
       <PageHeader
         title={name || 'Company'}
-        description="All contacts, leads and deals linked to this company."
+        description={`All contacts, leads${isModuleEnabled('deals') ? ' and deals' : ''} linked to this company.`}
         actions={
           <Link href="/contacts">
             <Button type="button" variant="secondary" size="sm">
@@ -52,16 +53,18 @@ export default function CompanyPage() {
       {name && !data && !error && <p className="text-sm text-slate-500">Loading...</p>}
 
       {data && (
-        <div className="grid gap-6 lg:grid-cols-3">
+        <div className={`grid gap-6 ${isModuleEnabled('deals') ? 'lg:grid-cols-3' : 'lg:grid-cols-2'}`}>
           <Card title={`Contacts (${data.contacts.length})`}>
             {data.contacts.length ? <ContactRows contacts={data.contacts} /> : <p className="text-sm text-slate-400">No contacts at this company.</p>}
           </Card>
           <Card title={`Leads (${data.leads.length})`}>
             {data.leads.length ? <LeadRows leads={data.leads} /> : <p className="text-sm text-slate-400">No leads at this company.</p>}
           </Card>
-          <Card title={`Deals (${data.deals.length})`}>
-            {data.deals.length ? <DealRows deals={data.deals} /> : <p className="text-sm text-slate-400">No deals with this company.</p>}
-          </Card>
+          {isModuleEnabled('deals') && (
+            <Card title={`Deals (${data.deals.length})`}>
+              {data.deals.length ? <DealRows deals={data.deals} /> : <p className="text-sm text-slate-400">No deals with this company.</p>}
+            </Card>
+          )}
         </div>
       )}
     </>

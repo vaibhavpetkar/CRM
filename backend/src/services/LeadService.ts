@@ -19,6 +19,7 @@ import { notifyUser } from '../utils/notificationService';
 import { getOrSetCache } from '../utils/cache';
 import { assigneeForNewLead } from './leadRotation';
 import { NotFoundError, ConflictError, ValidationError } from '../errors/AppError';
+import { isModuleEnabled } from '../middleware/moduleGate';
 
 interface ProductInput {
   itemId?: number | null;
@@ -483,7 +484,7 @@ class LeadService {
             { dueDate: after.nextFollowUp as Date, assignedToId: ownerId || existingTask.assignedToId },
             { transaction: t }
           );
-        } else if (after.nextFollowUp && ownerId) {
+        } else if (after.nextFollowUp && ownerId && isModuleEnabled('tasks')) {
           const task = await Task.create(
             {
               title: `Follow up with ${lead.firstName} ${lead.lastName}${lead.company ? ` (${lead.company})` : ''}`,
@@ -588,7 +589,8 @@ class LeadService {
       );
 
       let deal: Deal | null = null;
-      if (createDeal) {
+      // No deal while the Deals module is switched off; the lead still becomes a contact.
+      if (createDeal && isModuleEnabled('deals')) {
         deal = await Deal.create(
           {
             title: dealTitle || `${lead.company || `${lead.firstName} ${lead.lastName}`} Deal`,

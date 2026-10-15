@@ -3,6 +3,7 @@ import { Op } from 'sequelize';
 import Lead from '../models/Lead';
 import Deal from '../models/Deal';
 import Contact from '../models/Contact';
+import { isModuleEnabled } from '../middleware/moduleGate';
 
 const RESULT_LIMIT_PER_TYPE = 5;
 
@@ -32,7 +33,7 @@ export const globalSearch = async (req: Request, res: Response) => {
         limit: RESULT_LIMIT_PER_TYPE,
         order: [['createdAt', 'DESC']],
       }),
-      Deal.findAll({
+      isModuleEnabled('deals') ? Deal.findAll({
         where: {
           [Op.or]: [
             { title: like },
@@ -41,7 +42,7 @@ export const globalSearch = async (req: Request, res: Response) => {
         },
         limit: RESULT_LIMIT_PER_TYPE,
         order: [['createdAt', 'DESC']],
-      }),
+      }) : Promise.resolve([]),
       Contact.findAll({
         where: {
           [Op.or]: [

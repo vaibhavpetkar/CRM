@@ -5,6 +5,7 @@ import PageHeader from '@/components/ui/page-header';
 import Card from '@/components/ui/card';
 import LoadingSpinner from '@/components/ui/loading-spinner';
 import { tasksApi, meetingsApi, leadsApi } from '@/lib/api';
+import { isModuleEnabled } from '@/lib/modules';
 import { ChevronLeftIcon, ChevronRightIcon, CheckCircleIcon, CalendarDaysIcon, ClipboardDocumentListIcon } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
 
@@ -41,8 +42,8 @@ export default function CalendarPage() {
     setError(null);
     try {
       const [tasksRes, meetingsRes, leadsRes] = await Promise.allSettled([
-        tasksApi.getTasks({}),
-        meetingsApi.getMeetings({}),
+        isModuleEnabled('tasks') ? tasksApi.getTasks({}) : Promise.reject(new Error('module off')),
+        isModuleEnabled('meetings') ? meetingsApi.getMeetings({}) : Promise.reject(new Error('module off')),
         leadsApi.getLeads({ limit: 500 }),
       ]);
 
@@ -126,7 +127,7 @@ export default function CalendarPage() {
 
   return (
     <>
-      <PageHeader title="Calendar" description="Tasks, meetings, and lead follow-ups in one place" />
+      <PageHeader title="Calendar" description={isModuleEnabled('tasks') || isModuleEnabled('meetings') ? 'Tasks, meetings, and lead follow-ups in one place' : 'Lead follow-ups in one place'} />
 
       {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
 
