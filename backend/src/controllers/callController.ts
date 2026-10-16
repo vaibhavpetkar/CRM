@@ -45,6 +45,14 @@ export const listCalls = asyncHandler(async (req: AuthRequest, res: Response) =>
   );
 });
 
+export const listLiveCalls = asyncHandler(async (req: AuthRequest, res: Response) => {
+  return res.json(await callService.listLiveCalls(req.user));
+});
+
+export const cancelCall = asyncHandler(async (req: AuthRequest, res: Response) => {
+  return res.json(await callService.cancelCall(req.user, Number(req.params.id)));
+});
+
 export const getCall = asyncHandler(async (req: AuthRequest, res: Response) => {
   return res.json(await callService.getCall(req.user, Number(req.params.id)));
 });

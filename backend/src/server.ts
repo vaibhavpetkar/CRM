@@ -49,6 +49,7 @@ import voiceWebhookRoutes from './routes/voiceWebhookRoutes';
 import portalWebhookRoutes from './routes/portalWebhookRoutes';
 import { startPortalPoller } from './services/portalLeadsService';
 import { startViPuller } from './services/viCpaasService';
+import { startStaleCallSweeper } from './services/callService';
 import expenseRoutes from './routes/expenseRoutes';
 import reportRoutes from './routes/reportRoutes';
 import documentTemplateRoutes from './routes/documentTemplateRoutes';
@@ -345,6 +346,7 @@ const startServer = async () => {
       logger.info(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
       startPortalPoller();
       startViPuller();
+      startStaleCallSweeper();
     });
   } catch (error) {
     logger.error(`❌ Unable to connect to the database: ${error}`);

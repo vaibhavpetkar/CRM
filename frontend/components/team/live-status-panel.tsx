@@ -4,8 +4,9 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Card from '@/components/ui/card';
 import { teamApi, PresenceState, TeamPresence } from '@/lib/api';
+import { ChevronDownIcon, PhoneArrowDownLeftIcon, PhoneArrowUpRightIcon } from '@heroicons/react/24/outline';
 import { getSocket } from '@/lib/socket';
-import { formatDuration } from '@/components/calls/call-format';
+import { CALL_STATUS_CLASS, CALL_STATUS_LABEL, formatDuration } from '@/components/calls/call-format';
 import { cn } from '@/lib/utils';
 
 // Live sales-team status for managers: who is free, on a call (with a running
@@ -45,6 +46,7 @@ export default function LiveStatusPanel() {
   const [now, setNow] = useState(() => Date.now());
   // Server clock minus ours, so timers match the server's call times.
   const [skew, setSkew] = useState(0);
+  const [openAgent, setOpenAgent] = useState<number | null>(null);
   const inFlight = useRef(false);
 
   const load = useCallback(async () => {
@@ -97,7 +99,7 @@ export default function LiveStatusPanel() {
   return (
     <Card
       className="mb-6"
-      title="Live team status"
+      title="Live call monitor"
       action={
         <span className="flex items-center gap-1.5 text-xs text-slate-500">
           <span className="relative flex h-2 w-2">
@@ -108,6 +110,24 @@ export default function LiveStatusPanel() {
         </span>
       }
     >
+      {data && (
+        <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          {[
+            { label: 'On call now', value: data.counts.on_call, cls: 'text-amber-600' },
+            { label: 'Calls today', value: data.today.calls, cls: 'text-slate-900' },
+            { label: 'Outgoing', value: data.today.outgoing, cls: 'text-blue-600' },
+            { label: 'Incoming received', value: data.today.incoming, cls: 'text-violet-600' },
+            { label: 'Connected', value: data.today.connected, cls: 'text-emerald-600' },
+            { label: 'Talk time', value: talkTime(data.today.talkSeconds), cls: 'text-slate-900' },
+          ].map((k) => (
+            <div key={k.label} className="rounded-lg border border-slate-100 bg-slate-50/60 px-3 py-2.5">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">{k.label}</p>
+              <p className={cn('mt-0.5 text-xl font-semibold tabular-nums', k.cls)}>{k.value}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="mb-4 flex flex-wrap gap-2">
         <button
           onClick={() => setFilter('all')}
@@ -172,10 +192,55 @@ export default function LiveStatusPanel() {
                       {a.call.fromNumber && <> · from {a.call.fromNumber}</>}
                     </p>
                   )}
-                  <p className="mt-1 text-xs text-slate-400">
-                    Today: {a.today.calls} call{a.today.calls === 1 ? '' : 's'}, {talkTime(a.today.talkSeconds)} talk
-                    {a.state === 'offline' && a.lastLogin && <> · last login {timeAgo(a.lastLogin)}</>}
-                  </p>
+                  <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
+                    <span title="Outgoing calls today" className="flex items-center gap-1">
+                      <PhoneArrowUpRightIcon className="h-3.5 w-3.5 text-blue-500" />
+                      {a.today.outgoing} out
+                    </span>
+                    <span title="Incoming calls received today" className="flex items-center gap-1">
+                      <PhoneArrowDownLeftIcon className="h-3.5 w-3.5 text-violet-500" />
+                      {a.today.incoming} in
+                    </span>
+                    <span title="Calls that connected today">{a.today.connected} connected</span>
+                    {a.today.missed > 0 && <span title="Not answered or busy">{a.today.missed} missed</span>}
+                    <span title="Talk time today">{talkTime(a.today.talkSeconds)} talk</span>
+                  </div>
+                  {a.state === 'offline' && a.lastLogin && <p className="mt-1 text-xs text-slate-400">Last login {timeAgo(a.lastLogin)}</p>}
+                  {a.recentCalls.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setOpenAgent(openAgent === a.userId ? null : a.userId)}
+                      className="mt-2 flex items-center gap-1 text-xs font-medium text-[var(--primary)] hover:underline"
+                    >
+                      <ChevronDownIcon className={cn('h-3.5 w-3.5 transition-transform', openAgent === a.userId && 'rotate-180')} />
+                      {openAgent === a.userId ? "Hide today's calls" : "Show today's calls"}
+                    </button>
+                  )}
+                  {openAgent === a.userId && (
+                    <ul className="animate-fadeIn mt-2 space-y-1.5 border-t border-slate-100 pt-2">
+                      {a.recentCalls.map((c) => (
+                        <li key={c.id} className="flex items-center gap-2 text-xs">
+                          {c.direction === 'inbound' ? (
+                            <PhoneArrowDownLeftIcon className="h-3.5 w-3.5 shrink-0 text-violet-500" aria-label="Incoming" />
+                          ) : (
+                            <PhoneArrowUpRightIcon className="h-3.5 w-3.5 shrink-0 text-blue-500" aria-label="Outgoing" />
+                          )}
+                          {c.leadId ? (
+                            <Link href={`/leads/${c.leadId}`} className="min-w-0 truncate text-slate-700 hover:text-[var(--primary)] hover:underline">
+                              {c.withName}
+                            </Link>
+                          ) : (
+                            <span className="min-w-0 truncate text-slate-700">{c.withName}</span>
+                          )}
+                          <span className={cn('shrink-0 rounded-full px-1.5 py-px text-[10px] font-medium', CALL_STATUS_CLASS[c.status])}>{CALL_STATUS_LABEL[c.status]}</span>
+                          <span className="ml-auto shrink-0 font-mono tabular-nums text-slate-400">
+                            {c.status === 'completed' ? formatDuration(c.durationSeconds) : ''}{' '}
+                            {new Date(c.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               </li>
             );
