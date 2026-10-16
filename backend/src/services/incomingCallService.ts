@@ -107,10 +107,10 @@ export const readInboundEvent = (body: Record<string, any>): InboundEvent => {
     isFinalReport: !!(update.recordingUrl || update.endedAt),
     providerCallId: update.providerCallId || null,
     customer: asNumber(
-      pick(body, ['caller', 'caller_number', 'callerNumber', 'caller_id_number', 'calling_number', 'customer_number', 'customerNumber', 'CallFrom', 'from', 'From', 'ani', 'source_number', 'msisdn'])
+      pick(body, ['caller', 'caller_number', 'callerNumber', 'caller_id_number', 'calling_number', 'customer_number', 'customerNumber', 'CallFrom', 'from', 'From', 'ani', 'source_number', 'msisdn', 'A PARTY NO'])
     ),
     agent: asNumber(
-      pick(body, ['agent_number', 'agentNumber', 'agent', 'answered_by', 'answeredBy', 'DialWhomNumber', 'connected_to', 'receiver', 'receiver_number', 'destination_number', 'forwarded_to'])
+      pick(body, ['agent_number', 'agentNumber', 'agent', 'answered_by', 'answeredBy', 'DialWhomNumber', 'connected_to', 'receiver', 'receiver_number', 'destination_number', 'forwarded_to', 'B PARTY NO'])
     ),
     did: asNumber(pick(body, ['did', 'DID', 'did_number', 'virtual_number', 'called_number', 'dnis', 'CallTo', 'to', 'To'])),
   };

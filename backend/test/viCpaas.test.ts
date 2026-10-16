@@ -146,3 +146,41 @@ test('click-to-call logs in at clicktocall/AuthToken with username and password 
   await viLoginToken(request, { username: 'u-ctc', password: 'p', authUrl: VI_CTC_AUTH_URL });
   assert.equal(calls.length, 1, 'the token is reused');
 });
+
+// Vaibhav's real click-to-call report row, 16 Oct 2026: his phone (A party) never answered.
+const VI_REPORT_HEADER = ['CALL ID', 'DNI', 'CALL START DATE', 'CALL START TIME', 'CALL END DATE', 'CALL END TIME', 'A PARTY NO', 'AGENT NAME', 'A PARTY CALL START DATE', 'A PARTY CALL START TIME', 'A PARTY CALL END DATE', 'A PARTY CALL END TIME', 'A PARTY DIAL START DATE', 'A PARTY DIAL START TIME', 'A PARTY DIAL END DATE', 'A PARTY DIAL END TIME', 'A PARTY DIAL STATUS', 'A PARTY SWITCH RELEASE REASON', 'TOTAL DURATION(In Seconds)', 'B PARTY NO', 'B PARTY DIAL STATUS', 'GROUP_NAME', 'B PARTY SWITCH RELEASE REASON', 'B PARTY CALL START DATE', 'B PARTY CALL START TIME', 'B PARTY CALL END DATE', 'B PARTY CALL END TIME', 'B PARTY DIAL START DATE', 'B PARTY DIAL START TIME', 'B PARTY DIAL END DATE', 'B PARTY DIAL END TIME', 'B PARTY CALL DURATION(In Seconds)', 'CALLER CIRCLE', 'CALLER OPERATOR', 'Disconnected By', 'RECORD'];
+const VI_REPORT_ROW = '419766130\t8554000444\t16/10/2026\t22:54:55\t16/10/2026\t22:55:22\t8767831156\t8767831156\t\t\t\t\t16/10/2026\t22:54:56\t16/10/2026\t22:55:22\tUser Not Responding\tNormal, unspecified\t\t9922565938\t\tdefault_group\tNot Available\t\t\t\t\t\t\t\t\t\tMUMBAI\tReliance - Mobile\tAgent Disconnected\tNo Voice';
+
+test("Vi's click-to-call report: the sales person never picked up", () => {
+  const [row] = findRecords({ raw: `${VI_REPORT_HEADER.join('\t')}\n${VI_REPORT_ROW}` });
+  const u = mapViCall(row);
+  assert.equal(u.providerCallId, '419766130');
+  assert.equal(u.status, 'no-answer');
+  assert.equal(u.startedAt, null);
+  assert.equal(u.recordingUrl, null);
+  assert.equal(u.endedAt?.toISOString(), '2026-10-16T17:25:22.000Z');
+});
+
+test("Vi's click-to-call report: a connected call", () => {
+  const u = mapViCall({
+    'CALL ID': '1',
+    'CALL END DATE': '16/10/2026',
+    'CALL END TIME': '11:05:00',
+    'A PARTY CALL START DATE': '16/10/2026',
+    'A PARTY CALL START TIME': '11:00:05',
+    'A PARTY DIAL STATUS': 'Answered',
+    'B PARTY CALL START DATE': '16/10/2026',
+    'B PARTY CALL START TIME': '11:00:20',
+    'B PARTY CALL DURATION(In Seconds)': '280',
+    RECORD: 'https://cts.myvi.in/rec/1.wav',
+  });
+  assert.equal(u.status, 'completed');
+  assert.equal(u.durationSeconds, 280);
+  assert.equal(u.startedAt?.toISOString(), '2026-10-16T05:30:20.000Z');
+  assert.equal(u.recordingUrl, 'https://cts.myvi.in/rec/1.wav');
+});
+
+test('Vi report: the customer was busy after the sales person answered', () => {
+  const u = mapViCall({ 'CALL ID': '2', 'A PARTY DIAL STATUS': 'Answered', 'A PARTY CALL START DATE': '16/10/2026', 'A PARTY CALL START TIME': '11:00:05', 'B PARTY DIAL STATUS': 'User Busy' });
+  assert.equal(u.status, 'busy');
+});

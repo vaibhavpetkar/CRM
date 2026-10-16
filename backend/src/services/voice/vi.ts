@@ -78,16 +78,19 @@ export const fillTemplate = (template: string, values: Record<string, string>) =
   return fill(parsed);
 };
 
+// "CALL ID", "call_id" and "callId" are the same field: compare names without case, spaces or punctuation.
+const keyOf = (k: string) => k.toLowerCase().replace(/[^a-z0-9]/g, '');
+
 /** First non-empty value found under any of `keys`, looking inside data/result/call wrappers too. */
 export const pick = (body: any, keys: string[]): any => {
   // Vi CPaaS nests the call id in "message": {"status":1,"message":{"callid":26988056,...}}.
   const layers = [body, body?.message, body?.data, body?.result, body?.call, body?.Call, body?.response, body?.data?.call];
+  const wanted = keys.map(keyOf);
   for (const layer of layers) {
     if (!layer || typeof layer !== 'object') continue;
-    for (const k of keys) {
-      const value = layer[k];
-      if (value !== undefined && value !== null && value !== '') return value;
-    }
+    const byKey = new Map<string, unknown>();
+    for (const [k, v] of Object.entries(layer)) if (!byKey.has(keyOf(k)) && v !== undefined && v !== null && v !== '') byKey.set(keyOf(k), v);
+    for (const k of wanted) if (byKey.has(k)) return byKey.get(k);
   }
   return undefined;
 };
@@ -115,8 +118,48 @@ const toDate = (value: unknown): Date | null => {
   if (!value) return null;
   const s = String(value).trim();
   if (/^\d{10}$/.test(s)) return new Date(Number(s) * 1000);
+  // Vi's reports write Indian time as "16/10/2026 22:54:55".
+  const dmy = s.match(/^(\d{2})\/(\d{2})\/(\d{4})[ T](\d{2}:\d{2}:\d{2})$/);
+  if (dmy) return toDate(`${dmy[3]}-${dmy[2]}-${dmy[1]} ${dmy[4]}`);
   const d = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(s) ? new Date(`${s.replace(' ', 'T')}+05:30`) : new Date(s);
   return Number.isNaN(d.getTime()) ? null : d;
+};
+
+/** A date and a time Vi's reports keep in separate columns ("CALL END DATE" + "CALL END TIME"). */
+const pickDateTime = (body: Record<string, any>, prefix: string): Date | null => {
+  const date = pick(body, [`${prefix} DATE`]);
+  const time = pick(body, [`${prefix} TIME`]);
+  return date && time ? toDate(`${String(date).trim()} ${String(time).trim()}`) : null;
+};
+
+/**
+ * Vi's click-to-call report (Pull API and pingback): the A party is the sales
+ * person, rung first; the B party is the customer, dialled once A picks up.
+ */
+const mapViPartyReport = (body: Record<string, any>): CallUpdate | null => {
+  const aStatus = pick(body, ['A PARTY DIAL STATUS']);
+  const bStatus = pick(body, ['B PARTY DIAL STATUS']);
+  if (aStatus === undefined && bStatus === undefined && pick(body, ['A PARTY NO']) === undefined) return null;
+  const aAnswered = !!pickDateTime(body, 'A PARTY CALL START');
+  const bStarted = pickDateTime(body, 'B PARTY CALL START');
+  const talk = toSeconds(pick(body, ['B PARTY CALL DURATION(In Seconds)', 'B PARTY CALL DURATION']));
+  const endedAt = pickDateTime(body, 'CALL END') || pickDateTime(body, 'B PARTY CALL END') || pickDateTime(body, 'A PARTY DIAL END');
+  let status: CallStatus | undefined;
+  if (bStarted || (talk ?? 0) > 0) status = endedAt ? 'completed' : 'in-progress';
+  else if (endedAt || aStatus || bStatus) {
+    // Nobody talked: the leg that failed says why (busy, or no answer).
+    const failed = String((aAnswered ? bStatus : aStatus) ?? '');
+    status = /busy|reject|declin/i.test(failed) ? 'busy' : /fail|invalid|error/i.test(failed) ? 'failed' : 'no-answer';
+  }
+  const recording = pick(body, ['RECORD', 'recording_url', 'recordingUrl']);
+  return {
+    providerCallId: pick(body, ['CALL ID']) !== undefined ? String(pick(body, ['CALL ID'])) : null,
+    status,
+    durationSeconds: talk,
+    startedAt: bStarted,
+    endedAt,
+    recordingUrl: typeof recording === 'string' && /^https?:\/\//i.test(recording) ? recording : null,
+  };
 };
 
 const toSeconds = (value: unknown): number | null => {
@@ -130,6 +173,8 @@ const toSeconds = (value: unknown): number | null => {
 
 /** Maps a Vi response or webhook body onto our fields, whatever it calls them. */
 export const mapViCall = (body: Record<string, any>): CallUpdate => {
+  const report = mapViPartyReport(body);
+  if (report) return report;
   const id = pick(body, ['callid', 'call_id', 'callId', 'CallId', 'CallID', 'CallSid', 'call_sid', 'sid', 'uuid', 'call_uuid', 'id']);
   const recording = pick(body, ['recording_url', 'recordingUrl', 'RecordingUrl', 'recording', 'record_url', 'recording_file']);
   const endedAt = toDate(pick(body, ['end_time', 'endTime', 'EndTime', 'ended_at', 'hangup_time']));
