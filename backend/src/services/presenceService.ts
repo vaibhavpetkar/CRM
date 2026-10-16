@@ -1,10 +1,12 @@
-import { fn, col, Op } from 'sequelize';
+import { Op } from 'sequelize';
 import Call, { TERMINAL_CALL_STATUSES } from '../models/Call';
 import Lead from '../models/Lead';
 import Contact from '../models/Contact';
 import User from '../models/User';
 import Role from '../models/Role';
 import { formatIndianNumber } from '../utils/indianPhone';
+import { localDay, startOfLocalDay } from '../utils/reportTime';
+import { endStaleCalls } from './callService';
 
 // Live sales-team status for managers (Team page). Nothing is stored for it:
 // each agent's state is worked out from two things we already have, whether
@@ -44,17 +46,19 @@ export const derivePresence = (input: PresenceInput): { state: PresenceState; si
 
 const STATE_ORDER: Record<PresenceState, number> = { on_call: 0, after_call: 1, available: 2, offline: 3 };
 
-const startOfToday = () => {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
-};
+// "Today" in India time, like the reports.
+const startOfToday = () => startOfLocalDay(localDay(new Date()));
+
+type DayTotals = { calls: number; outgoing: number; incoming: number; connected: number; missed: number; talkSeconds: number };
+const emptyTotals = (): DayTotals => ({ calls: 0, outgoing: 0, incoming: 0, connected: 0, missed: 0, talkSeconds: 0 });
 
 /**
  * Every active team member of the current company with their live state.
  * Runs inside the request's tenant context, so every query is company-scoped.
  */
 export const getTeamPresence = async (onlineUserIds: Set<number>) => {
+  // Calls the provider never reported on would otherwise show "On call" for hours.
+  await endStaleCalls().catch(() => 0);
   const now = new Date();
   const acw = afterCallSeconds();
 
@@ -75,14 +79,10 @@ export const getTeamPresence = async (onlineUserIds: Set<number>) => {
     }),
     Call.findAll({
       where: { createdAt: { [Op.gte]: startOfToday() } } as any,
-      attributes: [
-        'userId',
-        [fn('COUNT', col('id')), 'calls'],
-        [fn('SUM', col('durationSeconds')), 'talkSeconds'],
-      ],
-      group: ['userId'],
-      raw: true,
-    }) as unknown as Promise<{ userId: number; calls: string; talkSeconds: string | null }[]>,
+      attributes: ['id', 'userId', 'direction', 'status', 'durationSeconds', 'leadId', 'contactId', 'customerNumber', 'createdAt'],
+      order: [['createdAt', 'DESC']],
+      limit: 5000,
+    }),
   ]);
 
   // Newest first, so the first one seen per agent is the one that counts.
@@ -90,12 +90,28 @@ export const getTeamPresence = async (onlineUserIds: Set<number>) => {
   for (const call of liveCalls) if (!liveByUser.has(call.userId)) liveByUser.set(call.userId, call);
   const endedByUser = new Map<number, Date>();
   for (const call of recentCalls) if (call.endedAt && !endedByUser.has(call.userId)) endedByUser.set(call.userId, new Date(call.endedAt));
-  const totals = new Map(todayTotals.map((t) => [Number(t.userId), { calls: Number(t.calls) || 0, talkSeconds: Number(t.talkSeconds) || 0 }]));
+  // Today's numbers per agent, and their latest calls for the drill-down.
+  const totals = new Map<number, DayTotals>();
+  const recentByUser = new Map<number, Call[]>();
+  for (const c of todayTotals) {
+    const t = totals.get(c.userId) || emptyTotals();
+    t.calls++;
+    if (c.direction === 'inbound') t.incoming++;
+    else t.outgoing++;
+    if (c.status === 'completed') t.connected++;
+    if (c.status === 'no-answer' || c.status === 'busy') t.missed++;
+    t.talkSeconds += Number(c.durationSeconds) || 0;
+    totals.set(c.userId, t);
+    const list = recentByUser.get(c.userId) || [];
+    if (list.length < 15) list.push(c);
+    recentByUser.set(c.userId, list);
+  }
 
   // Who each live call is with, for "On call with Priya Jadhav".
   const live = [...liveByUser.values()];
-  const leadIds = live.map((c) => c.leadId).filter((id): id is number => !!id);
-  const contactIds = live.map((c) => c.contactId).filter((id): id is number => !!id);
+  const named = [...live, ...[...recentByUser.values()].flat()];
+  const leadIds = [...new Set(named.map((c) => c.leadId).filter((id): id is number => !!id))];
+  const contactIds = [...new Set(named.map((c) => c.contactId).filter((id): id is number => !!id))];
   const [leads, contacts] = await Promise.all([
     leadIds.length ? Lead.findAll({ where: { id: leadIds }, attributes: ['id', 'firstName', 'lastName'] }) : [],
     contactIds.length ? Contact.findAll({ where: { id: contactIds }, attributes: ['id', 'firstName', 'lastName'] }) : [],
@@ -134,7 +150,16 @@ export const getTeamPresence = async (onlineUserIds: Set<number>) => {
             withName: (call.leadId ? leadNames.get(call.leadId) : call.contactId ? contactNames.get(call.contactId) : null) || formatIndianNumber(call.customerNumber),
           }
         : null,
-      today: totals.get(user.id) || { calls: 0, talkSeconds: 0 },
+      today: totals.get(user.id) || emptyTotals(),
+      recentCalls: (recentByUser.get(user.id) || []).map((c) => ({
+        id: c.id,
+        direction: c.direction || 'outbound',
+        status: c.status,
+        durationSeconds: c.durationSeconds ?? null,
+        leadId: c.leadId || null,
+        withName: (c.leadId ? leadNames.get(c.leadId) : c.contactId ? contactNames.get(c.contactId) : null) || formatIndianNumber(c.customerNumber),
+        at: c.createdAt,
+      })),
     };
   });
 
@@ -143,5 +168,15 @@ export const getTeamPresence = async (onlineUserIds: Set<number>) => {
   const counts = { on_call: 0, after_call: 0, available: 0, offline: 0 } as Record<PresenceState, number>;
   for (const a of agents) counts[a.state] += 1;
 
-  return { serverTime: now, afterCallSeconds: acw, counts, agents };
+  const team = emptyTotals();
+  for (const t of totals.values()) {
+    team.calls += t.calls;
+    team.outgoing += t.outgoing;
+    team.incoming += t.incoming;
+    team.connected += t.connected;
+    team.missed += t.missed;
+    team.talkSeconds += t.talkSeconds;
+  }
+
+  return { serverTime: now, afterCallSeconds: acw, counts, today: team, agents };
 };

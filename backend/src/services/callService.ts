@@ -8,7 +8,7 @@ import Contact from '../models/Contact';
 import User from '../models/User';
 import { UPLOAD_DIR } from '../config/upload';
 import { AppError, ForbiddenError, NotFoundError, ValidationError } from '../errors/AppError';
-import { runWithTenant } from '../tenancy/context';
+import { runUnscoped, runWithTenant } from '../tenancy/context';
 import { logActivity } from './activityLogger';
 import { getVoiceProvider, providerKey, CallUpdate, VoiceProvider, VoiceProviderError } from './voice';
 import { formatIndianNumber, normalizeIndianNumber } from '../utils/indianPhone';
@@ -25,6 +25,17 @@ const POLL_EVERY_MS = 2000;
 const RECORDING_RETRY_MS = 10000;
 
 const isTerminal = (status: string) => (TERMINAL_CALL_STATUSES as string[]).includes(status);
+
+// A call the provider never reports on would stay "Starting" forever and keep
+// the agent "On call". Calls still ringing after CALL_RING_TIMEOUT_SECONDS, or
+// connected for longer than CALL_MAX_MINUTES, are ended automatically. A later
+// report from the provider (webhook or Pull API) still overrides that.
+const RING_TIMEOUT_MS = () => Math.max(30, Number(process.env.CALL_RING_TIMEOUT_SECONDS) || 180) * 1000;
+const MAX_CALL_MS = () => Math.max(5, Number(process.env.CALL_MAX_MINUTES) || 120) * 60000;
+const AUTO_ENDED = 'Auto-ended';
+const CANCELLED_BY = 'Cancelled by';
+/** Ended by the CRM rather than by the provider, so a real report may still replace the outcome. */
+const endedByCrm = (call: Call) => isTerminal(call.status) && !!call.error && (call.error.startsWith(AUTO_ENDED) || call.error.startsWith(CANCELLED_BY));
 
 /** Same rules as authorize(): super admins and '*' roles can do anything. */
 export const userCan = (user: any, permission: string) => {
@@ -298,7 +309,10 @@ export const applyUpdate = async (call: Call, update: CallUpdate, provider: Voic
   if (update.recordingUrl && !call.recordingUrl) changes.recordingUrl = update.recordingUrl;
   if (Object.keys(changes).length) await call.update(changes);
 
-  if (update.status && update.status !== call.status && !isTerminal(call.status)) {
+  if (update.status && isTerminal(update.status) && update.status !== call.status && endedByCrm(call)) {
+    // The provider reported on a call we had ended ourselves: its outcome wins.
+    await call.update({ status: update.status, error: null, endedAt: update.endedAt || call.endedAt });
+  } else if (update.status && update.status !== call.status && !isTerminal(call.status)) {
     if (isTerminal(update.status)) {
       // The webhook and a poll can land together: only the one that flips the
       // status logs the call on the timeline.
@@ -318,6 +332,7 @@ export const applyUpdate = async (call: Call, update: CallUpdate, provider: Voic
 
 /** Asks the provider for news when the call is still going or its recording is missing. */
 const refresh = async (call: Call) => {
+  await endIfStale(call);
   if (!call.providerCallId) return;
   const needsStatus = !isTerminal(call.status);
   const needsRecording = isTerminal(call.status) && call.status === 'completed' && !call.recordingFile;
@@ -337,6 +352,128 @@ const refresh = async (call: Call) => {
   } catch (err) {
     logger.warn(`[voice] Status check for call #${call.id} failed: ${(err as Error).message}`);
   }
+};
+
+// ─── Stuck calls, cancelling, the live queue ───────────────────────────────
+
+/** Ends a call the CRM gave up on, once, and logs it on the lead's timeline. Runs in the call's company context. */
+const endByCrm = async (call: Call, status: CallStatus, reason: string) => {
+  const [won] = await Call.update(
+    { status, endedAt: new Date(), error: reason.slice(0, 500) },
+    { where: { id: call.id, status: { [Op.notIn]: TERMINAL_CALL_STATUSES } } }
+  );
+  await call.reload();
+  if (won) await logCallActivity(call).catch((err) => logger.warn(`[voice] Activity log failed: ${err}`));
+  return !!won;
+};
+
+const staleOutcome = (call: Call): { status: CallStatus; reason: string } | null => {
+  if (isTerminal(call.status)) return null;
+  const now = Date.now();
+  if (call.status === 'in-progress') {
+    const since = new Date(call.startedAt || call.createdAt).getTime();
+    if (now - since < MAX_CALL_MS()) return null;
+    return { status: 'completed', reason: `${AUTO_ENDED}: the calling provider never reported the end of this call.` };
+  }
+  // Counted from when the call was placed: status polls touch updatedAt.
+  if (now - new Date(call.createdAt).getTime() < RING_TIMEOUT_MS()) return null;
+  const mins = Math.round(RING_TIMEOUT_MS() / 60000);
+  return {
+    status: 'no-answer',
+    reason: `${AUTO_ENDED}: no answer was reported by the calling provider within ${mins} minute${mins === 1 ? '' : 's'}.`,
+  };
+};
+
+const endIfStale = async (call: Call) => {
+  const outcome = staleOutcome(call);
+  if (outcome) await endByCrm(call, outcome.status, outcome.reason);
+};
+
+/** Ends every stuck call in every company. Runs on a timer. */
+export const endStaleCalls = async () => {
+  const oldest = new Date(Date.now() - Math.min(RING_TIMEOUT_MS(), MAX_CALL_MS()));
+  const calls = await runUnscoped(() =>
+    Call.findAll({ where: { status: { [Op.notIn]: TERMINAL_CALL_STATUSES }, createdAt: { [Op.lt]: oldest } } as any })
+  );
+  let ended = 0;
+  for (const call of calls) {
+    const companyId = call.get('companyId') as number | null;
+    const run = async () => {
+      const outcome = staleOutcome(call);
+      if (outcome && (await endByCrm(call, outcome.status, outcome.reason))) ended++;
+    };
+    await (companyId ? runWithTenant(companyId, run) : run()).catch((err) => logger.warn(`[voice] Could not end stuck call #${call.id}: ${err}`));
+  }
+  if (ended) logger.info(`[voice] Ended ${ended} stuck call(s) the provider never reported on.`);
+  return ended;
+};
+
+let staleTimer: NodeJS.Timeout | null = null;
+export const startStaleCallSweeper = () => {
+  if (staleTimer) return;
+  staleTimer = setInterval(() => endStaleCalls().catch((err) => logger.warn(`[voice] Stuck-call sweep failed: ${err}`)), 60000);
+  staleTimer.unref?.();
+};
+
+const userName = async (id: number) => {
+  const u = await User.findByPk(id, { attributes: ['id', 'firstName', 'lastName'] });
+  return u ? `${u.firstName || ''} ${u.lastName || ''}`.trim() : '';
+};
+
+/**
+ * Stops tracking a call that is stuck or no longer wanted: the caller or a
+ * manager marks it cancelled. The provider has no hang-up API, so a phone that
+ * is really ringing stops when the person hangs up.
+ */
+export const cancelCall = async (user: any, id: number) => {
+  const call = await loadCall(user, id, 'read');
+  if (call.userId !== user.id && !userCan(user, 'users:read')) throw new ForbiddenError('Only the person who placed the call or a manager can cancel it.');
+  if (!isTerminal(call.status)) {
+    const who = call.userId === user.id ? 'the caller' : (await userName(user.id)) || 'a manager';
+    await endByCrm(call, 'canceled', `${CANCELLED_BY} ${who}.`);
+  }
+  return serialize(call);
+};
+
+/** Calls ringing or connected right now: the user's own, or the whole team's for managers. */
+export const listLiveCalls = async (user: any) => {
+  const team = userCan(user, 'users:read');
+  const calls = await Call.findAll({
+    where: { status: { [Op.notIn]: TERMINAL_CALL_STATUSES }, ...(team ? {} : { userId: user.id }) },
+    order: [['createdAt', 'ASC']],
+    limit: 200,
+  });
+  for (const call of calls) await endIfStale(call);
+  const live = calls.filter((c) => !isTerminal(c.status));
+
+  const userIds = [...new Set(live.map((c) => c.userId))];
+  const leadIds = [...new Set(live.map((c) => c.leadId).filter((x): x is number => !!x))];
+  const [users, leads] = await Promise.all([
+    userIds.length ? User.findAll({ where: { id: userIds }, attributes: ['id', 'firstName', 'lastName'] }) : [],
+    leadIds.length ? Lead.findAll({ where: { id: leadIds }, attributes: ['id', 'firstName', 'lastName'] }) : [],
+  ]);
+  const agents = new Map(users.map((u) => [u.id, `${u.firstName || ''} ${u.lastName || ''}`.trim()]));
+  const leadNames = new Map(leads.map((l) => [l.id, `${l.firstName || ''} ${l.lastName || ''}`.trim()]));
+  const counts = { total: live.length, waiting: 0, ringing: 0, connected: 0, incoming: 0, outgoing: 0 };
+  for (const c of live) {
+    if (c.status === 'queued') counts.waiting++;
+    else if (c.status === 'ringing') counts.ringing++;
+    else counts.connected++;
+    if (c.direction === 'inbound') counts.incoming++;
+    else counts.outgoing++;
+  }
+  return {
+    team,
+    counts,
+    ringTimeoutSeconds: Math.round(RING_TIMEOUT_MS() / 1000),
+    calls: live.map((c) =>
+      serialize(c, {
+        calledBy: agents.get(c.userId) || null,
+        leadName: c.leadId ? leadNames.get(c.leadId) || null : null,
+        canCancel: c.userId === user.id || team,
+      })
+    ),
+  };
 };
 
 /** Webhook from the provider. The token in the URL identifies the call (no login). */

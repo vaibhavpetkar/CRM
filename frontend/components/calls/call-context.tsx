@@ -134,6 +134,15 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     setNeedsMyNumber(false);
   }, [call?.isActive]);
 
+  const cancel = useCallback(async () => {
+    const current = callRef.current;
+    if (!current) return;
+    const next = await callsApi.cancel(current.id);
+    endedAt.current = Date.now();
+    setCall((prev) => (prev && prev.id === next.id ? { ...next, notes: prev.notes } : prev));
+    setFinishedCount((n) => n + 1);
+  }, []);
+
   const setNotes = useCallback((notes: string) => setCall((prev) => (prev ? { ...prev, notes } : prev)), []);
 
   return (
@@ -153,6 +162,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
           onNotesSaved={() => setFinishedCount((n) => n + 1)}
           onRetry={() => place(target)}
           onClose={close}
+          onCancel={cancel}
         />
       )}
     </CallContext.Provider>

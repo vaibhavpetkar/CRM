@@ -11,6 +11,7 @@ import DateRangePicker, { DateRange, presetRange } from '@/components/sales/date
 import { AgentStatusDot, AgentStatusBadge } from '@/components/sales/agent-status';
 import RecordingPlayer from '@/components/calls/recording-player';
 import LogCallModal from '@/components/calls/log-call-modal';
+import LiveCallQueue from '@/components/calls/live-call-queue';
 import { CALL_STATUS_CLASS, CALL_STATUS_LABEL, formatDuration } from '@/components/calls/call-format';
 import { CallLogRow, PresenceState, salesApi, SalesAgentActivity } from '@/lib/api';
 import { getSocket } from '@/lib/socket';
@@ -120,6 +121,8 @@ export default function CallTrackingPage() {
           </>
         }
       />
+
+      <LiveCallQueue className="mb-4" />
 
       <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs">
         <DateRangePicker value={range} onChange={setRange} />

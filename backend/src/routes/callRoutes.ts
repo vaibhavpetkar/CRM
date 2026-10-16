@@ -19,7 +19,9 @@ router.get('/', protect, callController.listCalls);
 router.post('/', protect, callController.startCall);
 // A call made outside the calling provider (e.g. from a personal mobile).
 router.post('/manual', protect, callController.logManualCall);
+router.get('/live', protect, callController.listLiveCalls);
 router.get('/:id', protect, callController.getCall);
+router.post('/:id/cancel', protect, callController.cancelCall);
 router.patch('/:id', protect, callController.updateCallNotes);
 router.get('/:id/recording', protect, callController.getCallRecording);
 

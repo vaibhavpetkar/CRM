@@ -216,13 +216,32 @@ export interface TeamPresenceAgent {
   online: boolean;
   lastLogin: string | null;
   call: { id: number; status: CallStatus; leadId: number | null; contactId: number | null; withName: string; fromNumber: string | null } | null;
-  today: { calls: number; talkSeconds: number };
+  today: TeamDayTotals;
+  recentCalls: {
+    id: number;
+    direction: 'outbound' | 'inbound';
+    status: CallStatus;
+    durationSeconds: number | null;
+    leadId: number | null;
+    withName: string;
+    at: string;
+  }[];
+}
+
+export interface TeamDayTotals {
+  calls: number;
+  outgoing: number;
+  incoming: number;
+  connected: number;
+  missed: number;
+  talkSeconds: number;
 }
 
 export interface TeamPresence {
   serverTime: string;
   afterCallSeconds: number;
   counts: Record<PresenceState, number>;
+  today: TeamDayTotals;
   agents: TeamPresenceAgent[];
 }
 
@@ -1133,6 +1152,16 @@ export interface CallRow {
   error: string | null;
   createdAt: string;
   calledBy?: string | null;
+  direction?: 'outbound' | 'inbound';
+  leadName?: string | null;
+  canCancel?: boolean;
+}
+
+export interface LiveCalls {
+  team: boolean;
+  counts: { total: number; waiting: number; ringing: number; connected: number; incoming: number; outgoing: number };
+  ringTimeoutSeconds: number;
+  calls: CallRow[];
 }
 
 export interface CallConfig {
@@ -1163,6 +1192,10 @@ export const callsApi = {
   start: async (payload: { leadId?: number; contactId?: number; number: string }) =>
     request<CallRow>('/calls', { method: 'POST', body: JSON.stringify(payload) }),
   get: async (id: number) => request<CallRow>(`/calls/${id}`),
+  /** Calls ringing or connected now: your own, or the team's for managers. */
+  live: async () => request<LiveCalls>('/calls/live'),
+  /** Stops tracking a stuck or unwanted call (marks it cancelled). */
+  cancel: async (id: number) => request<CallRow>(`/calls/${id}/cancel`, { method: 'POST' }),
   /** Logs a call made outside the calling provider, e.g. from a personal mobile. */
   logManual: async (payload: {
     leadId?: number;

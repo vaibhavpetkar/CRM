@@ -5,12 +5,15 @@ import { callsApi, type CallRow } from '@/lib/api';
 import RecordingPlayer from './recording-player';
 import { CALL_STATUS_CLASS, CALL_STATUS_LABEL, formatDuration } from './call-format';
 import { useCalls } from './call-context';
+import { useToast } from '@/components/ui/toast';
 
 /** Every call made to a lead or contact, newest first, with notes and recordings. */
 export default function CallHistory({ leadId, contactId, compact = false }: { leadId?: number | string; contactId?: number | string; compact?: boolean }) {
   const { finishedCount } = useCalls();
   const [calls, setCalls] = useState<CallRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState<number | null>(null);
+  const toast = useToast();
 
   const load = useCallback(() => {
     callsApi
@@ -25,6 +28,18 @@ export default function CallHistory({ leadId, contactId, compact = false }: { le
   useEffect(() => {
     load();
   }, [load, finishedCount]);
+
+  const cancel = async (id: number) => {
+    setCancelling(id);
+    try {
+      await callsApi.cancel(id);
+      load();
+    } catch (err) {
+      toast.error((err as Error).message || 'Could not cancel the call.');
+    } finally {
+      setCancelling(null);
+    }
+  };
 
   if (error) return <p className="py-4 text-center text-xs text-red-500">{error}</p>;
   if (!calls) return <p className="py-4 text-center text-xs text-slate-400">Loading...</p>;
@@ -41,6 +56,16 @@ export default function CallHistory({ leadId, contactId, compact = false }: { le
             <span className="text-xs text-slate-600">{c.customerNumber}</span>
             {c.callerId && <span className="text-[11px] text-slate-400">from {c.callerId}</span>}
             {c.status === 'completed' && <span className="font-mono text-xs text-slate-500">{formatDuration(c.durationSeconds)}</span>}
+            {c.isActive && (
+              <button
+                type="button"
+                onClick={() => cancel(c.id)}
+                disabled={cancelling === c.id}
+                className="rounded-md border border-red-200 px-2 py-0.5 text-[11px] font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+              >
+                {cancelling === c.id ? 'Cancelling...' : 'Cancel'}
+              </button>
+            )}
             <span className="ml-auto text-xs text-slate-400">
               {new Date(c.createdAt).toLocaleString()}
               {c.calledBy ? ` · ${c.calledBy}` : ''}

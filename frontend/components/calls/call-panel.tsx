@@ -20,6 +20,8 @@ interface Props {
   onNotesSaved: () => void;
   onRetry: () => void;
   onClose: () => void;
+  /** Marks a stuck or unwanted call as cancelled, so the panel can close and a new call can start. */
+  onCancel: () => Promise<void>;
 }
 
 const NOTES_SAVE_DELAY_MS = 800;
@@ -29,13 +31,15 @@ const NOTES_SAVE_DELAY_MS = 800;
  * CRM, shows the call's progress and a timer, saves notes as they're typed,
  * and plays the recording once the call ends.
  */
-export default function CallPanel({ target, call, config, placing, error, needsMyNumber, onSaveMyNumber, onNotesChange, onNotesSaved, onRetry, onClose }: Props) {
+export default function CallPanel({ target, call, config, placing, error, needsMyNumber, onSaveMyNumber, onNotesChange, onNotesSaved, onRetry, onClose, onCancel }: Props) {
   const [minimized, setMinimized] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [myNumber, setMyNumber] = useState('');
   const [myNumberError, setMyNumberError] = useState<string | null>(null);
   const [savingMyNumber, setSavingMyNumber] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
   // The provider remounts this panel for each new call (key = call id), so
   // this starts from that call's saved notes.
   const savedNotes = useRef<string>(call?.notes || '');
@@ -129,7 +133,7 @@ export default function CallPanel({ target, call, config, placing, error, needsM
           type="button"
           onClick={handleClose}
           disabled={active || placing}
-          title={active ? 'Hang up on your phone to end the call' : 'Close'}
+          title={active ? 'Hang up on your phone, or use Cancel call below' : 'Close'}
           className="text-slate-400 hover:text-slate-600 disabled:opacity-30"
           aria-label="Close"
         >
@@ -154,6 +158,33 @@ export default function CallPanel({ target, call, config, placing, error, needsM
           )}
 
           {call?.error && !error && <p className="rounded-lg bg-red-50 p-2 text-xs text-red-600">{call.error}</p>}
+
+          {active && (
+            <div className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 p-2">
+              <p className="text-[11px] text-slate-500">
+                {status === 'in-progress' ? 'Hang up on your phone to end the call.' : 'Phone not ringing, or the customer hung up?'}
+              </p>
+              <button
+                type="button"
+                disabled={cancelling}
+                onClick={async () => {
+                  setCancelling(true);
+                  setCancelError(null);
+                  try {
+                    await onCancel();
+                  } catch (err) {
+                    setCancelError(err instanceof Error ? err.message : 'Could not cancel the call.');
+                  } finally {
+                    setCancelling(false);
+                  }
+                }}
+                className="shrink-0 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+              >
+                {cancelling ? 'Cancelling...' : 'Cancel call'}
+              </button>
+            </div>
+          )}
+          {cancelError && <p className="text-xs text-red-500">{cancelError}</p>}
 
           {needsMyNumber && (
             <div className="space-y-2">
