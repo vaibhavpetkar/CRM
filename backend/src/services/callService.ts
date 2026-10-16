@@ -179,7 +179,7 @@ export const startCall = async (user: any, input: Target & { number?: string }) 
       callerId,
       statusCallbackUrl: `${callbackBaseUrl()}/api/webhooks/voice/${callbackToken}`,
       record: true,
-      reference: `crm${call.id}`,
+      reference: String(call.id),
     });
     await call.update({
       providerCallId: placed.providerCallId,

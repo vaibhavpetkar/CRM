@@ -1398,7 +1398,7 @@ export interface IntegrationActivity {
   items: IntegrationActivityRow[];
 }
 
-export type ViAuthType = 'bearer' | 'basic' | 'header' | 'none';
+export type ViAuthType = 'token' | 'bearer' | 'basic' | 'header' | 'none';
 
 /** What the admin types on Settings > Integrations > Vi CPaaS. Secrets are write-only. */
 export interface ViCpaasForm {

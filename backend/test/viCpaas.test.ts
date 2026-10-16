@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import crypto from 'crypto';
 import { aesDecrypt, aesEncrypt, openSecret, parseAesBytes, sealSecret } from '../src/utils/aesCbc';
 import { buildStoredConfig, decryptViPayload, envSettings, fromRow } from '../src/services/voice/viSettings';
-import { buildViBody, outsideCallingHours } from '../src/services/voice/vi';
+import { buildViBody, mapViCall, outsideCallingHours } from '../src/services/voice/vi';
 import { findRecords, viDate, viDni } from '../src/services/viCpaasService';
 import { isInboundReport, viPushAllowed } from '../src/services/incomingCallService';
 
@@ -118,4 +118,31 @@ test('the old VI_* env vars still work', () => {
   assert.equal(s.authHeader, 'x-api-key');
   assert.equal(s.authScheme, '');
   for (const k of ['VI_API_URL', 'VI_API_KEY', 'VI_AUTH_SCHEME', 'VI_AUTH_HEADER']) delete process.env[k];
+});
+
+test("the default CTC body is Vi's initiate-call and its answer gives the call id", () => {
+  const body: any = buildViBody({ ...envSettings(), requestTemplate: '', encryptRequests: false }, {
+    callerId: '8554000444', agent: '9876543210', customer: '9123456789', reference: '42',
+  });
+  assert.deepEqual(body, { cli: '8554000444', apartyno: '9876543210', bpartyno: '9123456789', reference_id: '42', channelflag: 0, dtmfflag: 0, recordingflag: 0 });
+  const answer = { status: 1, message: { RespId: 200, Response: 'success', ReqId: 101, callid: 26988056 }, requestid: '101' };
+  assert.equal(mapViCall(answer).providerCallId, '26988056');
+  assert.equal(mapViCall(answer).status, undefined);
+});
+
+test('click-to-call logs in at clicktocall/AuthToken with username and password only', async () => {
+  const { viCtcAuthUrl, viLoginToken, VI_CTC_AUTH_URL } = await import('../src/services/voice/viToken');
+  assert.equal(viCtcAuthUrl('https://cts.myvi.in:8443/Cpaas/api/v1/clicktocall/initiate-call'), VI_CTC_AUTH_URL);
+  assert.equal(viCtcAuthUrl('https://vi.example/x/clicktocall/initiate-call'), 'https://vi.example/x/clicktocall/AuthToken');
+  assert.equal(viCtcAuthUrl(''), VI_CTC_AUTH_URL);
+  const calls: any[] = [];
+  const request = async (url: string, init: RequestInit) => {
+    calls.push({ url, body: JSON.parse(String(init.body)) });
+    return { idToken: 'tok-1', expiresIn: 86400 };
+  };
+  const token = await viLoginToken(request, { username: 'u-ctc', password: 'p', authUrl: VI_CTC_AUTH_URL });
+  assert.equal(token, 'tok-1');
+  assert.deepEqual(calls, [{ url: VI_CTC_AUTH_URL, body: { username: 'u-ctc', password: 'p' } }]);
+  await viLoginToken(request, { username: 'u-ctc', password: 'p', authUrl: VI_CTC_AUTH_URL });
+  assert.equal(calls.length, 1, 'the token is reused');
 });

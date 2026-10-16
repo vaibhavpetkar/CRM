@@ -14,23 +14,23 @@ type Section = { title: string; help: string; fields: Field[]; auth?: 'authType'
 const SECTIONS: Section[] = [
   {
     title: 'CTC configuration',
-    help: 'From the CTC (click-to-call) part of your Vi API document. In Vi, set the callback / status URL to the Call events URL above.',
+    help: "Vi's initiate-call API is built in: only the Vi number is needed here. In Vi, set Click To Call Pingback to the Call events URL above.",
     fields: [
-      { key: 'ctcUrl', label: 'CTC API URL', placeholder: 'https://...' },
-      { key: 'callerId', label: 'Vi number customers see (DID)', placeholder: '98765 43210', help: 'Or add several under Calling numbers.' },
+      { key: 'ctcUrl', label: 'CTC API URL (leave empty)', placeholder: 'https://cts.myvi.in:8443/Cpaas/api/v1/clicktocall/initiate-call' },
+      { key: 'callerId', label: 'Vi number customers see (CLI)', placeholder: '85540 00444', help: 'The Callee number on the Vi CTC Configuration page.' },
       {
         key: 'requestTemplate',
-        label: 'Request body (JSON, optional)',
+        label: 'Request body (JSON, leave empty)',
         multiline: true,
-        placeholder: '{"agent_number":"{{agent}}","customer_number":"{{customer}}","caller_id":"{{callerId}}","callback_url":"{{callbackUrl}}"}',
-        help: 'Use the field names from the Vi document. Placeholders: {{agent}}, {{customer}}, {{callerId}}, {{callbackUrl}}, {{reference}}, {{username}}, {{password}}, {{accountId}}, {{record}}.',
+        placeholder: '{"cli":"{{callerId}}","apartyno":"{{agent}}","bpartyno":"{{customer}}","reference_id":"{{reference}}","channelflag":0,"dtmfflag":0,"recordingflag":0}',
+        help: 'Only to change Vi\'s default. Placeholders: {{agent}}, {{customer}}, {{callerId}}, {{callbackUrl}}, {{reference}}, {{username}}, {{password}}, {{accountId}}, {{record}}.',
       },
-      { key: 'statusUrl', label: 'Call status URL (optional)', placeholder: 'https://.../status?call_id={{callId}}' },
+      { key: 'statusUrl', label: 'Call status URL (leave empty)', placeholder: 'https://.../status?call_id={{callId}}' },
     ],
   },
   {
-    title: 'OBD API credential',
-    help: 'The API user you create under OBD API credential configuration in Vi.',
+    title: 'CTC login (OBD API credential)',
+    help: 'The Username and Password on the Vi page Click To Call > CTC Configuration > Configure Click To Call API. The CRM logs in with them and your DNI to get a token, which also reads the call reports.',
     auth: 'authType',
     fields: [
       { key: 'username', label: 'API username' },
@@ -43,8 +43,8 @@ const SECTIONS: Section[] = [
     help: "Vi's Pull Report API (incoming and click-to-call reports). The CRM reads it every few minutes so calls Vi could not push still arrive.",
     pull: true,
     fields: [
-      { key: 'pullUsername', label: 'Pull API username' },
-      { key: 'pullPassword', label: 'Pull API password', secret: true },
+      { key: 'pullUsername', label: 'Pull API username (empty = CTC login)' },
+      { key: 'pullPassword', label: 'Pull API password (empty = CTC login)', secret: true },
       { key: 'dni', label: 'DNI (your Vi service number)', placeholder: '97xxxxxx42', help: 'Leave empty to use the Vi number above.' },
       { key: 'pullUrl', label: 'Pull API address (leave empty)', placeholder: 'https://cts.myvi.in:8443/Cpaas/api/v1/pullcalldetails' },
     ],
@@ -77,6 +77,7 @@ const SECTIONS: Section[] = [
 ];
 
 const AUTH_LABEL: Record<ViAuthType, string> = {
+  token: 'Vi login token (recommended)',
   bearer: 'Bearer token header',
   basic: 'Username + password (Basic)',
   header: 'API key in a custom header',
@@ -226,7 +227,7 @@ export default function ViCpaasCard({ onChange }: { onChange?: (s: ViCpaasSettin
                 <Button
                   size="sm"
                   variant="secondary"
-                  disabled={!settings.pullUsername || !settings.secretsSet.pullPassword || dirty || acting === 'pull'}
+                  disabled={!(settings.pullUsername || settings.username) || !(settings.secretsSet.pullPassword || settings.secretsSet.password) || dirty || acting === 'pull'}
                   onClick={() =>
                     run('pull', async () => {
                       const res = await salesApi.pullViCpaas();

@@ -2,6 +2,7 @@ import type { CallStatus } from '../../models/Call';
 import { CallUpdate, PlaceCallInput, PlaceCallResult, RecordingDownload, VoiceProvider, VoiceProviderError } from './types';
 import { DEFAULT_ENCRYPTED_TEMPLATE, ViSettings, decryptViPayload, loadViSettings, peekViSettings } from './viSettings';
 import { aesEncrypt } from '../../utils/aesCbc';
+import { viCtcAuthUrl, viLoginToken } from './viToken';
 
 /**
  * Vi (Vodafone Idea) CPaaS cloud calling. Used when a company switches it on
@@ -38,12 +39,19 @@ import { aesEncrypt } from '../../utils/aesCbc';
  */
 const env = (name: string) => (process.env[name] || '').trim();
 
-const DEFAULT_TEMPLATE = JSON.stringify({
-  agent_number: '{{agent}}',
-  customer_number: '{{customer}}',
-  caller_id: '{{callerId}}',
-  record: '{{record}}',
-  callback_url: '{{callbackUrl}}',
+/** Vi CPaaS click-to-call, from the Vi API document (Basic or Bearer auth). */
+export const VI_CTC_URL = 'https://cts.myvi.in:8443/Cpaas/api/v1/clicktocall/initiate-call';
+
+// initiate-call: Vi rings A (our sales person) from the CLI, then B (the customer).
+// channelflag 0 + recordingflag 0 = normal recording; dtmfflag 0 = no DTMF.
+export const DEFAULT_TEMPLATE = JSON.stringify({
+  cli: '{{callerId}}',
+  apartyno: '{{agent}}',
+  bpartyno: '{{customer}}',
+  reference_id: '{{reference}}',
+  channelflag: 0,
+  dtmfflag: 0,
+  recordingflag: 0,
 });
 
 /** "+919876543210" -> "9876543210" */
@@ -72,7 +80,8 @@ export const fillTemplate = (template: string, values: Record<string, string>) =
 
 /** First non-empty value found under any of `keys`, looking inside data/result/call wrappers too. */
 export const pick = (body: any, keys: string[]): any => {
-  const layers = [body, body?.data, body?.result, body?.call, body?.Call, body?.response, body?.data?.call];
+  // Vi CPaaS nests the call id in "message": {"status":1,"message":{"callid":26988056,...}}.
+  const layers = [body, body?.message, body?.data, body?.result, body?.call, body?.Call, body?.response, body?.data?.call];
   for (const layer of layers) {
     if (!layer || typeof layer !== 'object') continue;
     for (const k of keys) {
@@ -121,7 +130,7 @@ const toSeconds = (value: unknown): number | null => {
 
 /** Maps a Vi response or webhook body onto our fields, whatever it calls them. */
 export const mapViCall = (body: Record<string, any>): CallUpdate => {
-  const id = pick(body, ['call_id', 'callId', 'CallSid', 'call_sid', 'sid', 'uuid', 'call_uuid', 'reference_id', 'ref_id', 'id']);
+  const id = pick(body, ['callid', 'call_id', 'callId', 'CallId', 'CallID', 'CallSid', 'call_sid', 'sid', 'uuid', 'call_uuid', 'id']);
   const recording = pick(body, ['recording_url', 'recordingUrl', 'RecordingUrl', 'recording', 'record_url', 'recording_file']);
   const endedAt = toDate(pick(body, ['end_time', 'endTime', 'EndTime', 'ended_at', 'hangup_time']));
   let status = toViStatus(pick(body, ['call_status', 'callStatus', 'status', 'Status', 'state', 'event', 'disposition']));
@@ -139,7 +148,7 @@ export const mapViCall = (body: Record<string, any>): CallUpdate => {
 
 const authHeaders = (s: ViSettings): Record<string, string> => {
   const { authType: type, username: user, password: secret } = s;
-  if (type === 'none' || (!secret && !user)) return {};
+  if (type === 'none' || type === 'token' || (!secret && !user)) return {};
   if (type === 'basic') return { Authorization: `Basic ${Buffer.from(`${user}:${secret}`).toString('base64')}` };
   if (type === 'header') return { [s.authHeader || 'Authorization']: s.authScheme ? `${s.authScheme} ${secret}` : secret };
   return { Authorization: `Bearer ${secret}` };
@@ -250,11 +259,22 @@ export class ViProvider implements VoiceProvider {
       password: s.password,
       reference: input.reference || '',
     });
-    const res = await viRequest(s, s.ctcUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
+    const send = async (fresh: boolean) => {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (s.authType === 'token') {
+        const login = { username: s.username, password: s.password, authUrl: viCtcAuthUrl(s.ctcUrl || VI_CTC_URL) };
+        headers.Authorization = `Bearer ${await viLoginToken((url, init) => viRequest({ ...s, authType: 'none' }, url, init), login, fresh)}`;
+      }
+      return viRequest(s, s.ctcUrl || VI_CTC_URL, { method: 'POST', headers, body: JSON.stringify(body) });
+    };
+    let res: any;
+    try {
+      res = await send(false);
+    } catch (err) {
+      // An expired token (403/406): log in again once.
+      if (s.authType !== 'token' || !(err instanceof VoiceProviderError) || err.status !== 502) throw err;
+      res = await send(true);
+    }
     const mapped = mapViCall(res);
     if (!mapped.providerCallId) throw new VoiceProviderError('Vi accepted the request but did not return a call id. Check the CTC API URL against your Vi API document.');
     return { providerCallId: mapped.providerCallId, status: mapped.status && mapped.status !== 'completed' ? mapped.status : 'queued', callerId };
