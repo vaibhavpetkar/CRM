@@ -129,3 +129,20 @@ test("the default CTC body is Vi's initiate-call and its answer gives the call i
   assert.equal(mapViCall(answer).providerCallId, '26988056');
   assert.equal(mapViCall(answer).status, undefined);
 });
+
+test('click-to-call logs in at clicktocall/AuthToken with username and password only', async () => {
+  const { viCtcAuthUrl, viLoginToken, VI_CTC_AUTH_URL } = await import('../src/services/voice/viToken');
+  assert.equal(viCtcAuthUrl('https://cts.myvi.in:8443/Cpaas/api/v1/clicktocall/initiate-call'), VI_CTC_AUTH_URL);
+  assert.equal(viCtcAuthUrl('https://vi.example/x/clicktocall/initiate-call'), 'https://vi.example/x/clicktocall/AuthToken');
+  assert.equal(viCtcAuthUrl(''), VI_CTC_AUTH_URL);
+  const calls: any[] = [];
+  const request = async (url: string, init: RequestInit) => {
+    calls.push({ url, body: JSON.parse(String(init.body)) });
+    return { idToken: 'tok-1', expiresIn: 86400 };
+  };
+  const token = await viLoginToken(request, { username: 'u-ctc', password: 'p', authUrl: VI_CTC_AUTH_URL });
+  assert.equal(token, 'tok-1');
+  assert.deepEqual(calls, [{ url: VI_CTC_AUTH_URL, body: { username: 'u-ctc', password: 'p' } }]);
+  await viLoginToken(request, { username: 'u-ctc', password: 'p', authUrl: VI_CTC_AUTH_URL });
+  assert.equal(calls.length, 1, 'the token is reused');
+});

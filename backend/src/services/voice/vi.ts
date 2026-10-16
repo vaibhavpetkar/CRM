@@ -2,7 +2,7 @@ import type { CallStatus } from '../../models/Call';
 import { CallUpdate, PlaceCallInput, PlaceCallResult, RecordingDownload, VoiceProvider, VoiceProviderError } from './types';
 import { DEFAULT_ENCRYPTED_TEMPLATE, ViSettings, decryptViPayload, loadViSettings, peekViSettings } from './viSettings';
 import { aesEncrypt } from '../../utils/aesCbc';
-import { viDni, viLoginToken } from './viToken';
+import { viCtcAuthUrl, viLoginToken } from './viToken';
 
 /**
  * Vi (Vodafone Idea) CPaaS cloud calling. Used when a company switches it on
@@ -262,7 +262,7 @@ export class ViProvider implements VoiceProvider {
     const send = async (fresh: boolean) => {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (s.authType === 'token') {
-        const login = { username: s.username, password: s.password, dni: viDni(s) };
+        const login = { username: s.username, password: s.password, authUrl: viCtcAuthUrl(s.ctcUrl || VI_CTC_URL) };
         headers.Authorization = `Bearer ${await viLoginToken((url, init) => viRequest({ ...s, authType: 'none' }, url, init), login, fresh)}`;
       }
       return viRequest(s, s.ctcUrl || VI_CTC_URL, { method: 'POST', headers, body: JSON.stringify(body) });
