@@ -87,8 +87,21 @@ export const viDate = (d: Date) => {
   return `${ist.slice(8, 10)}/${ist.slice(5, 7)}/${ist.slice(0, 4)}`;
 };
 
+/** A report sent as a tab or comma separated table with a header row ("CALL ID\tDNI\t..."). */
+const parseTable = (text: string): Record<string, any>[] => {
+  const lines = text.split(/\r?\n/).filter((l) => l.trim());
+  if (lines.length < 2 || !/call\s*id/i.test(lines[0])) return [];
+  const sep = lines[0].includes('\t') ? '\t' : ',';
+  const header = lines[0].split(sep).map((h) => h.trim().replace(/^"|"$/g, ''));
+  return lines.slice(1).map((line) => {
+    const cells = line.split(sep).map((c) => c.trim().replace(/^"|"$/g, ''));
+    return Object.fromEntries(header.map((h, i) => [h, cells[i] ?? '']));
+  });
+};
+
 /** The list of call records in a Pull Report answer, wherever it sits ("report" may be a JSON string). */
 export const findRecords = (body: unknown, depth = 0): Record<string, any>[] => {
+  if (typeof body === 'string' && !/^\s*[[{]/.test(body)) return parseTable(body);
   if (typeof body === 'string' && /^\s*[[{]/.test(body)) {
     try {
       return findRecords(JSON.parse(body), depth);
