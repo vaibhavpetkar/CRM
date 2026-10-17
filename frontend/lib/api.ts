@@ -724,6 +724,87 @@ export const settingsApi = {
   }),
 };
 
+// ─── Backups API (Super Admin only) ───────────────────────────────────────────
+
+export type BackupKind = 'manual' | 'auto' | 'pre-restore' | 'uploaded';
+
+export interface BackupInfo {
+  name: string;
+  kind: BackupKind;
+  size: number;
+  createdAt: string;
+  uploadsArchive: { name: string; size: number } | null;
+}
+
+export interface BackupList {
+  backups: BackupInfo[];
+  /** 'backup' or 'restore' while one is running on the server. */
+  running: string | null;
+  keep: number;
+  dailyAt: string | null;
+  tools: { pgDump: string | null; pgRestore: string | null };
+}
+
+export interface RestoreResult {
+  message: string;
+  restored: string;
+  safetyBackup: string;
+  uploadsRestored: boolean;
+}
+
+const enc = encodeURIComponent;
+
+export const backupsApi = {
+  list: async () => request<BackupList>('/admin/backups'),
+  create: async () => request<{ message: string; backup: BackupInfo & { warning?: string } }>('/admin/backups', { method: 'POST' }),
+  remove: async (name: string) => request<{ message: string }>(`/admin/backups/${enc(name)}`, { method: 'DELETE' }),
+  restore: async (name: string, restoreUploads: boolean) =>
+    request<RestoreResult>(`/admin/backups/${enc(name)}/restore`, {
+      method: 'POST',
+      body: JSON.stringify({ confirm: 'RESTORE', restoreUploads }),
+    }),
+  /**
+   * Starts a browser download of a backup file. Uses a short-lived signed
+   * link so a large file streams straight to disk instead of into memory.
+   */
+  download: async (fileName: string) => {
+    const { path } = await request<{ path: string }>(`/admin/backups/${enc(fileName)}/download-link`, { method: 'POST' });
+    const a = document.createElement('a');
+    a.href = `${API_BASE}${path}`;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  },
+  /** Uploads a .dump file and restores it. XHR (not fetch) so the page can show upload progress. */
+  uploadAndRestore: (file: File, onProgress?: (fraction: number) => void) =>
+    new Promise<RestoreResult>((resolve, reject) => {
+      const form = new FormData();
+      form.append('confirm', 'RESTORE');
+      form.append('file', file);
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `${API_BASE}/admin/backups/upload-restore`);
+      const token = getAuthToken();
+      if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable && onProgress) onProgress(e.loaded / e.total);
+      };
+      xhr.onerror = () => reject(new Error('Network error: the upload did not reach the server.'));
+      xhr.onload = () => {
+        let data: (Partial<RestoreResult> & { message?: string }) | null = null;
+        try {
+          data = JSON.parse(xhr.responseText);
+        } catch {
+          /* not JSON */
+        }
+        if (xhr.status >= 200 && xhr.status < 300 && data) return resolve(data as RestoreResult);
+        if (xhr.status === 413 && !data) return reject(new Error('The file is too large for the server to accept.'));
+        reject(new Error(data?.message || `Upload failed with status ${xhr.status}`));
+      };
+      xhr.send(form);
+    }),
+};
+
 // ─── Item Categories API ───────────────────────────────────────────────────────
 
 export const itemCategoriesApi = {

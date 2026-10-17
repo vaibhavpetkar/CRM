@@ -170,10 +170,16 @@ services:
       - ANTHROPIC_MAX_CONCURRENT=${ANTHROPIC_MAX_CONCURRENT:-8}
       - AI_QUEUE_WAIT_MS=${AI_QUEUE_WAIT_MS:-20000}
       - AI_REQUEST_TIMEOUT_MS=${AI_REQUEST_TIMEOUT_MS:-45000}
+      # Settings > Backups (super admin). Keeps the newest BACKUP_KEEP backups
+      # (0 = keep all). BACKUP_DAILY_AT=HH:MM (IST) turns on a daily backup.
+      - BACKUP_DIR=/usr/src/app/backups
+      - BACKUP_KEEP=${BACKUP_KEEP:-30}
+      - BACKUP_DAILY_AT=${BACKUP_DAILY_AT:-}
       # Path to .env file on host (mounted at /host/.env inside container)
       - ENV_FILE_PATH=/host/.env
     volumes:
       - backend_uploads:/usr/src/app/uploads
+      - backups_data:/usr/src/app/backups
       # Mount host project root to /host so backend can read/write .env
       - ${VPS_DEPLOY_PATH:-/var/www/crm}:/host
     healthcheck:
@@ -215,4 +221,5 @@ volumes:
   postgres_data:
   redis_data:
   backend_uploads:
+  backups_data:
   ollama_data:

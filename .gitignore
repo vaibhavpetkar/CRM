@@ -31,3 +31,6 @@ lerna-debug.log*
 
 # Runtime uploads (attachments, call recordings); production keeps them in a Docker volume
 backend/uploads/
+
+# Local database backups (Settings > Backups)
+backend/backups/
