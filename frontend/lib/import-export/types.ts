@@ -2,7 +2,7 @@
 // Any list page can plug into <ImportExportButtons /> by describing its fields
 // and handing over a create/update function — nothing else needs to change.
 
-export type FieldType = 'text' | 'number' | 'email' | 'date' | 'boolean' | 'select';
+export type FieldType = 'text' | 'number' | 'email' | 'date' | 'boolean' | 'select' | 'mobile';
 
 export type ImportExportField = {
   /** key used in the record object (e.g. "firstName") */
@@ -64,6 +64,8 @@ export type ImportExportConfig = {
    */
   onImportBatch?: (rows: Record<string, any>[]) => Promise<{ ok: boolean; error?: string }[]>;
   importBatchSize?: number;
+  /** field whose value must be unique within the file (e.g. "mobile"); later repeats are flagged before sending */
+  uniqueKey?: string;
   /** called after an import batch finishes so the parent list can refresh */
   onImportComplete?: () => void;
 };

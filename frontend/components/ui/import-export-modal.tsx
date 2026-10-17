@@ -22,7 +22,7 @@ import { cn } from '@/lib/utils';
 import type { ImportExportConfig, ImportRow } from '@/lib/import-export/types';
 import { runExport, downloadTemplate, type ExportFormat } from '@/lib/import-export/exporters';
 import { parseImportFile } from '@/lib/import-export/parse';
-import { validateCell } from '@/lib/import-export/validate';
+import { normalizeMobile, validateCell } from '@/lib/import-export/validate';
 import { useToast } from '@/components/ui/toast';
 
 type Tab = 'export' | 'import';
@@ -237,8 +237,29 @@ export default function ImportExportModal({ open, onClose, config, initialTab = 
 
     const recordOf = (row: ImportRow) => {
       const { __rowId, __status, __error, __selected, ...record } = row;
+      // Send mobile numbers as plain 10 digits ("+91 98765-43210" -> "9876543210").
+      for (const field of importFields) {
+        if (field.type === 'mobile' && record[field.key]) record[field.key] = normalizeMobile(record[field.key]) ?? record[field.key];
+      }
       return record;
     };
+
+    // A value that must be unique (e.g. mobile) and repeats within the file:
+    // the first row is imported, later ones are flagged instead of creating duplicates.
+    const repeatError = new Map<string, string>();
+    if (config.uniqueKey) {
+      const key = config.uniqueKey;
+      const field = importFields.find((f) => f.key === key);
+      const firstRowOf = new Map<string, number>();
+      rows.forEach((row, index) => {
+        const raw = String(row[key] ?? '').trim();
+        if (!raw) return;
+        const value = field?.type === 'mobile' ? normalizeMobile(raw) || raw : raw.toLowerCase();
+        const first = firstRowOf.get(value);
+        if (first === undefined) firstRowOf.set(value, index);
+        else repeatError.set(row.__rowId, `Same ${field?.label || key} as row ${first + 1} in this file`);
+      });
+    }
 
     const chunkSize = config.onImportBatch ? Math.max(1, config.importBatchSize || 500) : 25;
     let done = 0;
@@ -247,7 +268,7 @@ export default function ImportExportModal({ open, onClose, config, initialTab = 
       const results = new Map<string, { ok: boolean; error?: string }>();
       const valid: ImportRow[] = [];
       for (const row of chunk) {
-        const validationError = validateRow(row);
+        const validationError = validateRow(row) || repeatError.get(row.__rowId) || null;
         if (validationError) results.set(row.__rowId, { ok: false, error: validationError });
         else valid.push(row);
       }

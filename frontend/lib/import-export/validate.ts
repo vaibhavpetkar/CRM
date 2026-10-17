@@ -10,6 +10,14 @@ function isValidDate(value: string) {
   return date.getUTCFullYear() === y && date.getUTCMonth() === m - 1 && date.getUTCDate() === d;
 }
 
+/** "+91 98765-43210", "098765 43210" -> "9876543210"; null when it isn't a 10 digit Indian mobile. */
+export function normalizeMobile(raw: unknown): string | null {
+  let digits = String(raw ?? '').replace(/\D/g, '');
+  if (digits.length === 12 && digits.startsWith('91')) digits = digits.slice(2);
+  else if (digits.length === 11 && digits.startsWith('0')) digits = digits.slice(1);
+  return digits.length === 10 ? digits : null;
+}
+
 /** Checks one cell against its field definition, so a bad value is reported
  * in the preview row instead of as a generic server "Validation failed".
  * Returns an error message, or null when the value is fine. */
@@ -24,6 +32,8 @@ export function validateCell(field: ImportExportField, raw: unknown): string | n
       return isValidDate(value) ? null : `${field.label} must be a date as YYYY-MM-DD (got "${value}")`;
     case 'email':
       return EMAIL_RE.test(value) ? null : `${field.label} must be an email address (got "${value}")`;
+    case 'mobile':
+      return normalizeMobile(value) ? null : `${field.label} must be a 10 digit mobile number (got "${value}")`;
     case 'select':
       if (field.strict && field.options && !field.options.includes(value)) {
         return `${field.label} must be one of: ${field.options.join(', ')} (got "${value}")`;

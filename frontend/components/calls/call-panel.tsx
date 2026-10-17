@@ -1,12 +1,13 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { ChevronDownIcon, ChevronUpIcon, PhoneIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { ChevronDownIcon, ChevronUpIcon, PhoneIcon, SpeakerWaveIcon, SpeakerXMarkIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { callsApi, type CallConfig, type CallRow } from '@/lib/api';
 import Button from '@/components/ui/button';
 import RecordingPlayer from './recording-player';
 import { CALL_STATUS_CLASS, CALL_STATUS_LABEL, formatDuration } from './call-format';
 import type { CallTarget } from './call-context';
+import { useRingback } from './use-ringback';
 
 interface Props {
   target: CallTarget;
@@ -104,6 +105,10 @@ export default function CallPanel({ target, call, config, placing, error, needsM
         ? (now - new Date(call.startedAt).getTime()) / 1000
         : null;
 
+  // Ring while the call is being placed and until someone picks up.
+  const ringing = !error && !needsMyNumber && (placing || status === 'queued' || status === 'ringing');
+  const { muted, toggleMuted } = useRingback(ringing);
+
   let headline = 'Starting the call...';
   if (error) headline = 'Call not placed';
   else if (needsMyNumber) headline = 'Add your phone number';
@@ -126,6 +131,17 @@ export default function CallPanel({ target, call, config, placing, error, needsM
           <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${CALL_STATUS_CLASS[status]}`}>{CALL_STATUS_LABEL[status]}</span>
         )}
         {talkSeconds != null && <span className="font-mono text-xs text-slate-600">{formatDuration(talkSeconds)}</span>}
+        {ringing && (
+          <button
+            type="button"
+            onClick={toggleMuted}
+            className="text-slate-400 hover:text-slate-600"
+            title={muted ? 'Turn the ringing sound on' : 'Mute the ringing sound'}
+            aria-label={muted ? 'Unmute ringing sound' : 'Mute ringing sound'}
+          >
+            {muted ? <SpeakerXMarkIcon className="h-4 w-4" /> : <SpeakerWaveIcon className="h-4 w-4" />}
+          </button>
+        )}
         <button type="button" onClick={() => setMinimized(!minimized)} className="text-slate-400 hover:text-slate-600" aria-label={minimized ? 'Expand' : 'Minimize'}>
           {minimized ? <ChevronUpIcon className="h-4 w-4" /> : <ChevronDownIcon className="h-4 w-4" />}
         </button>
