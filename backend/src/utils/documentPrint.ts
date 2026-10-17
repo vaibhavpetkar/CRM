@@ -16,6 +16,7 @@ import { getBuiltInPrintTemplate } from '../config/printStarters';
 import { renderTemplate, SafeHtml, escapeHtml } from './templateRenderer';
 import { formatMoney } from './format';
 import { NotFoundError } from '../errors/AppError';
+import { sanitizeHtml } from './sanitizeHtml';
 
 // Turns a real record into the {{field}} data every Document Template uses,
 // and renders a print format for it. This is the one place print output is
@@ -373,6 +374,7 @@ export const renderDocumentPrint = async (
   const data = await buildDocumentData(docType, id);
   const template = await resolvePrintTemplate(docType, options.templateId);
   const number = (data.quote_number && docType === 'quote' ? data.quote_number : data.invoice_number) || data.task_title || data.meeting_title || '';
-  const body = renderTemplate(template, data, { escapeHtml: true });
+  // Sanitized after merging, so neither the template nor a record's values (a link field, say) can add script.
+  const body = sanitizeHtml(renderTemplate(template, data, { escapeHtml: true }));
   return wrapPrintPage(body, `${DOC_TITLES[docType]} ${number}`.trim(), options.autoPrint);
 };
