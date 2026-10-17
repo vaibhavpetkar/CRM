@@ -10,7 +10,8 @@ export function setAuthToken(token: string) {
     localStorage.setItem('crm_token', token);
     // Mirrored into a cookie (readable by proxy.ts) so unauthenticated users
     // are redirected to /login before any protected page ever renders.
-    document.cookie = `crm_token=${token}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
+    const secure = window.location.protocol === 'https:' ? '; Secure' : '';
+    document.cookie = `crm_token=${token}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax${secure}`;
   }
 }
 
@@ -109,18 +110,6 @@ export const authApi = {
     return data;
   },
 
-  register: async (userData: any) => {
-    const data = await request<{ message: string; token: string; user: any }>('/auth/register', {
-      method: 'POST',
-      body: JSON.stringify(userData),
-    });
-    if (data.token) {
-      setAuthToken(data.token);
-      setStoredUser(data.user);
-    }
-    return data;
-  },
-
   signupCompany: async (payload: { companyName: string; companyCode?: string; firstName: string; lastName: string; email: string; password: string; phone?: string }) => {
     const data = await request<{ message: string; token: string; user: any; company?: { code: string | null } }>('/auth/signup-company', {
       method: 'POST',
@@ -183,10 +172,13 @@ export const authApi = {
   },
 
   changePassword: async (currentPassword: string, newPassword: string) => {
-    return request<{ message: string }>('/auth/change-password', {
+    const data = await request<{ message: string; token?: string }>('/auth/change-password', {
       method: 'POST',
       body: JSON.stringify({ currentPassword, newPassword }),
     });
+    // A new password signs out older sessions, so keep this one on the fresh token.
+    if (data.token) setAuthToken(data.token);
+    return data;
   },
 
   getMe: async () => {
@@ -1542,9 +1534,19 @@ export async function openPrintWindow(html: Promise<string>): Promise<void> {
   win.document.write('<p style="font-family:sans-serif;color:#64748b;padding:24px">Preparing print…</p>');
   try {
     const content = await html;
+    // The page comes from a template users can edit, so it runs in a sandboxed
+    // frame with its own origin: its print script works, but it cannot reach
+    // this window, the CRM's storage or the login token.
+    const title = /<title>([^<]*)<\/title>/i.exec(content)?.[1] || 'Print';
     win.document.open();
-    win.document.write(content);
+    win.document.write(
+      `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title>` +
+        '<style>html,body{margin:0;height:100%}iframe{border:0;width:100%;height:100%;display:block}</style></head>' +
+        '<body><iframe sandbox="allow-scripts allow-modals"></iframe></body></html>'
+    );
     win.document.close();
+    const frame = win.document.querySelector('iframe');
+    if (frame) frame.srcdoc = content;
   } catch (err) {
     win.close();
     throw err;
