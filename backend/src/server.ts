@@ -101,6 +101,7 @@ applyTenantScoping();
 // Import middleware
 import { protect } from './middleware/authMiddleware';
 import { moduleGate } from './middleware/moduleGate';
+import { redactUrl } from './utils/redactUrl';
 
 dotenv.config();
 
@@ -113,6 +114,16 @@ const port = process.env.PORT || 5000;
 // request, which would make IP-based rate limiting below treat all users as
 // a single client.
 app.set('trust proxy', 1);
+app.disable('x-powered-by');
+
+// Basic browser hardening on every API response. nginx adds HSTS on top.
+app.use((_req: Request, res: Response, next: express.NextFunction) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+  next();
+});
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
 
@@ -160,7 +171,7 @@ app.use((req: Request, res: Response, next: express.NextFunction) => {
   const start = Date.now();
   res.on('finish', () => {
     const duration = Date.now() - start;
-    logger.info(`${req.method} ${req.originalUrl} ${res.statusCode} - ${duration}ms`);
+    logger.info(`${req.method} ${redactUrl(req.originalUrl)} ${res.statusCode} - ${duration}ms`);
   });
   next();
 });

@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import {
-  register,
   signupCompany,
   lookupCompany,
   login,
@@ -20,7 +19,6 @@ import { companyLookupRateLimiter, loginRateLimiter, passwordResetRateLimiter, r
 const router = Router();
 
 // Public auth routes
-router.post('/register', registrationRateLimiter, register);
 router.post('/signup-company', registrationRateLimiter, signupCompany);
 router.post('/login', loginRateLimiter, login);
 router.get('/company/:code', companyLookupRateLimiter, lookupCompany);
