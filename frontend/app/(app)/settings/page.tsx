@@ -8,7 +8,7 @@ import Card from '@/components/ui/card';
 import StatusBadge from '@/components/ui/status-badge';
 import { authApi, googleTasksApi, getStoredUser } from '@/lib/api';
 import Link from 'next/link';
-import { Cog6ToothIcon } from '@heroicons/react/24/outline';
+import { CircleStackIcon, Cog6ToothIcon } from '@heroicons/react/24/outline';
 import { useToast } from '@/components/ui/toast';
 import PasswordInput from '@/components/ui/password-input';
 
@@ -97,8 +97,14 @@ export default function SettingsPage() {
   const isSuperAdmin = user?.isSuperAdmin;
 
   const superAdminTabs: Tab[] = isSuperAdmin
-    ? [{ id: 'developer', label: 'Developer', icon: <Cog6ToothIcon className="h-4 w-4" /> }]
+    ? [
+        { id: 'developer', label: 'Developer', icon: <Cog6ToothIcon className="h-4 w-4" /> },
+        { id: 'backups', label: 'Backups', icon: <CircleStackIcon className="h-4 w-4" /> },
+      ]
     : [];
+
+  // Super admin tabs are pages of their own.
+  const tabPages: Record<string, string> = { developer: '/settings/developer', backups: '/settings/backups' };
 
   const allTabs: Tab[] = [...tabs, ...superAdminTabs];
 
@@ -145,14 +151,14 @@ export default function SettingsPage() {
           <button
             key={tab.id}
             onClick={() => {
-              if (tab.id === 'developer') {
-                window.location.href = '/settings/developer';
+              if (tabPages[tab.id]) {
+                window.location.href = tabPages[tab.id];
               } else {
                 setActiveTab(tab.id);
               }
             }}
             className={`px-4 py-2.5 text-sm font-medium transition-colors flex items-center gap-1.5 ${
-              activeTab === tab.id || (tab.id === 'developer' && window.location.pathname === '/settings/developer')
+              activeTab === tab.id || (tabPages[tab.id] && window.location.pathname === tabPages[tab.id])
                 ? 'border-b-2 border-[var(--primary)] text-[var(--primary)]'
                 : 'text-slate-500 hover:text-slate-700'
             }`}

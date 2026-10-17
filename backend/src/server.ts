@@ -55,6 +55,8 @@ import reportRoutes from './routes/reportRoutes';
 import documentTemplateRoutes from './routes/documentTemplateRoutes';
 import publicRoutes from './routes/publicRoutes';
 import subscriptionRoutes from './routes/subscriptionRoutes';
+import backupRoutes from './routes/backupRoutes';
+import { startBackupScheduler } from './services/backupService';
 
 // Import models in dependency order before sync
 import './models/Company';
@@ -223,6 +225,8 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/document-templates', documentTemplateRoutes);
 app.use('/api/calls', callRoutes);
 app.use('/api/sales', salesRoutes);
+// Database + uploads backups and restore (super admin only).
+app.use('/api/admin/backups', backupRoutes);
 
 // Serve uploaded files (attachments, generated PDFs) statically — but only to
 // authenticated users. Nothing in the frontend loads these via raw <img>/<a>
@@ -359,6 +363,9 @@ const startServer = async () => {
       startViPuller();
       startStaleCallSweeper();
     });
+
+    // Daily automatic backup, only when BACKUP_DAILY_AT is set.
+    startBackupScheduler();
   } catch (error) {
     logger.error(`❌ Unable to connect to the database: ${error}`);
     process.exit(1);

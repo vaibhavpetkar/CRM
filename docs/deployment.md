@@ -97,11 +97,80 @@ sudo docker compose logs -f backend
 curl -s https://crm.eleviq.buzz/api/health
 ```
 
-## Backups
+## Backups and restore
+
+### From the app (super admin)
+
+Sign in as the super admin and open **Settings > Backups**
+(`/settings/backups`). Nobody else can see or call it, not even a company
+Administrator.
+
+- **Back up now** saves the whole database (every company) with
+  `pg_dump -Fc`, plus a `.tar.gz` of the uploads folder (attachments, PDFs,
+  call recordings). Files are named with the UTC time, e.g.
+  `crm-manual-20261017-023000Z.dump` and
+  `crm-manual-20261017-023000Z.uploads.tar.gz`.
+- **Download** saves a copy to your computer. Keep copies off the server too:
+  the backups live in the `backups_data` Docker volume on the same machine.
+- **Restore** replaces all current data with the chosen backup. You must type
+  `RESTORE`. A safety backup (`crm-pre-restore-…`) of the current data is
+  always taken first, so a wrong restore can be undone by restoring that one.
+  Tick "Also restore uploaded files" to unpack the uploads archive too.
+- **Upload a backup and restore** takes a `.dump` file (up to 2 GB), keeps it
+  as `crm-uploaded-…` and restores it the same way.
+
+The restore runs `pg_restore --clean --if-exists --no-owner --single-transaction`:
+if anything fails, nothing is changed. After a restore, users may need to
+sign in again.
+
+Settings (in `.env`):
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `BACKUP_KEEP` | `30` | Newest backups kept; older ones are deleted after each new backup. `0` keeps all. |
+| `BACKUP_DAILY_AT` | blank (off) | `HH:MM` in IST, e.g. `02:30`, for a daily automatic backup (`crm-auto-…`). |
+
+The backend image includes the PostgreSQL 15 client tools (`pg_dump`,
+`pg_restore`); the Backups page shows the installed version. nginx allows
+large uploads and long timeouts only on `/api/admin/backups`
+(`nginx/templates/crm.conf.template`, `nginx/crm.eleviq.buzz.conf`). If your
+server uses a different nginx config, add the same `location` block there.
+The backend accepts an upload for at most 5 minutes (Node's request
+timeout); for a very large file over a slow link, copy it onto the server
+and use the command line below or put it in the backups volume and restore
+it from the list.
+
+### From the command line
+
+Backups are in the `backups_data` volume, mounted at `/usr/src/app/backups` in
+the backend container.
 
 ```bash
-sudo docker exec crm_postgres pg_dump -U postgres crm_db | gzip > crm_$(date +%F).sql.gz
+# Take a backup (same format as Back up now). The single quotes make the
+# container's own DB_* variables fill in, so no password is typed here.
+sudo docker exec crm_backend sh -c 'PGPASSWORD="$DB_PASSWORD" pg_dump -Fc -h "$DB_HOST" -U "$DB_USERNAME" -d "$DB_NAME" \
+  -f /usr/src/app/backups/crm-manual-$(date -u +%Y%m%d-%H%M%SZ).dump'
+
+# Uploaded files
+sudo docker exec crm_backend tar -czf /usr/src/app/backups/uploads-$(date -u +%F).tar.gz -C /usr/src/app/uploads .
+
+# List and copy backups to this machine
+sudo docker exec crm_backend ls -lh /usr/src/app/backups
+sudo docker cp crm_backend:/usr/src/app/backups/crm-manual-20261017-023000Z.dump .
+
+# Restore a .dump (replaces all data; take a backup first)
+sudo docker cp crm-manual-20261017-023000Z.dump crm_backend:/usr/src/app/backups/
+sudo docker exec crm_backend sh -c 'PGPASSWORD="$DB_PASSWORD" pg_restore --clean --if-exists --no-owner \
+  --single-transaction -h "$DB_HOST" -U "$DB_USERNAME" -d "$DB_NAME" /usr/src/app/backups/crm-manual-20261017-023000Z.dump'
+
+# Restore uploaded files
+sudo docker exec crm_backend tar -xzf /usr/src/app/backups/crm-manual-20261017-023000Z.uploads.tar.gz -C /usr/src/app/uploads
 ```
 
-Uploaded files and call recordings live in the `backend_uploads` volume; back
-it up too.
+A `.dump` copied into
+`/usr/src/app/backups` with a name like `crm-manual-YYYYMMDD-HHMMSSZ.dump`
+also shows up in Settings > Backups, where it can be restored.
+
+Without Docker, the same `pg_dump -Fc` / `pg_restore` commands work against
+any PostgreSQL 15 server; the PostgreSQL data itself is in the
+`postgres_data` volume.
