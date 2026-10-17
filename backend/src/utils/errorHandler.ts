@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction, RequestHandler } from 'express';
 import { ValidationError as SequelizeValidationError, UniqueConstraintError, ForeignKeyConstraintError } from 'sequelize';
+import { MulterError } from 'multer';
 import { AppError } from '../errors/AppError';
 import logger from './logger';
 
@@ -52,6 +53,21 @@ export const errorHandler = (err: unknown, req: Request, res: Response, _next: N
       message: 'Validation failed',
       details,
     });
+  }
+
+  if (err instanceof MulterError) {
+    const tooLarge = err.code === 'LIMIT_FILE_SIZE' || err.code === 'LIMIT_FIELD_VALUE';
+    return res.status(tooLarge ? 413 : 400).json({ message: tooLarge ? 'The file is too large' : err.message });
+  }
+
+  // body-parser and similar middleware attach a 4xx status (bad JSON, body too
+  // large). Those are the client's mistake, not a server failure.
+  const status = (err as { status?: unknown; statusCode?: unknown })?.status ?? (err as { statusCode?: unknown })?.statusCode;
+  if (typeof status === 'number' && status >= 400 && status < 500) {
+    const type = (err as { type?: string }).type;
+    const message =
+      type === 'entity.too.large' ? 'The request is too large' : type === 'entity.parse.failed' ? 'The request body is not valid JSON' : 'Bad request';
+    return res.status(status).json({ message });
   }
 
   const error = err as Error;

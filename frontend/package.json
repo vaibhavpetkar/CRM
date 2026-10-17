@@ -14,9 +14,9 @@
     "clsx": "^2.1.1",
     "docx": "^9.1.0",
     "file-saver": "^2.0.5",
-    "jspdf": "^2.5.2",
-    "jspdf-autotable": "^3.8.4",
-    "next": "16.2.11",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.9",
+    "next": "^16.4.2",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-hook-form": "^7.85.0",
@@ -33,7 +33,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.2.11",
+    "eslint-config-next": "^16.4.2",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

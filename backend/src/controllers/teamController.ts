@@ -3,6 +3,7 @@ import { Op } from 'sequelize';
 import User from '../models/User';
 import Role from '../models/Role';
 import { AuthRequest } from '../middleware/authMiddleware';
+import { seatLimitMessage } from '../utils/subscription';
 import { asyncHandler } from '../utils/errorHandler';
 import * as presenceService from '../services/presenceService';
 import { getOnlineUserIds } from '../realtime/presence';
@@ -142,6 +143,12 @@ export const updateTeamMember = async (req: AuthRequest, res: Response) => {
           return res.status(400).json({ message: 'Cannot deactivate the last active super admin.' });
         }
       }
+    }
+
+    // Turning a user back on takes a seat, so it has to fit the plan.
+    if (!member.isActive && (isActive === true || isActive === 'true')) {
+      const seatMessage = await seatLimitMessage(req.company!);
+      if (seatMessage) return res.status(403).json({ message: seatMessage });
     }
 
     const normalizedRoleId = roleId === '' ? null : roleId;
