@@ -1,5 +1,6 @@
 import type { CallStatus } from '../../models/Call';
 import { CallUpdate, PlaceCallInput, PlaceCallResult, RecordingDownload, VoiceProvider, VoiceProviderError } from './types';
+import { safeFetch } from '../../utils/urlGuard';
 
 /**
  * Exotel (exotel.com), the default provider: a DoT-licensed Indian cloud
@@ -135,8 +136,11 @@ export class ExotelProvider implements VoiceProvider {
   async downloadRecording(url: string): Promise<RecordingDownload> {
     // Recordings are usually a public S3 link; some accounts protect them
     // with the API key, so retry with it on a 401/403.
-    let res = await fetch(url);
-    if (res.status === 401 || res.status === 403) res = await fetch(url, { headers: { Authorization: this.authHeader() } });
+    // The URL arrives in a webhook, so it must be a public address.
+    let res = await safeFetch(url, { signal: AbortSignal.timeout(60000) }, { allowHttp: true });
+    if (res.status === 401 || res.status === 403) {
+      res = await safeFetch(url, { headers: { Authorization: this.authHeader() }, signal: AbortSignal.timeout(60000) }, { allowHttp: true });
+    }
     if (!res.ok) throw new VoiceProviderError(`Recording download failed (HTTP ${res.status}).`);
     return { data: Buffer.from(await res.arrayBuffer()), contentType: res.headers.get('content-type') || 'audio/mpeg' };
   }

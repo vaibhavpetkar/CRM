@@ -1,10 +1,10 @@
-import nodemailer from 'nodemailer';
+import nodemailer, { type Mail } from 'nodemailer';
 import logger from './logger';
 
 // Lazily-created singleton transporter. If SMTP env vars aren't configured,
 // callers get `false` back and the caller falls back to dev-mode behavior
 // (e.g. returning the raw link in the API response instead of emailing it).
-let transporter: nodemailer.Transporter | null = null;
+let transporter: Mail | null = null;
 
 // Either a well-known provider (EMAIL_SERVICE=gmail) or any SMTP server
 // (EMAIL_HOST + EMAIL_PORT, e.g. the company's own Mailcow server).
@@ -12,7 +12,7 @@ const isEmailConfigured = (): boolean => {
   return Boolean((process.env.EMAIL_SERVICE || process.env.EMAIL_HOST) && process.env.EMAIL_USER && process.env.EMAIL_PASS);
 };
 
-const getTransporter = (): nodemailer.Transporter | null => {
+const getTransporter = (): Mail | null => {
   if (!isEmailConfigured()) return null;
   if (transporter) return transporter;
 

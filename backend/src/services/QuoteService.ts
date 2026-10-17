@@ -23,7 +23,9 @@ import { sendMailWithAttachment } from '../utils/mailer';
 import { sanitizeDateFields } from '../utils/sanitize';
 import DocumentTemplate from '../models/DocumentTemplate';
 import { renderTemplate } from '../utils/templateRenderer';
+import { sanitizeHtml } from '../utils/sanitizeHtml';
 import path from 'path';
+import fs from 'fs';
 import crypto from 'crypto';
 import { NotFoundError, ConflictError, ValidationError } from '../errors/AppError';
 
@@ -327,8 +329,15 @@ class QuoteService {
     if (!quote) throw new NotFoundError('Quote', id);
 
     const doc = await this.buildPrintableDocument(quote);
-    const fileName = `quote-${quote.quoteNumber}-v${quote.revisionNumber}.pdf`;
+    // Quote numbers repeat across companies and are easy to guess, so the
+    // saved file gets a random, company-specific prefix (see quotePdfDownloadName).
+    const companyId = (quote as any).companyId ?? 0;
+    const fileName = `${companyId}-${crypto.randomBytes(12).toString('hex')}-quote-${quote.quoteNumber}-v${quote.revisionNumber}.pdf`;
+    const previous = quote.pdfPath;
     const pdfPath = await generateDocumentPdf(doc, fileName);
+    if (previous && previous !== pdfPath) {
+      fs.promises.unlink(path.join(__dirname, '../../', previous)).catch(() => undefined);
+    }
 
     await quote.update({ pdfPath });
     return pdfPath;
@@ -727,7 +736,7 @@ class QuoteService {
     return {
       subject: renderTemplate(template.subject, data) || `Quotation ${quote.quoteNumber} from ${companyName}`,
       // Escaped: customer-entered values (client name, address) must not inject markup into the email.
-      html: renderTemplate(template.htmlBody, data, { escapeHtml: true }),
+      html: sanitizeHtml(renderTemplate(template.htmlBody, data, { escapeHtml: true })),
     };
   }
 
@@ -764,3 +773,6 @@ class QuoteService {
 }
 
 export default new QuoteService();
+
+/** The file name a user sees when downloading a saved quote PDF (without the random prefix). */
+export const quotePdfDownloadName = (pdfPath: string) => path.basename(pdfPath).replace(/^\d+-[a-f0-9]{24}-/, '');

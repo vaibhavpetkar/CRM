@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt, { JwtPayload } from 'jsonwebtoken';
+import crypto from 'crypto';
 import User from '../models/User';
 import Role from '../models/Role';
 import { runWithTenant } from '../tenancy/context';
@@ -22,6 +23,21 @@ const allowedWhileLocked = (req: Request) => {
   return ['/api/profile', '/api/auth/me', '/api/company'].includes(path) || path.startsWith('/api/notifications');
 };
 
+/**
+ * A short, one-way fingerprint of the stored password hash. Sign-in tokens
+ * carry it, so a token stops working once that password is changed or reset.
+ */
+export const passwordFingerprint = (passwordHash: string | null | undefined) =>
+  crypto.createHash('sha256').update(String(passwordHash ?? '')).digest('base64url').slice(0, 16);
+
+/**
+ * True when a decoded token still belongs to the user's current password.
+ * Tokens issued before fingerprints existed carry none and stay valid until
+ * they expire.
+ */
+export const tokenMatchesPassword = (decoded: JwtPayload, user: { password?: string | null }) =>
+  decoded.pwv === undefined || decoded.pwv === passwordFingerprint(user.password);
+
 export const authMiddleware = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const token = req.header('Authorization')?.replace('Bearer ', '');
@@ -34,7 +50,7 @@ export const authMiddleware = async (req: AuthRequest, res: Response, next: Next
       include: [{ model: Role, as: 'role' }],
     });
 
-    if (!user) {
+    if (!user || !tokenMatchesPassword(decoded, user)) {
       return res.status(401).json({ message: 'Invalid token.' });
     }
 

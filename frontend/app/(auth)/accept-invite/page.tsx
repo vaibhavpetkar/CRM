@@ -53,8 +53,8 @@ function AcceptInviteForm() {
       return;
     }
 
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters.');
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters.');
       return;
     }
 
@@ -140,7 +140,7 @@ function AcceptInviteForm() {
           <label className="mb-1.5 block text-sm font-medium text-slate-700">Set Password</label>
           <PasswordInput
             required
-            minLength={6}
+            minLength={8}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Min. 6 characters"
@@ -152,7 +152,7 @@ function AcceptInviteForm() {
           <label className="mb-1.5 block text-sm font-medium text-slate-700">Confirm Password</label>
           <PasswordInput
             required
-            minLength={6}
+            minLength={8}
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             placeholder="Repeat password"

@@ -3,7 +3,7 @@ import path from 'path';
 import { Op } from 'sequelize';
 import { AuthRequest } from '../middleware/authMiddleware';
 import { asyncHandler } from '../utils/errorHandler';
-import quoteService from '../services/QuoteService';
+import quoteService, { quotePdfDownloadName } from '../services/QuoteService';
 import Quote from '../models/Quote';
 import Notification from '../models/Notification';
 import { notifyUser } from '../utils/notificationService';
@@ -87,7 +87,7 @@ export const deleteQuote = asyncHandler(async (req: AuthRequest, res: Response) 
 
 export const downloadQuotePdf = asyncHandler(async (req: AuthRequest, res: Response) => {
   const pdfPath = await quoteService.generatePdf(req.params.id);
-  return res.download(path.join(__dirname, '../../', pdfPath));
+  return res.download(path.join(__dirname, '../../', pdfPath), quotePdfDownloadName(pdfPath));
 });
 
 export const printQuote = asyncHandler(async (req: AuthRequest, res: Response) => {

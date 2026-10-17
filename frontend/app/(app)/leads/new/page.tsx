@@ -42,7 +42,7 @@ const leadSchema = z.object({
   prefix: z.string().optional(),
   firstName: z.string().trim().min(1, 'First name is required'),
   lastName: z.string().trim().min(1, 'Last name is required'),
-  email: z.string().trim().email('Valid email is required'),
+  email: z.string().trim().refine((v) => !v || z.string().email().safeParse(v).success, 'Enter a valid email address').optional(),
   mobile: z.string().regex(/^\d{10}$/, 'Mobile number must be 10 digits'),
   alternateMobile: tenDigits('Alternate mobile'),
   phone: z.string().optional(),
@@ -229,7 +229,7 @@ export default function NewLeadPage() {
         <Field label="Last Name" required error={errors.lastName?.message}>
           <IconInput icon={<UserIcon />} placeholder="Enter last name" invalid={!!errors.lastName} {...register('lastName')} />
         </Field>
-        <Field label="Email" required error={errors.email?.message}>
+        <Field label="Email" error={errors.email?.message}>
           <IconInput icon={<EnvelopeIcon />} type="email" placeholder="Enter email address" invalid={!!errors.email} {...register('email')} />
         </Field>
         <Field label="Mobile Number" required error={errors.mobile?.message}>

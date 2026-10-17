@@ -6,13 +6,12 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { Op } from 'sequelize';
 import { OAuth2Client } from 'google-auth-library';
-import { AuthRequest } from '../middleware/authMiddleware';
+import { AuthRequest, passwordFingerprint } from '../middleware/authMiddleware';
 import { runUnscoped, runWithTenant } from '../tenancy/context';
 import { createTrialCompany } from '../tenancy/provisioning';
 import { seatLimitMessage } from '../utils/subscription';
 import Company from '../models/Company';
 import { COMPANY_CODE_PATTERN, findCompanyByCode, isCompanyCodeTaken, normalizeCompanyCode } from '../utils/companyCode';
-import { getDefaultCompanyId } from '../tenancy/migration';
 import { sendInviteEmail, sendResetPasswordEmail } from '../utils/mailer';
 
 const roleInclude = { model: Role, as: 'role' };
@@ -21,11 +20,18 @@ const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const generateToken = (userId: number): string => {
+const MIN_PASSWORD_LENGTH = 8;
+const PASSWORD_TOO_SHORT = `Password must be at least ${MIN_PASSWORD_LENGTH} characters`;
+
+const normalizeEmail = (email: unknown) => String(email ?? '').trim().toLowerCase();
+
+// Tokens carry a fingerprint of the password hash (see passwordFingerprint),
+// so changing or resetting a password signs out every other session.
+const generateToken = (user: Pick<User, 'id' | 'password'>): string => {
   const jwtSecret = process.env.JWT_SECRET;
   if (!jwtSecret) throw new Error('JWT_SECRET is not defined');
   const jwtExpiresIn = process.env.JWT_EXPIRES_IN || '7d';
-  return jwt.sign({ id: userId }, jwtSecret, { expiresIn: jwtExpiresIn } as SignOptions);
+  return jwt.sign({ id: user.id, pwv: passwordFingerprint(user.password) }, jwtSecret, { expiresIn: jwtExpiresIn } as SignOptions);
 };
 
 const hashPassword = async (password: string): Promise<string> => {
@@ -72,54 +78,6 @@ const companyPublicFields = (company: Company | null | undefined) =>
 
 const loadUserCompany = (user: User) =>
   user.companyId ? runUnscoped(() => Company.findByPk(user.companyId as number)) : Promise.resolve(null);
-
-// ─── Register ─────────────────────────────────────────────────────────────────
-
-export const register = async (req: Request, res: Response) => {
-  try {
-    const { firstName, lastName, email, password, phone } = req.body;
-
-    if (!firstName || !lastName || !email || !password) {
-      return res.status(400).json({ message: 'firstName, lastName, email, and password are required' });
-    }
-
-    if (password.length < 6) {
-      return res.status(400).json({ message: 'Password must be at least 6 characters' });
-    }
-
-    const existingUser = await User.findOne({ where: { email: email.toLowerCase() } });
-    if (existingUser) {
-      return res.status(400).json({ message: 'User already exists with this email' });
-    }
-
-    const hashedPassword = await hashPassword(password);
-
-    // Self-registration is intentionally limited: no roleId/companyId escalation,
-    // no super-admin minting, and the account is inactive until an admin invites
-    // (or provisions) it. Super-admin provisioning happens only in server.ts/seed.ts.
-    const user = await User.create({
-      firstName,
-      lastName,
-      email: email.toLowerCase(),
-      password: hashedPassword,
-      phone: phone || null,
-      isSuperAdmin: false,
-      isActive: false,
-      emailVerified: false,
-      phoneVerified: false,
-      // Lands in the original company until self-serve company signup exists.
-      companyId: await getDefaultCompanyId(),
-    });
-
-    return res.status(201).json({
-      message: 'User registered successfully. An administrator must activate your account before you can log in.',
-      user: userPublicFields(user),
-    });
-  } catch (error) {
-    console.error('Registration error:', error);
-    return res.status(500).json({ message: 'Server error during registration' });
-  }
-};
 
 // ─── Company signup (15-day free trial) ───────────────────────────────────────
 
@@ -173,7 +131,7 @@ export const signupCompany = async (req: Request, res: Response) => {
 
     return res.status(201).json({
       message: 'Your company is ready. Your 15-day free trial has started.',
-      token: generateToken(user!.id),
+      token: generateToken(user!),
       user: userPublicFields(user!),
       company: companyPublicFields(company),
     });
@@ -204,7 +162,7 @@ export const login = async (req: Request, res: Response) => {
       }
     }
 
-    const user = await User.findOne({ where: { email }, include: [roleInclude] });
+    const user = await User.findOne({ where: { email: normalizeEmail(email) }, include: [roleInclude] });
     if (!user) {
       return res.status(400).json({ message: companyCode ? 'Invalid company code, email or password' : 'Invalid credentials' });
     }
@@ -223,7 +181,7 @@ export const login = async (req: Request, res: Response) => {
 
     await user.update({ lastLogin: new Date() });
 
-    const token = generateToken(user.id);
+    const token = generateToken(user);
 
     return res.json({
       message: 'Login successful',
@@ -257,8 +215,8 @@ export const googleLogin = async (req: Request, res: Response) => {
       return res.status(400).json({ message: 'Invalid Google token payload' });
     }
 
-    const { email, given_name, family_name } = payload;
-    let user = await User.findOne({ where: { email }, include: [roleInclude] });
+    const { email } = payload;
+    const user = await User.findOne({ where: { email: normalizeEmail(email) }, include: [roleInclude] });
 
     // Google sign-in only signs in existing accounts. New people join by
     // signing up their company or through an invitation, never by landing
@@ -275,7 +233,7 @@ export const googleLogin = async (req: Request, res: Response) => {
 
     await user.update({ lastLogin: new Date() });
 
-    const jwtToken = generateToken(user.id);
+    const jwtToken = generateToken(user);
 
     return res.json({
       message: 'Google login successful',
@@ -292,7 +250,9 @@ export const googleLogin = async (req: Request, res: Response) => {
 
 export const sendInvitation = async (req: Request, res: Response) => {
   try {
-    const { email, firstName = 'Invited', lastName = 'User', roleId } = req.body;
+    const { firstName = 'Invited', lastName = 'User' } = req.body;
+    const email = normalizeEmail(req.body?.email);
+    const roleId = req.body?.roleId ? Number(req.body.roleId) : null;
 
     if (!email) {
       return res.status(400).json({ message: 'Email is required to send an invitation' });
@@ -308,8 +268,17 @@ export const sendInvitation = async (req: Request, res: Response) => {
       return res.status(400).json({ message: 'This email is already registered with another company.' });
     }
 
+    // A role from another company (or a made-up id) must not be assigned.
+    if (roleId && !(await Role.findByPk(roleId))) {
+      return res.status(400).json({ message: 'That role does not exist.' });
+    }
+
     if (user) {
-      if (user.emailVerified) {
+      // Only someone who was invited and has not yet set a password can be
+      // re-invited. Anyone else (the company owner, a user who accepted)
+      // already has a password, and a new invite link would let whoever
+      // holds it take over their account.
+      if (user.emailVerified || !user.inviteToken) {
         return res.status(400).json({ message: 'User is already registered and active.' });
       }
       await user.update({
@@ -391,8 +360,8 @@ export const acceptInvitation = async (req: Request, res: Response) => {
       return res.status(400).json({ message: 'Invitation token and password are required' });
     }
 
-    if (password.length < 6) {
-      return res.status(400).json({ message: 'Password must be at least 6 characters' });
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      return res.status(400).json({ message: PASSWORD_TOO_SHORT });
     }
 
     const user = await User.findOne({
@@ -423,7 +392,7 @@ export const acceptInvitation = async (req: Request, res: Response) => {
       lastLogin: new Date(),
     });
 
-    const jwtToken = generateToken(user.id);
+    const jwtToken = generateToken(user);
 
     return res.json({
       message: 'Invitation accepted successfully. You are now logged in.',
@@ -500,9 +469,9 @@ export const verifyEmail = async (req: Request, res: Response) => {
 
 export const requestPasswordReset = async (req: Request, res: Response) => {
   try {
-    const { email } = req.body;
+    const email = normalizeEmail(req.body?.email);
 
-    const user = await User.findOne({ where: { email } });
+    const user = email ? await User.findOne({ where: { email } }) : null;
     if (!user) {
       return res.json({ message: 'If your email is registered, you will receive a password reset link' });
     }
@@ -543,8 +512,8 @@ export const resetPassword = async (req: Request, res: Response) => {
       return res.status(400).json({ message: 'New password is required' });
     }
 
-    if (password.length < 6) {
-      return res.status(400).json({ message: 'Password must be at least 6 characters' });
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      return res.status(400).json({ message: PASSWORD_TOO_SHORT });
     }
 
     const user = await User.findOne({
@@ -593,14 +562,15 @@ export const changePassword = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ message: 'Current password is incorrect' });
     }
 
-    if (newPassword.length < 6) {
-      return res.status(400).json({ message: 'New password must be at least 6 characters' });
+    if (newPassword.length < MIN_PASSWORD_LENGTH) {
+      return res.status(400).json({ message: `New password must be at least ${MIN_PASSWORD_LENGTH} characters` });
     }
 
     const hashedPassword = await hashPassword(newPassword);
     await user.update({ password: hashedPassword });
 
-    return res.json({ message: 'Password changed successfully' });
+    // Other devices are signed out by the new password; this one gets a fresh token.
+    return res.json({ message: 'Password changed successfully', token: generateToken(user) });
   } catch (error) {
     console.error('Change password error:', error);
     return res.status(500).json({ message: 'Server error' });

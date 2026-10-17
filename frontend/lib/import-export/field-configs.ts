@@ -9,9 +9,9 @@ import { LEAD_SOURCE_OPTIONS } from '../lead-options';
 export const LEAD_FIELDS: ImportExportField[] = [
   { key: 'firstName', label: 'First Name', required: true, type: 'text' },
   { key: 'lastName', label: 'Last Name', required: true, type: 'text' },
-  { key: 'email', label: 'Email', required: true, type: 'email' },
+  { key: 'mobile', label: 'Mobile', required: true, type: 'mobile' },
+  { key: 'email', label: 'Email', type: 'email' },
   { key: 'phone', label: 'Phone', type: 'text' },
-  { key: 'mobile', label: 'Mobile', type: 'text' },
   { key: 'company', label: 'Company', type: 'text' },
   { key: 'jobTitle', label: 'Job Title', type: 'text' },
   { key: 'leadSource', label: 'Lead Source', type: 'select', options: LEAD_SOURCE_OPTIONS.map((o) => o.value) },

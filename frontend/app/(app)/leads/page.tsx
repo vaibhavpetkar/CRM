@@ -393,6 +393,7 @@ export default function LeadsPage() {
                 onImportRow: handleImportRow,
                 onImportBatch: handleImportBatch,
                 importBatchSize: 500,
+                uniqueKey: 'mobile',
                 onImportComplete: fetchLeads,
               }}
             />
