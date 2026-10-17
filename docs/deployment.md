@@ -1,5 +1,7 @@
 # Deploying the CRM to a cloud server
 
+Before going live, work through the [production checklist](production-checklist.md).
+
 The CRM runs as Docker containers: PostgreSQL, Redis, Ollama (free local AI),
 the Express backend and the Next.js frontend. Any Linux cloud VM works (AWS
 EC2, Google Compute Engine, Azure VM, DigitalOcean Droplet, Hetzner, a VPS).
