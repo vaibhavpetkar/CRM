@@ -118,12 +118,10 @@ const port = process.env.PORT || 5000;
 app.set('trust proxy', 1);
 app.disable('x-powered-by');
 
-// Basic browser hardening on every API response. nginx adds HSTS on top.
+// Basic browser hardening on every API response. nginx adds HSTS and the
+// framing rules (X-Frame-Options, frame-ancestors) for the whole site.
 app.use((_req: Request, res: Response, next: express.NextFunction) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options', 'DENY');
-  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
   next();
 });
 

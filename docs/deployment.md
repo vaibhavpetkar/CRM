@@ -52,6 +52,10 @@ Certificate renewal (add to root's crontab):
 0 3 * * * certbot renew --webroot -w /var/www/certbot --quiet && docker exec crm_nginx nginx -s reload
 ```
 
+Then secure the server (firewall, SSH keys only, fail2ban, automatic
+security updates) with `sudo bash deploy/harden-server.sh`. See
+[server-security.md](./server-security.md).
+
 ## Updating
 
 ```bash

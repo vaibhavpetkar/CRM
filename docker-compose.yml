@@ -99,6 +99,10 @@ services:
       - REDIS_URL=redis://redis:6379
       - JWT_SECRET=${JWT_SECRET:?Set JWT_SECRET in .env}
       - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-7d}
+      # Key for secrets the CRM stores in the database (e.g. Vi CPaaS
+      # passwords). Blank = falls back to JWT_SECRET, as before. Setting or
+      # changing it means re-entering those secrets in Settings.
+      - SETTINGS_ENCRYPTION_KEY=${SETTINGS_ENCRYPTION_KEY:-}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
       - EMAIL_SERVICE=${EMAIL_SERVICE}

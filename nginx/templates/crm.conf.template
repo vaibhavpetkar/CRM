@@ -10,6 +10,15 @@ upstream crm_backend {
     server backend:5000;
 }
 
+# Don't print the nginx version on error pages or in the Server header.
+server_tokens off;
+
+# Outer brute-force guard for the public sign-in endpoints (per client IP).
+# The backend has its own, stricter per-route limits (middleware/rateLimiter.ts);
+# this one just stops floods before they reach Node. Over the limit -> 429.
+limit_req_zone $binary_remote_addr zone=crm_auth:10m rate=30r/m;
+limit_req_status 429;
+
 server {
     listen 80;
     server_name ${CRM_DOMAIN};
@@ -36,6 +45,11 @@ server {
     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
     add_header X-Content-Type-Options nosniff always;
     add_header Referrer-Policy strict-origin-when-cross-origin always;
+    # Only this site may put the CRM in a frame (clickjacking protection).
+    # The CSP below sets frame-ancestors only; it does not restrict scripts,
+    # styles or connections, so Next.js is unaffected.
+    add_header X-Frame-Options SAMEORIGIN always;
+    add_header Content-Security-Policy "frame-ancestors 'self'" always;
 
     client_max_body_size 15M; # backend allows up to 10mb JSON bodies + file attachments
 
@@ -81,6 +95,24 @@ server {
         proxy_connect_timeout 10s;
         proxy_send_timeout 30m;
         proxy_read_timeout 30m;
+    }
+
+    # Public sign-in / sign-up / password-reset endpoints: rate limited.
+    location ~ ^/api/auth/(login|google|signup-company|forgot-password|reset-password|accept-invite)(/|$) {
+        limit_req zone=crm_auth burst=20 nodelay;
+        error_page 429 = @crm_auth_limited;
+        proxy_pass http://crm_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # JSON reply (the backend's own format) when the limit above is hit.
+    location @crm_auth_limited {
+        default_type application/json;
+        return 429 '{"message":"Too many attempts. Please wait a minute and try again."}';
     }
 
     location /api/ {
