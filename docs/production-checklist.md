@@ -11,7 +11,8 @@ The details are in [deployment.md](deployment.md), [deploy-aws.md](deploy-aws.md
       been in git, a chat or a screenshot.
 - [ ] `SETTINGS_ENCRYPTION_KEY` is set (random, kept safe). It encrypts saved provider
       passwords (Vi, Exotel). If it is left blank they are encrypted with `JWT_SECRET`,
-      and rotating `JWT_SECRET` would then make them unreadable.
+      and rotating `JWT_SECRET` would then make them unreadable. If you add this key
+      after provider passwords were saved, enter those passwords again in Settings.
 - [ ] `CLIENT_URL` is the real `https://` address, so invite and reset links work.
 - [ ] SMTP (`EMAIL_*`) is configured, so invites and password resets are emailed.
 - [ ] `BACKUP_DAILY_AT` is set (for example `02:30`, India time) to take a daily automatic backup.
