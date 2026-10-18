@@ -6,7 +6,7 @@ import PageHeader from '@/components/ui/page-header';
 import Button from '@/components/ui/button';
 import Card from '@/components/ui/card';
 import StatusBadge from '@/components/ui/status-badge';
-import { authApi, googleTasksApi, getStoredUser } from '@/lib/api';
+import { authApi, callsApi, googleTasksApi, getStoredUser } from '@/lib/api';
 import Link from 'next/link';
 import { CircleStackIcon, Cog6ToothIcon } from '@heroicons/react/24/outline';
 import { useToast } from '@/components/ui/toast';
@@ -32,6 +32,33 @@ export default function SettingsPage() {
     setUser(getStoredUser());
     authApi.getMe().then(setUser).catch(() => {});
   }, []);
+
+  // ─── My calling number: the phone a click-to-call rings first ────────────
+  const [callNumber, setCallNumber] = useState('');
+  const [callNumberSaving, setCallNumberSaving] = useState(false);
+  const [callNumberMessage, setCallNumberMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  useEffect(() => {
+    callsApi
+      .getConfig()
+      .then((config) => setCallNumber(config.agentNumber || ''))
+      .catch(() => {});
+  }, []);
+
+  const saveCallNumber = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCallNumberSaving(true);
+    setCallNumberMessage(null);
+    try {
+      const config = await callsApi.setMyNumber(callNumber);
+      setCallNumber(config.agentNumber || callNumber);
+      setCallNumberMessage({ type: 'success', text: 'Saved. Your calls will ring this phone.' });
+    } catch (err) {
+      setCallNumberMessage({ type: 'error', text: err instanceof Error ? err.message : 'Could not save your number.' });
+    } finally {
+      setCallNumberSaving(false);
+    }
+  };
 
   // Deep-link support: /settings?tab=security, etc.
   useEffect(() => {
@@ -208,6 +235,32 @@ export default function SettingsPage() {
           <p className="mt-3 text-xs text-slate-400">
             Profile details are managed by your administrator. Contact them to update this information.
           </p>
+        </Card>
+      )}
+
+      {activeTab === 'profile' && (
+        <Card title="My calling number" className="mt-6">
+          <form onSubmit={saveCallNumber} className="space-y-3">
+            <p className="text-sm text-slate-500">
+              When you click Call on a lead, this phone rings first, then the customer is connected. The customer sees the
+              company number, not this one.
+            </p>
+            <div className="flex max-w-md gap-2">
+              <input
+                type="tel"
+                value={callNumber}
+                onChange={(e) => setCallNumber(e.target.value)}
+                placeholder="98765 43210"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-[var(--primary)] focus:outline-none"
+              />
+              <Button type="submit" size="sm" disabled={callNumberSaving || !callNumber.trim()}>
+                {callNumberSaving ? 'Saving...' : 'Save'}
+              </Button>
+            </div>
+            {callNumberMessage && (
+              <p className={`text-xs ${callNumberMessage.type === 'success' ? 'text-emerald-600' : 'text-red-500'}`}>{callNumberMessage.text}</p>
+            )}
+          </form>
         </Card>
       )}
 
