@@ -8,6 +8,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import sequelize from './config/database';
 import User from './models/User';
 import Role from './models/Role';
@@ -26,9 +27,12 @@ import './models/Campaign';
 import './models/Template';
 import './models/associations';
 
-// Hardcoded default admin credentials — override via env vars in production.
+// Local development keeps a known login. In production a missing
+// SUPER_ADMIN_PASSWORD gets a random one, shown once below, never a shared default.
 const DEFAULT_ADMIN_EMAIL = process.env.SUPER_ADMIN_EMAIL || 'admin@crmpro.com';
-const DEFAULT_ADMIN_PASSWORD = process.env.SUPER_ADMIN_PASSWORD || 'Admin@123456';
+const GENERATED_ADMIN_PASSWORD = !process.env.SUPER_ADMIN_PASSWORD && process.env.NODE_ENV === 'production';
+const DEFAULT_ADMIN_PASSWORD =
+  process.env.SUPER_ADMIN_PASSWORD || (GENERATED_ADMIN_PASSWORD ? crypto.randomBytes(12).toString('base64url') : 'Admin@123456');
 
 export const seedRoles = async () => {
   const createdRoles: Record<string, Role> = {};
@@ -71,7 +75,11 @@ export const seedAdmin = async (adminRoleId?: number) => {
 
   console.log('✅ Administrator account created:');
   console.log(`   Email:    ${DEFAULT_ADMIN_EMAIL}`);
-  console.log(`   Password: ${DEFAULT_ADMIN_PASSWORD}`);
+  if (!process.env.SUPER_ADMIN_PASSWORD) {
+    console.log(`   Password: ${DEFAULT_ADMIN_PASSWORD}${GENERATED_ADMIN_PASSWORD ? '  (generated; change it after signing in)' : ''}`);
+  } else {
+    console.log('   Password: the SUPER_ADMIN_PASSWORD from your environment');
+  }
   console.log('   ⚠️  Change this password immediately after first login (Settings → Change Password).');
   return admin;
 };

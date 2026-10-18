@@ -3,6 +3,8 @@ import { Op } from 'sequelize';
 import User from '../models/User';
 import Role from '../models/Role';
 import { AuthRequest } from '../middleware/authMiddleware';
+import { seatLimitMessage } from '../utils/subscription';
+import { normalizeIndianNumber } from '../utils/indianPhone';
 import { asyncHandler } from '../utils/errorHandler';
 import * as presenceService from '../services/presenceService';
 import { getOnlineUserIds } from '../realtime/presence';
@@ -144,6 +146,22 @@ export const updateTeamMember = async (req: AuthRequest, res: Response) => {
       }
     }
 
+    // Turning a user back on takes a seat, so it has to fit the plan.
+    if (!member.isActive && (isActive === true || isActive === 'true')) {
+      const seatMessage = await seatLimitMessage(req.company!);
+      if (seatMessage) return res.status(403).json({ message: seatMessage });
+    }
+
+    // The mobile is the phone a click-to-call rings first, so it is stored in
+    // one format (+91XXXXXXXXXX) and must be a real Indian number.
+    let normalizedPhone: string | null | undefined;
+    if (phone !== undefined) {
+      normalizedPhone = String(phone ?? '').trim() ? normalizeIndianNumber(String(phone)) : null;
+      if (String(phone ?? '').trim() && !normalizedPhone) {
+        return res.status(400).json({ message: 'Enter a valid Indian mobile number, e.g. 98765 43210.' });
+      }
+    }
+
     const normalizedRoleId = roleId === '' ? null : roleId;
     if (normalizedRoleId !== undefined) {
       const roleExists = normalizedRoleId === null || (await Role.findByPk(normalizedRoleId));
@@ -155,7 +173,7 @@ export const updateTeamMember = async (req: AuthRequest, res: Response) => {
     await member.update({
       firstName: firstName !== undefined ? firstName : member.firstName,
       lastName: lastName !== undefined ? lastName : member.lastName,
-      phone: phone !== undefined ? phone : member.phone,
+      phone: normalizedPhone !== undefined ? normalizedPhone : member.phone,
       department: department !== undefined ? department : member.department,
       position: position !== undefined ? position : member.position,
       roleId: normalizedRoleId !== undefined ? normalizedRoleId : member.roleId,

@@ -55,6 +55,8 @@ import reportRoutes from './routes/reportRoutes';
 import documentTemplateRoutes from './routes/documentTemplateRoutes';
 import publicRoutes from './routes/publicRoutes';
 import subscriptionRoutes from './routes/subscriptionRoutes';
+import backupRoutes from './routes/backupRoutes';
+import { startBackupScheduler } from './services/backupService';
 
 // Import models in dependency order before sync
 import './models/Company';
@@ -101,6 +103,7 @@ applyTenantScoping();
 // Import middleware
 import { protect } from './middleware/authMiddleware';
 import { moduleGate } from './middleware/moduleGate';
+import { redactUrl } from './utils/redactUrl';
 
 dotenv.config();
 
@@ -113,6 +116,14 @@ const port = process.env.PORT || 5000;
 // request, which would make IP-based rate limiting below treat all users as
 // a single client.
 app.set('trust proxy', 1);
+app.disable('x-powered-by');
+
+// Basic browser hardening on every API response. nginx adds HSTS and the
+// framing rules (X-Frame-Options, frame-ancestors) for the whole site.
+app.use((_req: Request, res: Response, next: express.NextFunction) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  next();
+});
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
 
@@ -160,7 +171,7 @@ app.use((req: Request, res: Response, next: express.NextFunction) => {
   const start = Date.now();
   res.on('finish', () => {
     const duration = Date.now() - start;
-    logger.info(`${req.method} ${req.originalUrl} ${res.statusCode} - ${duration}ms`);
+    logger.info(`${req.method} ${redactUrl(req.originalUrl)} ${res.statusCode} - ${duration}ms`);
   });
   next();
 });
@@ -212,6 +223,8 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/document-templates', documentTemplateRoutes);
 app.use('/api/calls', callRoutes);
 app.use('/api/sales', salesRoutes);
+// Database + uploads backups and restore (super admin only).
+app.use('/api/admin/backups', backupRoutes);
 
 // Serve uploaded files (attachments, generated PDFs) statically — but only to
 // authenticated users. Nothing in the frontend loads these via raw <img>/<a>
@@ -348,6 +361,9 @@ const startServer = async () => {
       startViPuller();
       startStaleCallSweeper();
     });
+
+    // Daily automatic backup, only when BACKUP_DAILY_AT is set.
+    startBackupScheduler();
   } catch (error) {
     logger.error(`❌ Unable to connect to the database: ${error}`);
     process.exit(1);

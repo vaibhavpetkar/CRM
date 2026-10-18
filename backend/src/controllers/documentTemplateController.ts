@@ -6,6 +6,7 @@ import { getStarter } from '../config/printStarters';
 import { renderTemplate, extractPlaceholders } from '../utils/templateRenderer';
 import { buildDocumentData, getPreviewData, renderDocumentPrint, wrapPrintPage } from '../utils/documentPrint';
 import { AppError } from '../errors/AppError';
+import { sanitizeHtml } from '../utils/sanitizeHtml';
 
 const VALID_DOC_TYPES = DOC_TYPES.map((d) => d.value);
 const VALID_PURPOSES = TEMPLATE_PURPOSES.map((p) => p.value);
@@ -116,7 +117,7 @@ export const createTemplate = async (req: Request & { user?: any }, res: Respons
       docType,
       purpose,
       subject: subject || '',
-      htmlBody: htmlBody || '',
+      htmlBody: sanitizeHtml(htmlBody || ''),
       layout: normalizeLayout(req.body.layout),
       isDefault: !!isDefault,
       createdById: req.user?.id || null,
@@ -145,10 +146,12 @@ export const updateTemplate = async (req: Request, res: Response) => {
 
     if (name !== undefined) template.name = String(name).trim();
     if (subject !== undefined) template.subject = subject;
-    if (htmlBody !== undefined) template.htmlBody = htmlBody;
+    // Templates open inside the CRM and on public quote links, so nothing that can run script is kept.
+    const cleanBody = htmlBody !== undefined ? sanitizeHtml(htmlBody) : undefined;
+    if (cleanBody !== undefined) template.htmlBody = cleanBody;
     // Editing the HTML by hand detaches it from a builder design, unless a new design is sent with it.
     if (req.body.layout !== undefined) template.layout = normalizeLayout(req.body.layout);
-    else if (htmlBody !== undefined && htmlBody !== template.previous('htmlBody')) template.layout = null;
+    else if (cleanBody !== undefined && cleanBody !== template.previous('htmlBody')) template.layout = null;
     if (isDefault !== undefined) template.isDefault = !!isDefault;
 
     await template.save();
@@ -186,7 +189,7 @@ export const previewTemplate = async (req: Request, res: Response) => {
 
     const data = recordId ? await buildDocumentData(docType, recordId) : getPreviewData(docType);
     const renderedSubject = renderTemplate(subject || '', data);
-    const renderedHtml = renderTemplate(htmlBody || '', data, { escapeHtml: true });
+    const renderedHtml = sanitizeHtml(renderTemplate(htmlBody || '', data, { escapeHtml: true }));
     const keys = knownKeys(docType);
     const unknownFields = extractPlaceholders(`${subject || ''} ${htmlBody || ''}`).filter((f) => !keys.has(f));
 
@@ -235,7 +238,7 @@ export const previewPrintPage = async (req: Request, res: Response) => {
     const { docType, htmlBody, recordId } = req.body as { docType: DocType; htmlBody: string; recordId?: number | string };
     if (!VALID_DOC_TYPES.includes(docType)) return res.status(400).json({ message: `docType must be one of: ${VALID_DOC_TYPES.join(', ')}` });
     const data = recordId ? await buildDocumentData(docType, recordId) : getPreviewData(docType);
-    const html = wrapPrintPage(renderTemplate(htmlBody || '', data, { escapeHtml: true }), 'Preview', req.body.autoPrint === true);
+    const html = wrapPrintPage(sanitizeHtml(renderTemplate(htmlBody || '', data, { escapeHtml: true })), 'Preview', req.body.autoPrint === true);
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     return res.send(html);
   } catch (error) {

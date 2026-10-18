@@ -180,6 +180,8 @@ export function downloadTemplate(
     switch (f.type) {
       case 'email':
         return 'name@example.com';
+      case 'mobile':
+        return '9876543210';
       case 'date':
         return 'YYYY-MM-DD';
       case 'number':

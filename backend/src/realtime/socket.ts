@@ -5,6 +5,9 @@ import Redis from 'ioredis';
 import jwt, { JwtPayload } from 'jsonwebtoken';
 import logger from '../utils/logger';
 import { initPresence, trackPresence } from './presence';
+import User from '../models/User';
+import { runUnscoped } from '../tenancy/context';
+import { tokenMatchesPassword } from '../middleware/authMiddleware';
 
 let io: SocketIOServer | null = null;
 
@@ -66,8 +69,15 @@ export const initRealtime = async (httpServer: HttpServer): Promise<SocketIOServ
       if (!token) return next(new Error('Authentication required'));
 
       const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as JwtPayload;
-      socket.userId = Number(decoded.id);
-      next();
+      // Same rules as the REST API: a deactivated user or a changed password
+      // ends live updates too.
+      void runUnscoped(() => User.findByPk(Number(decoded.id), { attributes: ['id', 'isActive', 'password'] }))
+        .then((user) => {
+          if (!user || !user.isActive || !tokenMatchesPassword(decoded, user)) return next(new Error('Invalid or expired token'));
+          socket.userId = user.id;
+          next();
+        })
+        .catch(() => next(new Error('Authentication failed')));
     } catch {
       next(new Error('Invalid or expired token'));
     }

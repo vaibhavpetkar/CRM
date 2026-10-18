@@ -20,6 +20,7 @@ import LoadingSpinner from '@/components/ui/loading-spinner';
 import { useToast } from '@/components/ui/toast';
 import { documentTemplatesApi, openPrintWindow, DocTypeOption, MergeField } from '@/lib/api';
 import { renderTemplate } from '@/lib/template-render';
+import { sanitizeHtml } from '@/lib/sanitize-html';
 import {
   Block,
   BlockStyle,
@@ -568,7 +569,7 @@ function PrintBuilder() {
 function BlockPreview({ html, label }: { html: string; label: string }) {
   const empty = !/<(img|hr|table)\b/i.test(html) && !html.replace(/<style[\s\S]*?<\/style>/gi, '').replace(/<[^>]+>/g, '').trim();
   if (empty) return <div className="rounded border border-dashed border-slate-200 px-2 py-3 text-center text-[11px] text-slate-300">{label} (empty for this record)</div>;
-  return <div dangerouslySetInnerHTML={{ __html: html }} />;
+  return <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(html) }} />;
 }
 
 // ─── Property panels ────────────────────────────────────────────────────────

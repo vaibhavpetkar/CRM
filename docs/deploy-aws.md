@@ -30,6 +30,9 @@ Inbound rules:
 
 Do not open 3000, 5000, 5432, 6379 or 11434. Compose binds them to localhost.
 
+After the first deploy, harden the server (firewall, SSH keys only, fail2ban,
+automatic security updates): see [server-security.md](./server-security.md).
+
 ## 3. Launch
 
 In the EC2 console, Launch instance with the settings above. Under

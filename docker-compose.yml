@@ -99,6 +99,10 @@ services:
       - REDIS_URL=redis://redis:6379
       - JWT_SECRET=${JWT_SECRET:?Set JWT_SECRET in .env}
       - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-7d}
+      # Key for secrets the CRM stores in the database (e.g. Vi CPaaS
+      # passwords). Blank = falls back to JWT_SECRET, as before. Setting or
+      # changing it means re-entering those secrets in Settings.
+      - SETTINGS_ENCRYPTION_KEY=${SETTINGS_ENCRYPTION_KEY:-}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
       - EMAIL_SERVICE=${EMAIL_SERVICE}
@@ -170,10 +174,16 @@ services:
       - ANTHROPIC_MAX_CONCURRENT=${ANTHROPIC_MAX_CONCURRENT:-8}
       - AI_QUEUE_WAIT_MS=${AI_QUEUE_WAIT_MS:-20000}
       - AI_REQUEST_TIMEOUT_MS=${AI_REQUEST_TIMEOUT_MS:-45000}
+      # Settings > Backups (super admin). Keeps the newest BACKUP_KEEP backups
+      # (0 = keep all). BACKUP_DAILY_AT=HH:MM (IST) turns on a daily backup.
+      - BACKUP_DIR=/usr/src/app/backups
+      - BACKUP_KEEP=${BACKUP_KEEP:-30}
+      - BACKUP_DAILY_AT=${BACKUP_DAILY_AT:-}
       # Path to .env file on host (mounted at /host/.env inside container)
       - ENV_FILE_PATH=/host/.env
     volumes:
       - backend_uploads:/usr/src/app/uploads
+      - backups_data:/usr/src/app/backups
       # Mount host project root to /host so backend can read/write .env
       - ${VPS_DEPLOY_PATH:-/var/www/crm}:/host
     healthcheck:
@@ -215,4 +225,5 @@ volumes:
   postgres_data:
   redis_data:
   backend_uploads:
+  backups_data:
   ollama_data:

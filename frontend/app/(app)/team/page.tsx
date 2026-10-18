@@ -67,7 +67,7 @@ export default function TeamPage() {
 
   // Edit modal state
   const [editingMember, setEditingMember] = useState<any | null>(null);
-  const [editForm, setEditForm] = useState({ department: '', position: '', roleId: '', isActive: true });
+  const [editForm, setEditForm] = useState({ phone: '', department: '', position: '', roleId: '', isActive: true });
   const [editSubmitting, setEditSubmitting] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
 
@@ -152,6 +152,7 @@ export default function TeamPage() {
   const openEdit = (member: any) => {
     setEditingMember(member);
     setEditForm({
+      phone: member.phone || '',
       department: member.department === 'Unassigned' ? '' : member.department || '',
       position: member.position || '',
       roleId: member.roleId ? String(member.roleId) : '',
@@ -169,6 +170,7 @@ export default function TeamPage() {
     setEditError(null);
     try {
       await teamApi.updateMember(editingMember.id, {
+        phone: editForm.phone.trim(),
         department: editForm.department || null,
         position: editForm.position || null,
         roleId: editForm.roleId ? Number(editForm.roleId) : null,
@@ -231,6 +233,11 @@ export default function TeamPage() {
           teamApi.updateMember(member.id, { roleId: matched.id }).then(fetchData);
         }
       },
+    },
+    {
+      header: 'Calling mobile',
+      accessor: (member) =>
+        member.phone ? <span className="text-slate-600">{member.phone}</span> : <span className="text-xs text-amber-600">Not set</span>,
     },
     {
       header: 'Department',
@@ -485,6 +492,18 @@ export default function TeamPage() {
                     <option key={r.id} value={r.id}>{r.name}</option>
                   ))}
                 </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-700">Calling mobile</label>
+                <input
+                  type="tel"
+                  value={editForm.phone}
+                  onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                  placeholder="98765 43210"
+                  className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
+                />
+                <p className="mt-1 text-[11px] text-slate-400">Calls ring this phone first. With Vi, it must be one of the numbers in Vi&apos;s Agent CLI Mapping.</p>
               </div>
 
               <div className="grid grid-cols-2 gap-3">

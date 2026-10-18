@@ -3,6 +3,7 @@ import { CallUpdate, PlaceCallInput, PlaceCallResult, RecordingDownload, VoicePr
 import { DEFAULT_ENCRYPTED_TEMPLATE, ViSettings, decryptViPayload, loadViSettings, peekViSettings } from './viSettings';
 import { aesEncrypt } from '../../utils/aesCbc';
 import { viCtcAuthUrl, viLoginToken } from './viToken';
+import { UnsafeUrlError, safeFetch } from '../../utils/urlGuard';
 
 /**
  * Vi (Vodafone Idea) CPaaS cloud calling. Used when a company switches it on
@@ -234,15 +235,25 @@ export const buildViBody = (s: ViSettings, values: Record<string, string>) => {
  * credential goes in the headers unless `headers` already carries an
  * Authorization (the Pull API sends its own bearer token).
  */
+/** A short, plain-text piece of a non-JSON answer, so an error never echoes a whole page back. */
+const rawSnippet = (raw: unknown) =>
+  typeof raw === 'string' ? raw.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120) : '';
+
 export const viRequest = async (s: ViSettings, url: string, init: RequestInit = {}) => {
   let res: Response;
   try {
-    res = await fetch(url, {
-      ...init,
-      headers: { Accept: 'application/json', ...authHeaders(s), ...((init.headers as Record<string, string>) || {}) },
-      signal: AbortSignal.timeout(20000),
-    });
+    // The URL can come from the company's settings, so it must be a public address.
+    res = await safeFetch(
+      url,
+      {
+        ...init,
+        headers: { Accept: 'application/json', ...authHeaders(s), ...((init.headers as Record<string, string>) || {}) },
+        signal: AbortSignal.timeout(20000),
+      },
+      { allowHttp: true },
+    );
   } catch (err) {
+    if (err instanceof UnsafeUrlError) throw new VoiceProviderError(`Vi address not allowed: ${err.message}`, 400);
     throw new VoiceProviderError(`Could not reach Vi: ${(err as Error).message}`);
   }
   const text = await res.text();
@@ -256,7 +267,7 @@ export const viRequest = async (s: ViSettings, url: string, init: RequestInit = 
   // Vi CPaaS answers failures as {"status": 0, "message": "..."}.
   const failed = body && (body.success === false || /^(error|fail)/i.test(String(body.status ?? '')) || (body.status === 0 && body.message));
   if (!res.ok || failed) {
-    const message = body?.message || body?.error?.message || body?.error || body?.raw?.slice?.(0, 200) || `HTTP ${res.status}`;
+    const message = body?.message || body?.error?.message || body?.error || rawSnippet(body?.raw) || `HTTP ${res.status}`;
     throw new VoiceProviderError(`Vi refused the request: ${message}`, [401, 403, 406].includes(res.status) ? 502 : 400);
   }
   return body || {};
@@ -338,8 +349,9 @@ export class ViProvider implements VoiceProvider {
 
   async downloadRecording(url: string): Promise<RecordingDownload> {
     const s = await loadViSettings();
-    let res = await fetch(url, { signal: AbortSignal.timeout(60000) });
-    if (res.status === 401 || res.status === 403) res = await fetch(url, { headers: authHeaders(s), signal: AbortSignal.timeout(60000) });
+    // The URL arrives in Vi's webhook, so it must be a public address.
+    let res = await safeFetch(url, { signal: AbortSignal.timeout(60000) }, { allowHttp: true });
+    if (res.status === 401 || res.status === 403) res = await safeFetch(url, { headers: authHeaders(s), signal: AbortSignal.timeout(60000) }, { allowHttp: true });
     if (!res.ok) throw new VoiceProviderError(`Recording download failed (HTTP ${res.status}).`);
     return { data: Buffer.from(await res.arrayBuffer()), contentType: res.headers.get('content-type') || 'audio/mpeg' };
   }

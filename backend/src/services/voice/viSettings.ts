@@ -1,6 +1,7 @@
 import Integration from '../../models/Integration';
 import { currentCompanyId } from '../../tenancy/context';
 import { openSecret, parseAesBytes, sealSecret, aesDecrypt } from '../../utils/aesCbc';
+import { checkUrlShape } from '../../utils/urlGuard';
 
 /**
  * Vi CPaaS settings for one company, saved from Settings > Integrations >
@@ -179,7 +180,18 @@ export const buildStoredConfig = (previous: string | null | undefined, input: Re
 
   const errors: string[] = [];
   for (const f of ['ctcUrl', 'statusUrl', 'pullUrl'] as const) {
-    if (next[f] && !/^https?:\/\//i.test(next[f]!)) errors.push(`${f === 'ctcUrl' ? 'CTC API URL' : f === 'statusUrl' ? 'Call status URL' : 'Pull API address'} must start with https://`);
+    if (!next[f]) continue;
+    const label = f === 'ctcUrl' ? 'CTC API URL' : f === 'statusUrl' ? 'Call status URL' : 'Pull API address';
+    if (!/^https?:\/\//i.test(next[f]!)) {
+      errors.push(`${label} must start with https://`);
+      continue;
+    }
+    // The server calls these addresses, so they must not point inside our network.
+    try {
+      checkUrlShape(next[f]!.replace(/\{\{\w+\}\}/g, 'x'), { allowHttp: true });
+    } catch (err) {
+      errors.push(`${label}: ${(err as Error).message}`);
+    }
   }
   for (const f of ['requestTemplate', 'encryptedTemplate'] as const) {
     if (!next[f]) continue;
