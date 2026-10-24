@@ -130,12 +130,12 @@ function dueLabel(due?: string | null) {
 function Donut({ data, total }: { data: Slice[]; total: number }) {
   if (data.length === 0) return <p className="py-10 text-center text-sm text-slate-400">No lead data yet.</p>;
   return (
-    <div className="flex flex-col items-center gap-3 sm:flex-row 2xl:justify-center 2xl:gap-6">
-      <div className="flex shrink-0 items-center gap-3.5">
-        <div className="min-w-[84px] shrink-0 text-left">
-          <p className="text-2xl font-extrabold leading-none text-slate-900">{total.toLocaleString()}</p>
-          <p className="mt-1 text-[11px] font-medium leading-tight text-slate-500">Total Leads</p>
-        </div>
+    <div className="w-full">
+      <div className="mb-4">
+        <p className="text-2xl font-extrabold leading-none text-slate-900">{total.toLocaleString()}</p>
+        <p className="mt-1 text-[11px] font-medium leading-tight text-slate-500">Total Leads</p>
+      </div>
+      <div className="flex flex-col items-center justify-center gap-4 sm:flex-row sm:items-center sm:justify-center 2xl:gap-6">
         <div className="h-[104px] w-[104px] shrink-0 2xl:h-36 2xl:w-36">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
@@ -148,20 +148,20 @@ function Donut({ data, total }: { data: Slice[]; total: number }) {
             </PieChart>
           </ResponsiveContainer>
         </div>
+        <ul className="w-full min-w-0 flex-1 space-y-1.5 2xl:max-w-[240px]">
+          {data.map((item) => (
+            <li key={item.name} className="flex items-center justify-between gap-2 text-[11px]">
+              <span className="flex min-w-0 items-center gap-1.5">
+                <span className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ backgroundColor: item.color }} />
+                <span className="truncate font-medium text-slate-700">{item.name}</span>
+              </span>
+              <span className="shrink-0 text-slate-500">
+                {item.value} ({total > 0 ? ((item.value / total) * 100).toFixed(1) : '0.0'}%)
+              </span>
+            </li>
+          ))}
+        </ul>
       </div>
-      <ul className="w-full min-w-0 flex-1 space-y-1.5 2xl:max-w-[240px]">
-        {data.map((item) => (
-          <li key={item.name} className="flex items-center justify-between gap-2 text-[11px]">
-            <span className="flex min-w-0 items-center gap-1.5">
-              <span className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ backgroundColor: item.color }} />
-              <span className="truncate font-medium text-slate-700">{item.name}</span>
-            </span>
-            <span className="shrink-0 text-slate-500">
-              {item.value} ({total > 0 ? ((item.value / total) * 100).toFixed(1) : '0.0'}%)
-            </span>
-          </li>
-        ))}
-      </ul>
     </div>
   );
 }
@@ -568,13 +568,13 @@ export default function DashboardPage() {
           )}
         </Panel>
 
-        <Panel title="Leads by Status" bodyClassName="flex items-center">
+        <Panel title="Leads by Status" bodyClassName="pt-2">
           <div className="w-full">
             <Donut data={statusSlices} total={stats.totalLeads} />
           </div>
         </Panel>
 
-        <Panel title="Leads by Source" action={<PanelLink href="/reports?step=lead-sources">Report</PanelLink>} bodyClassName="flex items-center">
+        <Panel title="Leads by Source" action={<PanelLink href="/reports?step=lead-sources">Report</PanelLink>} bodyClassName="pt-2">
           <div className="w-full">
             <Donut data={sourceSlices} total={stats.totalLeads} />
           </div>
