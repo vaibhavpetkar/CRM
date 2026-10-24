@@ -5,7 +5,7 @@ Before going live, work through the [production checklist](production-checklist.
 The CRM runs as Docker containers: PostgreSQL, Redis, Ollama (free local AI),
 the Express backend and the Next.js frontend. Any Linux cloud VM works (AWS
 EC2, Google Compute Engine, Azure VM, DigitalOcean Droplet, Hetzner, a VPS).
-Production domain: **crm.eleviq.buzz**.
+Production domain: **crm.shreemahalaxmirealty.in**.
 
 Deploying on AWS? Follow [deploy-aws.md](./deploy-aws.md) for the EC2-specific steps.
 
@@ -14,7 +14,7 @@ Deploying on AWS? Follow [deploy-aws.md](./deploy-aws.md) for the EC2-specific s
 - A Linux server with at least 2 vCPU and 4 GB RAM (Ollama uses ~2 GB; set
   `AI_PROVIDER`/`ANTHROPIC_API_KEY` and drop Ollama if the box is smaller).
 - Docker Engine with the Compose plugin.
-- A DNS `A` record for `crm.eleviq.buzz` pointing at the server.
+- A DNS `A` record for `crm.shreemahalaxmirealty.in` pointing at the server.
 - Ports 80 and 443 open in the cloud firewall / security group. Keep 3000,
   5000, 5432 and 6379 closed: Compose binds them to 127.0.0.1 only.
 
@@ -30,7 +30,7 @@ Get the HTTPS certificate once (nothing may be listening on port 80 yet):
 
 ```bash
 sudo apt install -y certbot
-sudo certbot certonly --standalone -d crm.eleviq.buzz
+sudo certbot certonly --standalone -d crm.shreemahalaxmirealty.in
 sudo mkdir -p /var/www/certbot
 ```
 
@@ -44,7 +44,7 @@ sudo docker compose exec -T backend npm run migrate
 On a brand-new database the backend creates the tables on its first start,
 which is why migrations run after `up`.
 
-Open https://crm.eleviq.buzz and sign in with `SUPER_ADMIN_EMAIL` /
+Open https://crm.shreemahalaxmirealty.in and sign in with `SUPER_ADMIN_EMAIL` /
 `SUPER_ADMIN_PASSWORD` and company code `my-company` (rename the company in
 Settings > Company).
 
@@ -100,7 +100,7 @@ origins are accepted; localhost is allowed only outside production.
 ```bash
 sudo docker compose ps                 # backend shows (healthy) once /api/health answers
 sudo docker compose logs -f backend
-curl -s https://crm.eleviq.buzz/api/health
+curl -s https://crm.shreemahalaxmirealty.in/api/health
 ```
 
 ## Backups and restore
@@ -139,7 +139,7 @@ Settings (in `.env`):
 The backend image includes the PostgreSQL 15 client tools (`pg_dump`,
 `pg_restore`); the Backups page shows the installed version. nginx allows
 large uploads and long timeouts only on `/api/admin/backups`
-(`nginx/templates/crm.conf.template`, `nginx/crm.eleviq.buzz.conf`). If your
+(`nginx/templates/crm.conf.template`, `nginx/crm.shreemahalaxmirealty.in.conf`). If your
 server uses a different nginx config, add the same `location` block there.
 The backend accepts an upload for at most 5 minutes (Node's request
 timeout); for a very large file over a slow link, copy it onto the server
