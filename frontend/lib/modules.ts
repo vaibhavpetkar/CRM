@@ -9,17 +9,7 @@
  */
 export type ModuleKey = 'deals' | 'quotes' | 'tasks' | 'meetings' | 'invoices' | 'marketing' | 'inventory' | 'finance';
 
-const ALL_MODULES: ModuleKey[] = ['deals', 'quotes', 'tasks', 'meetings', 'invoices', 'marketing', 'inventory', 'finance'];
-
-// NEXT_PUBLIC_DISABLED_MODULES (comma separated, "none" for none) overrides the default.
-const fromEnv = process.env.NEXT_PUBLIC_DISABLED_MODULES;
-export const DISABLED_MODULES: ModuleKey[] =
-  fromEnv === undefined
-    ? ALL_MODULES
-    : fromEnv
-        .split(',')
-        .map((m) => m.trim().toLowerCase())
-        .filter((m): m is ModuleKey => (ALL_MODULES as string[]).includes(m));
+export const DISABLED_MODULES: ModuleKey[] = [];
 
 /** Page paths owned by each module. Pipeline is the deals board. */
 const MODULE_PATHS: Record<ModuleKey, string[]> = {
