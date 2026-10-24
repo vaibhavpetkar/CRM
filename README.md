@@ -11,7 +11,7 @@
 **A full-featured, production-ready Customer Relationship Management system**  
 Built with Next.js, Express, PostgreSQL, Redis, and Socket.IO — Dockerized with GitHub Actions CI/CD.
 
-[🌐 Live Demo](https://crm.eleviq.buzz) · [📋 Changelog](./CHANGELOG.md) · [🐛 Report Bug](https://github.com/vaibhavpetkar/CRM/issues)
+[🌐 Live Demo](https://crm.shreemahalaxmirealty.in) · [📋 Changelog](./CHANGELOG.md) · [🐛 Report Bug](https://github.com/vaibhavpetkar/CRM/issues)
 
 </div>
 
@@ -19,7 +19,7 @@ Built with Next.js, Express, PostgreSQL, Redis, and Socket.IO — Dockerized wit
 
 ## 📸 Screenshots
 
-> Coming soon — visit the [live demo](https://crm.eleviq.buzz) to explore the application.
+> Coming soon — visit the [live demo](https://crm.shreemahalaxmirealty.in) to explore the application.
 
 ---
 
@@ -104,7 +104,7 @@ CRM/
 │   └── Dockerfile            # Multi-stage standalone Dockerfile
 │
 ├── nginx/
-│   ├── crm.eleviq.buzz.conf  # Production Nginx config (SSL/HTTPS)
+│   ├── crm.shreemahalaxmirealty.in.conf  # Production Nginx config (SSL/HTTPS)
 │   └── crm.local.conf        # Local dev Nginx config (HTTP only)
 │
 ├── .github/
@@ -217,8 +217,8 @@ git clone https://github.com/vaibhavpetkar/CRM.git /var/www/crm
 ### Step 2: Configure Nginx on VPS
 ```bash
 # Copy the production nginx config
-sudo cp /var/www/crm/nginx/crm.eleviq.buzz.conf /etc/nginx/sites-available/crm.eleviq.buzz
-sudo ln -sf /etc/nginx/sites-available/crm.eleviq.buzz /etc/nginx/sites-enabled/crm.eleviq.buzz
+sudo cp /var/www/crm/nginx/crm.shreemahalaxmirealty.in.conf /etc/nginx/sites-available/crm.shreemahalaxmirealty.in
+sudo ln -sf /etc/nginx/sites-available/crm.shreemahalaxmirealty.in /etc/nginx/sites-enabled/crm.shreemahalaxmirealty.in
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
@@ -253,7 +253,7 @@ graph LR
     E --> F[docker compose up --build]
     F --> G[Copy nginx config]
     G --> H[nginx -t && reload]
-    H --> I[✅ Live on crm.eleviq.buzz]
+    H --> I[✅ Live on crm.shreemahalaxmirealty.in]
 ```
 
 ---
@@ -276,7 +276,7 @@ graph LR
 | `GOOGLE_CLIENT_SECRET` | Google OAuth client secret |
 | `EMAIL_USER` | Gmail address for sending emails |
 | `EMAIL_PASS` | Gmail app password |
-| `CLIENT_URL` | Frontend origin for CORS (e.g. `https://crm.eleviq.buzz`) |
+| `CLIENT_URL` | Frontend origin for CORS (e.g. `https://crm.shreemahalaxmirealty.in`) |
 | `SUPER_ADMIN_EMAIL` | Initial super admin email |
 | `SUPER_ADMIN_PASSWORD` | Initial super admin password |
 | `OLLAMA_BASE_URL` | AI Assistant, free/local option — set automatically in `docker-compose.yml` to the built-in `ollama` service; leave unset outside Docker to disable |
@@ -291,7 +291,7 @@ graph LR
 ### Frontend (`frontend/.env.production.example`)
 | Variable | Description |
 |---|---|
-| `NEXT_PUBLIC_API_URL` | Backend API URL baked at build time (e.g. `https://crm.eleviq.buzz/api`) |
+| `NEXT_PUBLIC_API_URL` | Backend API URL baked at build time (e.g. `https://crm.shreemahalaxmirealty.in/api`) |
 | `NEXT_PUBLIC_GOOGLE_CLIENT_ID` | Google OAuth client ID (same as backend) |
 
 ---
@@ -344,5 +344,5 @@ GitHub: [@vaibhavpetkar](https://github.com/vaibhavpetkar)
 ---
 
 <div align="center">
-Made with ❤️ — <a href="https://crm.eleviq.buzz">crm.eleviq.buzz</a>
+Made with ❤️ — <a href="https://crm.shreemahalaxmirealty.in">crm.shreemahalaxmirealty.in</a>
 </div>
