@@ -107,7 +107,7 @@ Add `PERMIT_ROOT_LOGIN=no` if nothing logs in as root.
    again (`ssh -i your-key.pem ubuntu@<server-ip>`). If that works, you can
    close the first one. If it doesn't, use the first window to undo the SSH
    change (see below).
-2. Open the CRM in a browser (https://crm.eleviq.buzz) and sign in.
+2. Open the CRM in a browser (https://crm.shreemahalaxmirealty.in) and sign in.
 3. Turn on the Docker log limits when a minute of downtime is OK (at night,
    for example):
    ```bash

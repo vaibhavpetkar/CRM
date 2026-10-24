@@ -17,7 +17,7 @@ services:
       - frontend
       - backend
     environment:
-      - CRM_DOMAIN=${CRM_DOMAIN:-crm.eleviq.buzz}
+      - CRM_DOMAIN=${CRM_DOMAIN:-crm.shreemahalaxmirealty.in}
     ports:
       - "80:80"
       - "443:443"

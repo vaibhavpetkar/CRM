@@ -52,7 +52,7 @@ or a fine-grained token:
 1. EC2 > Elastic IPs > Allocate, then Associate it with the instance, so the
    address survives stop/start.
 2. At your DNS provider (or Route 53), create an `A` record:
-   `crm.eleviq.buzz -> <Elastic IP>`. Wait until `dig +short crm.eleviq.buzz`
+   `crm.shreemahalaxmirealty.in -> <Elastic IP>`. Wait until `dig +short crm.shreemahalaxmirealty.in`
    returns the Elastic IP.
 
 ## 5. Configure and start
@@ -63,13 +63,13 @@ cd /var/www/crm
 git checkout real-estate       # this server runs the real-estate branch
 nano .env                      # set DB_PASSWORD, JWT_SECRET, SUPER_ADMIN_PASSWORD (+ email, Google, Exotel...)
 
-sudo certbot certonly --standalone -d crm.eleviq.buzz
+sudo certbot certonly --standalone -d crm.shreemahalaxmirealty.in
 sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 sudo docker compose exec -T backend npm run migrate
 ```
 
 Generate secrets with
-`openssl rand -hex 48`. Then open https://crm.eleviq.buzz.
+`openssl rand -hex 48`. Then open https://crm.shreemahalaxmirealty.in.
 
 Certificate renewal (`sudo crontab -e`):
 
