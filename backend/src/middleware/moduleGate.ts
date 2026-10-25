@@ -11,17 +11,7 @@ import { Request, Response, NextFunction } from 'express';
  */
 export type ModuleKey = 'deals' | 'quotes' | 'tasks' | 'meetings' | 'invoices' | 'marketing' | 'inventory' | 'finance';
 
-const ALL_MODULES: ModuleKey[] = ['deals', 'quotes', 'tasks', 'meetings', 'invoices', 'marketing', 'inventory', 'finance'];
-
-const parseDisabled = (raw: string | undefined): ModuleKey[] =>
-  raw === undefined
-    ? ALL_MODULES
-    : raw
-        .split(',')
-        .map((m) => m.trim().toLowerCase())
-        .filter((m): m is ModuleKey => (ALL_MODULES as string[]).includes(m));
-
-export const DISABLED_MODULES = parseDisabled(process.env.DISABLED_MODULES);
+export const DISABLED_MODULES: ModuleKey[] = [];
 
 export const isModuleEnabled = (key: ModuleKey) => !DISABLED_MODULES.includes(key);
 
