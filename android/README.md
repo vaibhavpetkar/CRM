@@ -15,18 +15,19 @@ web app can tell when it runs inside it.
 
 ## Releasing
 
-Push a tag that starts with `crm-v` (not `v`, which deploys master):
+Write the notes in `docs/releases/crm-v2.0.1.md` and merge them into
+`real-estate`. `.github/workflows/android-release.yml` then builds the APK,
+creates the tag `crm-v2.0.1` on that commit and publishes the release
+"Inveon One CRM 2.0.1" with `InveonOneCRM-2.0.1.apk` and its `.sha256`
+attached.
+
+Pushing a tag that starts with `crm-v` does the same (never `v`, which
+deploys master):
 
 ```
 git tag crm-v2.0.1 origin/real-estate
 git push origin crm-v2.0.1
 ```
-
-`.github/workflows/android-release.yml` builds the APK and publishes the
-release "Inveon One CRM 2.0.1" with `InveonOneCRM-2.0.1.apk` and its
-`.sha256` attached. Write the notes first in `docs/releases/crm-v2.0.1.md`;
-without that file GitHub lists the merged pull requests instead. You can also
-run the workflow by hand from the Actions tab and type the tag.
 
 The version code comes from the tag (2.0.1 becomes 20001), so every new
 release installs over the last one.
