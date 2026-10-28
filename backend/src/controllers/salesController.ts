@@ -56,7 +56,10 @@ export const distributeUnassigned = asyncHandler(async (_req: AuthRequest, res: 
 // Public: the telephony provider asks whose turn it is for an incoming call.
 export const routeIncomingCallWebhook = async (req: Request, res: Response) => {
   try {
-    const route = await leadRotation.routeIncomingCall(String(req.params.token || ''));
+    // The caller's number, under whatever name the provider uses (CallFrom, caller, msisdn...).
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const caller = incomingCalls.readInboundEvent({ ...req.query, ...body }).customer;
+    const route = await leadRotation.routeIncomingCall(String(req.params.token || ''), caller);
     if (!route) return res.sendStatus(404);
     if (String(req.query.format || '') === 'text') return res.type('text/plain').send(route.numbers[0] || '');
     // Exotel Connect applet "dynamic URL" response: dial these in order.

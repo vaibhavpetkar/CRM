@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { Op } from 'sequelize';
+import { Op, col, fn, where as sqlWhere } from 'sequelize';
 import sequelize from '../config/database';
 import Integration from '../models/Integration';
 import User from '../models/User';
@@ -178,13 +178,41 @@ export const distributeUnassigned = async (limit = 500) => {
   return { assigned: [...counts.values()].reduce((a, b) => a + b, 0), byUser: Object.fromEntries(counts) };
 };
 
+const digitsLike = (column: string, number: string) =>
+  sqlWhere(fn('regexp_replace', col(column), '[^0-9]', '', 'g'), { [Op.like]: `%${number.replace(/\D/g, '').slice(-10)}` });
+
+/**
+ * The sales person this caller last spoke to: whoever is on the newest call
+ * with this number (incoming or outgoing), else the owner of their lead.
+ * Runs in the company's context. Null for a new caller.
+ */
+export const lastSalesPersonFor = async (number: string | null | undefined): Promise<number | null> => {
+  if (!number || number.replace(/\D/g, '').length < 10) return null;
+  const active = async (id: number | null | undefined) =>
+    id ? !!(await User.findOne({ where: { id, isActive: true } as any, attributes: ['id'] })) : false;
+  const calls = await Call.findAll({
+    where: { [Op.and]: [digitsLike('customerNumber', number)] } as any,
+    order: [['createdAt', 'DESC']],
+    limit: 5,
+    attributes: ['userId'],
+  });
+  for (const call of calls) if (await active(call.userId)) return call.userId;
+  const lead = await Lead.findOne({
+    where: { [Op.or]: [digitsLike('mobile', number), digitsLike('alternateMobile', number)] } as any,
+    order: [['createdAt', 'DESC']],
+    attributes: ['assignedToId'],
+  });
+  return (await active(lead?.assignedToId)) ? lead!.assignedToId! : null;
+};
+
 /**
  * Incoming-call routing for the provider (public, the token is the key):
- * returns whose turn it is, then the rest of the team as fallbacks, as
- * phone numbers. Shaped for Exotel's Connect applet "dynamic URL"; other
+ * a returning caller goes to the sales person they last spoke to; anyone
+ * else to whoever's turn it is. The rest of the team follow as fallbacks,
+ * as phone numbers. Shaped for Exotel's Connect applet "dynamic URL"; other
  * providers can ask for ?format=text to get just the first number.
  */
-export const routeIncomingCall = async (token: string) => {
+export const routeIncomingCall = async (token: string, caller?: string | null) => {
   if (!/^[a-f0-9]{48}$/.test(token)) return null;
   const row = await runUnscoped(() =>
     Integration.findOne({ where: { provider: PROVIDER, config: { [Op.like]: `%"routingToken":"${token}"%` } } })
@@ -194,11 +222,13 @@ export const routeIncomingCall = async (token: string) => {
   return runWithTenant(companyId, async () => {
     const config = parse(row.config);
     if (config.routingToken !== token) return null;
-    const first = await takeNextAgent({ force: true });
+    // A returning caller doesn't use up anyone's turn.
+    const lastSpokeTo = await lastSalesPersonFor(caller);
+    const first = lastSpokeTo ?? (await takeNextAgent({ force: true }));
     const order = first ? [first, ...config.userIds.filter((id) => id !== first)] : config.userIds;
     const users = await User.findAll({ where: { id: order, isActive: true }, attributes: ['id', 'phone'] });
     const phoneById = new Map(users.map((u) => [u.id, normalizeIndianNumber(u.phone)]));
     const numbers = order.map((id) => phoneById.get(id)).filter((n): n is string => !!n);
-    return { userId: first, numbers };
+    return { userId: first, returningCaller: !!lastSpokeTo, numbers };
   });
 };

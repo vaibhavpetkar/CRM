@@ -7,11 +7,6 @@ import { receiveIncomingCallWebhook, routeIncomingCallWebhook } from '../control
 // secret per-call token in the URL is what authenticates the request.
 const router = Router();
 
-// Rotational calling for incoming calls: the provider asks whose turn it is.
-// Before /:token so "rotation" isn't read as a call token.
-router.get('/rotation/:token', routeIncomingCallWebhook);
-router.post('/rotation/:token', routeIncomingCallWebhook);
-
 // Incoming call events (ringing, answered, ended, recording) for the company
 // whose secret token this is. Some providers send them as a GET query string.
 const parseBody = [
@@ -20,6 +15,13 @@ const parseBody = [
   // An AES-encrypted body (Vi CPaaS) arrives as plain text.
   express.text({ type: ['text/*', 'application/octet-stream'], limit: '200kb' }),
 ];
+
+// Rotational calling for incoming calls: the provider asks who to ring (the
+// sales person a returning caller last spoke to, else whose turn it is).
+// Before /:token so "rotation" isn't read as a call token.
+router.get('/rotation/:token', routeIncomingCallWebhook);
+router.post('/rotation/:token', ...parseBody, routeIncomingCallWebhook);
+
 router.get('/incoming/:token', receiveIncomingCallWebhook);
 router.post('/incoming/:token', ...parseBody, receiveIncomingCallWebhook);
 
