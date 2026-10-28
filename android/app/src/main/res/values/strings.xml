@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Inveon One CRM</string>
+    <string name="choose_file">Choose a file</string>
+    <string name="no_app_for_link">No app on this phone can open that link.</string>
+    <string name="download_started">Downloading %1$s</string>
+    <string name="download_saved">Saved %1$s to Downloads</string>
+    <string name="download_failed">Could not save the file.</string>
+</resources>

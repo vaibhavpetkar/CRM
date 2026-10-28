@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Same navy and brand blue as the web app's sidebar and buttons. -->
+    <color name="navy">#071533</color>
+    <color name="brand_blue">#0066FF</color>
+    <color name="brand_orange">#FF8A00</color>
+    <color name="canvas">#F4F7FC</color>
+</resources>
