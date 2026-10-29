@@ -125,6 +125,7 @@ services:
       - META_APP_SECRET=${META_APP_SECRET:-}
       - META_VERIFY_TOKEN=${META_VERIFY_TOKEN:-}
       - META_LOGIN_CONFIG_ID=${META_LOGIN_CONFIG_ID:-}
+      - META_POLL_MINUTES=${META_POLL_MINUTES:-2}
       # Click-to-call (call icon next to phone numbers). Default provider is
       # Exotel; VOICE_PROVIDER=mock gives a demo with no real calls. Call
       # status webhook: ${CLIENT_URL}/api/webhooks/voice/<per-call token>.
