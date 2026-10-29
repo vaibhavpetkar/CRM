@@ -117,8 +117,9 @@ export const buildAuthUrl = (connectingUserId: number): string => {
   if (!isMetaConfigured()) {
     throw new MetaApiError('Facebook Lead Ads is not configured: set META_APP_ID and META_APP_SECRET on the server.', 400);
   }
+  // Picking businesses and Pages in Facebook's dialog can take a while, so the link lasts an hour.
   const state = jwt.sign({ purpose: 'meta-connect', userId: connectingUserId }, process.env.JWT_SECRET as string, {
-    expiresIn: '10m',
+    expiresIn: '1h',
   });
   const url = new URL(`https://www.facebook.com/${GRAPH_VERSION()}/dialog/oauth`);
   url.searchParams.set('client_id', process.env.META_APP_ID as string);
