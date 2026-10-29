@@ -54,6 +54,7 @@ export const META_SCOPES = [
 const LEAD_FIELDS = 'id,created_time,field_data,form_id,ad_name,adset_name,campaign_name,platform,is_organic';
 const SYNC_DAYS = 7;
 const STALE_PROCESSING_MS = 10 * 60 * 1000;
+const POLL_MINUTES = () => Math.max(1, Number(process.env.META_POLL_MINUTES) || 2);
 
 export const isMetaConfigured = (): boolean => !!process.env.META_APP_ID && !!process.env.META_APP_SECRET;
 
@@ -496,9 +497,12 @@ const importLead = async (page: MetaPage, leadgenId: string, prefetched?: any): 
  * any the webhook missed (or that failed before). Already-imported leads are
  * skipped by their leadgen id, so this is safe to run any time.
  */
-export const syncPage = async (id: number) => {
+export const syncPage = async (id: number, opts: { sinceLastSync?: boolean } = {}) => {
   const page = await findPage(id);
-  const since = Math.floor((Date.now() - SYNC_DAYS * 24 * 60 * 60 * 1000) / 1000);
+  const weekAgo = Date.now() - SYNC_DAYS * 24 * 60 * 60 * 1000;
+  // The auto-fetch only re-reads since the last run (with overlap); dedupe makes the overlap harmless.
+  const lastSync = opts.sinceLastSync && page.lastSyncAt ? new Date(page.lastSyncAt).getTime() - 15 * 60 * 1000 : 0;
+  const since = Math.floor(Math.max(weekAgo, lastSync) / 1000);
   const counts = { created: 0, duplicate: 0, skipped: 0, failed: 0 };
 
   try {
@@ -523,4 +527,31 @@ export const syncPage = async (id: number) => {
 
   await page.update({ lastSyncAt: new Date() });
   return counts;
+};
+
+let pollTimer: NodeJS.Timeout | null = null;
+
+/**
+ * Every few minutes, fetch new leads for every Page set to receive leads, so
+ * leads still arrive when a webhook is missed (or the app is in Development
+ * mode, where Meta only sends test webhooks).
+ */
+export const startMetaPoller = () => {
+  if (pollTimer || !isMetaConfigured()) return;
+  const run = async () => {
+    try {
+      const pages = await runUnscoped(() => MetaPage.findAll({ where: { isSubscribed: true } }));
+      for (const page of pages) {
+        const companyId = page.get('companyId') as number | null;
+        if (!companyId || !page.pageAccessToken) continue;
+        await runWithTenant(companyId, () => syncPage(page.id, { sinceLastSync: true })).catch((err) =>
+          logger.warn(`[meta] Auto-fetch for page ${page.pageId}: ${err.message}`)
+        );
+      }
+    } catch (err) {
+      logger.warn(`[meta] Auto-fetch run failed: ${err}`);
+    }
+  };
+  pollTimer = setInterval(run, POLL_MINUTES() * 60000);
+  pollTimer.unref?.();
 };

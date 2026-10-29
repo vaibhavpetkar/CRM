@@ -48,6 +48,7 @@ import salesRoutes from './routes/salesRoutes';
 import voiceWebhookRoutes from './routes/voiceWebhookRoutes';
 import portalWebhookRoutes from './routes/portalWebhookRoutes';
 import { startPortalPoller } from './services/portalLeadsService';
+import { startMetaPoller } from './services/metaLeadsService';
 import { startViPuller } from './services/viCpaasService';
 import { startStaleCallSweeper } from './services/callService';
 import expenseRoutes from './routes/expenseRoutes';
@@ -358,6 +359,7 @@ const startServer = async () => {
       logger.info(`🚀 Server is running on http://localhost:${port}`);
       logger.info(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
       startPortalPoller();
+      startMetaPoller();
       startViPuller();
       startStaleCallSweeper();
     });
