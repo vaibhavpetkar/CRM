@@ -287,3 +287,41 @@ body {
     display: none !important;
   }
 }
+
+/* ─── Sign-in screens (app/(auth)/layout.tsx) ────────────────────────────────
+   Purple accent and Plus Jakarta Sans, scoped to .auth-shell so the rest of
+   the app keeps its own palette. */
+.auth-shell {
+  --primary: #5f259f;
+  --primary-hover: #470085;
+  --auth-btn: #5f259f;
+  --auth-btn-hover: #470085;
+  --auth-canvas: #f8f9fa;
+  --auth-tint: #f1e8fc;
+  --auth-glow: rgba(95, 37, 159, 0.09);
+  font-family: 'Plus Jakarta Sans', var(--font-sans);
+}
+
+.dark .auth-shell {
+  --primary: #c39cf5;
+  --primary-hover: #d4b6f8;
+  --auth-btn: #7b3fd4;
+  --auth-btn-hover: #8d55e0;
+  --auth-canvas: #0d0b14;
+  --auth-tint: rgba(167, 120, 240, 0.14);
+  --auth-glow: rgba(123, 63, 212, 0.16);
+  --card-bg: #17141f;
+  --border: #2c2738;
+}
+
+/* Large screens and TVs: scale the whole sign-in page up by raising the root
+   font size (the layout is sized in rem). */
+@media (min-width: 1920px) {
+  html:has(.auth-shell) { font-size: 19px; }
+}
+@media (min-width: 2560px) {
+  html:has(.auth-shell) { font-size: 24px; }
+}
+@media (min-width: 3200px) {
+  html:has(.auth-shell) { font-size: 32px; }
+}

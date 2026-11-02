@@ -74,7 +74,7 @@ export default function SignupPage() {
   );
 
   return (
-    <div className="w-full max-w-md rounded-2xl border border-slate-200/70 bg-[var(--card-bg)] p-8 shadow-xl shadow-slate-200/50 sm:p-10">
+    <div className="w-full">
       <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Start your free trial</h1>
       <p className="mt-1.5 text-sm text-slate-500">15 days free, no card needed. Set up your company and invite your team.</p>
 
