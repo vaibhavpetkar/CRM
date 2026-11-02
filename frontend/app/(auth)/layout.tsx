@@ -1,70 +1,48 @@
+/* eslint-disable @next/next/no-img-element -- static brand artwork from /public/auth */
 import { InveonOneLogo, InveonTechLogo } from '@/components/auth/brand';
 import ThemeToggle from '@/components/ui/theme-toggle';
 
 /*
  * Shared frame for every sign-in screen (login, forgot/reset password,
- * invites). One layout that reflows instead of separate mobile/desktop pages:
+ * invites), built from the "Inveon One CRM — Sign In" design. Artwork lives
+ * in /public/auth.
  *
- *   phone   (< 640px)   logo bar, the form card, then a short feature list
- *   tablet  (640-1023)  same order, wider card, features in a 2 x 2 grid
- *   desktop (>= 1024)   hero on the left, form card on the right
- *   TV      (>= 1920)   same as desktop; globals.css raises the root font
- *                       size (.auth-shell) so everything scales up evenly
+ *   phone / tablet (< 1024px)  logo + headline, then the form card, then the
+ *                              feature cards and quick links
+ *   desktop (>= 1024px)        branding on the left, form card on the right,
+ *                              module badges floating on the portal rings
+ *   TV (>= 1920px)             same as desktop; globals.css raises the root
+ *                              font size (.auth-shell) so everything scales
  *
- * Sizes here are in rem on purpose, so the TV scaling reaches all of them.
+ * Sizes are in rem on purpose so the TV scaling reaches all of them.
  */
 
-const FEATURES = [
-  {
-    label: 'Leads',
-    sub: 'Every portal, ad and walk-in in one list',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6">
-        <circle cx="12" cy="8" r="3.5" stroke="currentColor" strokeWidth="1.7" />
-        <path d="M5 20c0-3.6 3.1-6 7-6s7 2.4 7 6" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-      </svg>
-    ),
-  },
-  {
-    label: 'Calls',
-    sub: 'Click-to-call with notes and recordings',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6">
-        <path
-          d="M5 4h3.5l1.5 4-2.2 1.4a11 11 0 0 0 4.8 4.8L14 12l4 1.5V17a2 2 0 0 1-2 2A13 13 0 0 1 3 6a2 2 0 0 1 2-2Z"
-          stroke="currentColor"
-          strokeWidth="1.7"
-          strokeLinejoin="round"
-        />
-      </svg>
-    ),
-  },
-  {
-    label: 'Site Visits',
-    sub: 'Schedule visits and never miss a follow-up',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6">
-        <path d="M3.5 10.5 12 4l8.5 6.5V20h-17v-9.5Z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
-        <path d="M9.5 20v-5.5h5V20" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
-      </svg>
-    ),
-  },
-  {
-    label: 'Reports',
-    sub: 'Live team performance and analytics',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6">
-        <path d="M4 20V10M10 20V5M16 20v-7M21.5 20h-19" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-      </svg>
-    ),
-  },
+const ORBIT_BADGES = [
+  { src: '/auth/orbit-user.png', alt: 'Users', pos: 'left-[40.5%] top-[18.2%]', anim: 'auth-float-1' },
+  { src: '/auth/orbit-deals.png', alt: 'Deals', pos: 'left-[56.5%] top-[19.8%]', anim: 'auth-float-2' },
+  { src: '/auth/orbit-chart.png', alt: 'Analytics', pos: 'left-[35.6%] top-[47.1%]', anim: 'auth-float-3' },
+  { src: '/auth/orbit-megaphone.png', alt: 'Marketing', pos: 'left-[59.5%] top-[47%]', anim: 'auth-float-1' },
 ];
 
-const HIGHLIGHTS = ['Secure sign-in', 'Phone, tablet, desktop & TV', 'Light & dark mode'];
+const FEATURES = [
+  { label: 'Leads', sub: 'Capture & Manage', icon: '/auth/feature-leads.png' },
+  { label: 'Sales', sub: 'Track & Convert', icon: '/auth/feature-sales.png' },
+  { label: 'Customers', sub: 'Build Relationships', icon: '/auth/feature-customers.png' },
+  { label: 'Marketing', sub: 'Engage & Grow', icon: '/auth/feature-marketing.png' },
+];
+
+const QUICK_LINKS = [
+  { label: 'Quotations', icon: '/auth/link-quotations.png' },
+  { label: 'Sales Orders', icon: '/auth/link-sales-orders.png' },
+  { label: 'Invoicing', icon: '/auth/link-invoicing.png' },
+  { label: 'Campaigns', icon: '/auth/link-campaigns.png' },
+  { label: 'Reports', icon: '/auth/link-reports.png' },
+  { label: 'Integrations', icon: '/auth/link-integrations.png' },
+];
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="auth-shell relative min-h-screen overflow-hidden bg-[var(--auth-canvas)] text-slate-900">
+    <div className="auth-shell relative min-h-screen w-full overflow-x-hidden bg-[var(--auth-canvas)] text-[var(--auth-ink)]">
       {/* Plus Jakarta Sans for the sign-in screens; falls back to the app font if it can't load. */}
       <link rel="preconnect" href="https://fonts.googleapis.com" />
       <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
@@ -74,74 +52,93 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         precedence="default"
       />
 
-      {/* Soft background glows */}
-      <div className="pointer-events-none absolute -left-40 -top-40 h-[32rem] w-[32rem] rounded-full bg-[var(--auth-glow)] blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-48 right-[-10rem] h-[36rem] w-[36rem] rounded-full bg-[var(--auth-glow)] blur-3xl" />
+      {/* 3D portal background, dimmed in dark mode */}
+      <div className="pointer-events-none fixed inset-0 z-0 bg-[url('/auth/bg.jpg')] bg-cover bg-center bg-no-repeat" />
+      <div className="pointer-events-none fixed inset-0 z-0 bg-[#0b1220]/85 opacity-0 dark:opacity-100" />
 
-      <div className="relative mx-auto flex min-h-screen w-full max-w-[90rem] flex-col px-4 py-4 sm:px-8 sm:py-6 lg:px-12 lg:py-8">
-        <header className="flex items-center justify-between gap-4">
-          <InveonOneLogo className="w-24 sm:w-28 lg:w-32" />
-          <ThemeToggle />
-        </header>
-
-        <main className="flex flex-1 items-center py-6 sm:py-8 lg:py-4">
-          <div className="grid w-full items-center gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,28rem)] lg:gap-12 xl:grid-cols-[minmax(0,1fr)_30rem] xl:gap-20">
-            {/* Form card */}
-            <section className="mx-auto w-full max-w-[30rem] rounded-3xl border border-slate-200/70 bg-white p-6 shadow-[0_24px_60px_-24px_rgba(71,0,133,0.28)] sm:p-10 lg:order-2 lg:max-w-none">
-              {children}
-            </section>
-
-            {/* Hero */}
-            <section className="mx-auto w-full max-w-[30rem] sm:max-w-2xl lg:order-1 lg:mx-0 lg:max-w-none">
-              <span className="inline-flex items-center gap-2 rounded-full bg-[var(--auth-tint)] px-3 py-1 text-xs font-bold uppercase tracking-wider text-[var(--primary)]">
-                <span className="h-1.5 w-1.5 rounded-full bg-[var(--primary)]" />
-                Inveon One CRM
-              </span>
-              <h2 className="mt-4 text-2xl font-bold leading-tight tracking-tight text-slate-900 sm:text-3xl lg:text-4xl xl:text-5xl">
-                Everything your sales team needs.{' '}
-                <span className="text-[var(--primary)] lg:block">All in one place.</span>
-              </h2>
-              <p className="mt-4 hidden max-w-xl text-base leading-relaxed text-slate-600 sm:block lg:text-lg">
-                Capture leads, call customers, plan site visits and track every follow-up from one simple workspace.
-              </p>
-
-              <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 lg:mt-8">
-                {FEATURES.map((f) => (
-                  <div
-                    key={f.label}
-                    className="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm transition-shadow hover:shadow-md sm:p-5"
-                  >
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--auth-tint)] text-[var(--primary)] sm:h-12 sm:w-12">
-                      {f.icon}
-                    </div>
-                    <div className="mt-3 text-sm font-bold text-slate-900 sm:text-base">{f.label}</div>
-                    <div className="mt-1 text-xs leading-snug text-slate-500 sm:text-sm">{f.sub}</div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-4 hidden flex-wrap items-center gap-x-5 gap-y-2 rounded-2xl bg-slate-100/80 px-5 py-3 text-sm font-semibold text-slate-700 sm:flex">
-                {HIGHLIGHTS.map((h) => (
-                  <span key={h} className="flex items-center gap-2">
-                    <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4 text-[var(--primary)]">
-                      <path d="m5 12.5 4.5 4.5L19 7.5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                    {h}
-                  </span>
-                ))}
-              </div>
-            </section>
-          </div>
-        </main>
-
-        <footer className="flex flex-col items-center justify-between gap-3 border-t border-slate-200/70 pt-4 text-xs text-slate-500 sm:flex-row">
-          <span>© {new Date().getFullYear()} Inveon Technologies. All rights reserved.</span>
-          <span className="flex items-center gap-2">
-            Powered by
-            <InveonTechLogo className="w-20" />
-          </span>
-        </footer>
+      {/* Module badges sitting on the portal rings (desktop and up) */}
+      <div className="pointer-events-none fixed inset-0 z-10 hidden lg:block" aria-hidden="true">
+        {ORBIT_BADGES.map((b) => (
+          <img
+            key={b.alt}
+            src={b.src}
+            alt=""
+            className={`absolute h-11 w-11 object-contain drop-shadow-[0_6px_16px_rgba(22,104,227,0.22)] xl:h-12 xl:w-12 ${b.pos} ${b.anim}`}
+          />
+        ))}
       </div>
+
+      <main className="relative z-20 flex min-h-screen w-full items-center px-4 py-6 sm:px-10 sm:py-8 lg:px-12 lg:py-6 xl:px-16">
+        <div className="grid w-full grid-cols-1 items-center gap-8 lg:grid-cols-[minmax(0,1fr)_auto] lg:gap-x-6 lg:gap-y-0">
+          {/* Logo + headline */}
+          <section className="mx-auto w-full max-w-[30rem] sm:max-w-[36rem] lg:col-start-1 lg:row-start-1 lg:mx-0 lg:self-end">
+            <img
+              src="/auth/inveon-one-crm.png"
+              alt="Inveon One CRM"
+              className="mb-5 h-auto w-[11rem] select-none object-contain dark:hidden sm:mb-6 sm:w-[14.75rem] lg:w-[15.25rem] xl:w-[16.5rem]"
+            />
+            <InveonOneLogo className="mb-5 hidden w-[11rem] dark:block sm:mb-6 sm:w-[14.75rem] lg:w-[15.25rem] xl:w-[16.5rem]" />
+
+            <div className="mb-3 max-w-[26.25rem] xl:max-w-[28rem]">
+              <h1 className="text-[1.5rem] font-extrabold leading-[1.18] tracking-tight text-[var(--auth-ink)] sm:text-[1.75rem] lg:text-[1.8rem] xl:text-[2rem]">
+                Everything Your Business Needs.
+              </h1>
+              <p className="mt-1 text-[1.5rem] font-extrabold leading-[1.18] tracking-tight text-[var(--auth-blue)] sm:text-[1.75rem] lg:text-[1.8rem] xl:text-[2rem]">
+                All in One Place.
+              </p>
+            </div>
+            <p className="max-w-[23.75rem] text-[0.84rem] leading-[1.58] text-[var(--auth-text)] sm:text-[0.875rem] xl:max-w-[25.5rem]">
+              One powerful platform to streamline operations, automate workflows, and grow your business with confidence.
+            </p>
+          </section>
+
+          {/* Form card */}
+          <section className="mx-auto w-full max-w-[30rem] lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:-translate-x-6 lg:self-center xl:-translate-x-10">
+            <div className="auth-card relative w-full rounded-[1.625rem] bg-white p-6 sm:p-8 lg:w-[22rem] xl:w-[22.5rem] 2xl:w-[24rem] xl:p-9">
+              <ThemeToggle className="absolute right-5 top-5 sm:right-6 sm:top-6" />
+              <div className="[&_h1]:pr-16">{children}</div>
+
+              <div className="mt-5 flex flex-col items-center justify-center pt-2">
+                <span className="mb-1.5 text-[0.6rem] font-bold uppercase tracking-wider text-slate-400">Powered by</span>
+                <img
+                  src="/auth/inveon-technologies.png"
+                  alt="Inveon Technologies"
+                  className="h-[2.75rem] w-auto select-none object-contain dark:hidden sm:h-12"
+                />
+                <InveonTechLogo className="hidden h-[2.75rem] w-auto dark:block sm:h-12" />
+              </div>
+            </div>
+          </section>
+
+          {/* Feature cards + quick links */}
+          <section className="mx-auto w-full max-w-[30rem] sm:max-w-[36rem] lg:col-start-1 lg:row-start-2 lg:mx-0 lg:mt-7 lg:self-start">
+            <div className="grid w-full grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-3.5 lg:max-w-[30.5rem] xl:max-w-[32.5rem]">
+              {FEATURES.map((f) => (
+                <div
+                  key={f.label}
+                  className="auth-glass group flex flex-col items-center rounded-2xl px-2.5 py-4 text-center transition-all duration-200 hover:-translate-y-1"
+                >
+                  <img src={f.icon} alt="" className="mb-2 h-9 w-9 object-contain transition-transform group-hover:scale-105" />
+                  <span className="mb-1 text-[0.8125rem] font-bold leading-tight text-[var(--auth-ink)] sm:text-[0.84rem]">{f.label}</span>
+                  <span className="mb-2.5 whitespace-nowrap text-[0.625rem] font-medium leading-none text-[var(--auth-sub)] sm:text-[0.65rem]">
+                    {f.sub}
+                  </span>
+                  <span className="h-[0.16rem] w-6 rounded-full bg-[#1668e3]" />
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2.5 pt-1 text-[0.75rem] font-semibold text-[var(--auth-text)] sm:gap-x-5 sm:text-[0.78rem] lg:mt-8 lg:flex-nowrap lg:whitespace-nowrap xl:gap-x-6">
+              {QUICK_LINKS.map((q) => (
+                <span key={q.label} className="inline-flex items-center gap-1.5">
+                  <img src={q.icon} alt="" className="h-[1.0625rem] w-[1.0625rem] object-contain" />
+                  {q.label}
+                </span>
+              ))}
+            </div>
+          </section>
+        </div>
+      </main>
     </div>
   );
 }
