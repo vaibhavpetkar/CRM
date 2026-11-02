@@ -1,165 +1,146 @@
-import { HeroArt, InveonOneLogo } from '@/components/auth/brand';
+import { InveonOneLogo, InveonTechLogo } from '@/components/auth/brand';
+import ThemeToggle from '@/components/ui/theme-toggle';
+
+/*
+ * Shared frame for every sign-in screen (login, forgot/reset password,
+ * invites). One layout that reflows instead of separate mobile/desktop pages:
+ *
+ *   phone   (< 640px)   logo bar, the form card, then a short feature list
+ *   tablet  (640-1023)  same order, wider card, features in a 2 x 2 grid
+ *   desktop (>= 1024)   hero on the left, form card on the right
+ *   TV      (>= 1920)   same as desktop; globals.css raises the root font
+ *                       size (.auth-shell) so everything scales up evenly
+ *
+ * Sizes here are in rem on purpose, so the TV scaling reaches all of them.
+ */
 
 const FEATURES = [
   {
     label: 'Leads',
-    sub: 'Capture & Manage',
+    sub: 'Every portal, ad and walk-in in one list',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6">
-        <circle cx="12" cy="12" r="8.5" stroke="currentColor" strokeWidth="1.5" />
-        <path d="M12 1.5v2.5M12 20v2.5M1.5 12H4M20 12h2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-        <circle cx="12" cy="10" r="2.6" stroke="currentColor" strokeWidth="1.5" />
-        <path d="M7.5 17.2c.9-2 2.6-3 4.5-3s3.6 1 4.5 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        <circle cx="12" cy="8" r="3.5" stroke="currentColor" strokeWidth="1.7" />
+        <path d="M5 20c0-3.6 3.1-6 7-6s7 2.4 7 6" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
       </svg>
     ),
   },
   {
-    label: 'Sales',
-    sub: 'Track & Convert',
+    label: 'Calls',
+    sub: 'Click-to-call with notes and recordings',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6">
-        <rect x="3" y="14" width="3.6" height="7" rx="0.6" fill="currentColor" />
-        <rect x="8.6" y="11" width="3.6" height="10" rx="0.6" fill="currentColor" />
-        <rect x="14.2" y="8" width="3.6" height="13" rx="0.6" fill="currentColor" />
-        <path d="M3 10.5 9 6l3.5 2.5L20 3m0 0h-4m4 0v4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+        <path
+          d="M5 4h3.5l1.5 4-2.2 1.4a11 11 0 0 0 4.8 4.8L14 12l4 1.5V17a2 2 0 0 1-2 2A13 13 0 0 1 3 6a2 2 0 0 1 2-2Z"
+          stroke="currentColor"
+          strokeWidth="1.7"
+          strokeLinejoin="round"
+        />
       </svg>
     ),
   },
   {
-    label: 'Customers',
-    sub: 'Build Relationships',
+    label: 'Site Visits',
+    sub: 'Schedule visits and never miss a follow-up',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6">
-        <circle cx="9" cy="8" r="3" stroke="currentColor" strokeWidth="1.5" />
-        <circle cx="17" cy="10" r="2.4" stroke="currentColor" strokeWidth="1.5" />
-        <path d="M2.5 19c0-3 2.9-5.2 6.5-5.2s6.5 2.2 6.5 5.2M15 19c.2-2 1.6-3.6 3.7-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      </svg>
-    ),
-  },
-  {
-    label: 'Marketing',
-    sub: 'Engage & Grow',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6">
-        <path d="M3 9.5v5h3l9 4.5V5L6 9.5H3Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-        <path d="M6.5 14.5 8 20h2.5L9.5 15" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-        <path d="M18 9.5a3 3 0 0 1 0 5M19.5 5.5l1.5-1.5M19.5 18.5l1.5 1.5M21 12h1.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      </svg>
-    ),
-  },
-];
-
-const QUICK_LINKS = [
-  {
-    label: 'Quotations',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4">
-        <path d="M7 3h7l4 4v14H7V3Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
-        <path d="M10 11h5M10 15h5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-      </svg>
-    ),
-  },
-  {
-    label: 'Sales Orders',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4">
-        <circle cx="9" cy="20" r="1.4" fill="currentColor" />
-        <circle cx="18" cy="20" r="1.4" fill="currentColor" />
-        <path d="M2.5 4h2.5l2.4 12.2h10.7L20.5 8H6.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    ),
-  },
-  {
-    label: 'Invoicing',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4">
-        <path d="M6 2h9l3 3v17H6V2Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
-        <path d="M9 9h6M9 13h6M9 17h3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-      </svg>
-    ),
-  },
-  {
-    label: 'Campaigns',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4">
-        <path d="M2 12 21 3l-5 18-5-8-8-1Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+        <path d="M3.5 10.5 12 4l8.5 6.5V20h-17v-9.5Z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+        <path d="M9.5 20v-5.5h5V20" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
       </svg>
     ),
   },
   {
     label: 'Reports',
+    sub: 'Live team performance and analytics',
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4">
-        <circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth="1.6" />
-        <path d="M11 3v8l6 3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    ),
-  },
-  {
-    label: 'Integrations',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4">
-        <path d="M9 3h6v4.5a2.5 2.5 0 0 0 2.5 2.5H22v6h-4.5A2.5 2.5 0 0 0 15 18.5V21H9v-4.5A2.5 2.5 0 0 0 6.5 14H2V9h4.5A2.5 2.5 0 0 0 9 6.5V3Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+      <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6">
+        <path d="M4 20V10M10 20V5M16 20v-7M21.5 20h-19" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
       </svg>
     ),
   },
 ];
 
+const HIGHLIGHTS = ['Secure sign-in', 'Phone, tablet, desktop & TV', 'Light & dark mode'];
+
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="relative flex min-h-screen overflow-hidden bg-gradient-to-br from-[#eceef7] via-[#e9ebf5] to-[#d6dbee] dark:from-[#0b1220] dark:via-[#0d1528] dark:to-[#111a33]">
-      {/* Background glows */}
-      <div className="pointer-events-none absolute -left-40 -top-40 h-[520px] w-[520px] rounded-full bg-white/60 blur-3xl dark:bg-blue-500/5" />
-      <div className="pointer-events-none absolute bottom-[-120px] left-[30%] h-[420px] w-[520px] rounded-full bg-orange-100/50 blur-3xl dark:bg-orange-500/5" />
+    <div className="auth-shell relative min-h-screen overflow-hidden bg-[var(--auth-canvas)] text-slate-900">
+      {/* Plus Jakarta Sans for the sign-in screens; falls back to the app font if it can't load. */}
+      <link rel="preconnect" href="https://fonts.googleapis.com" />
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+        precedence="default"
+      />
 
-      {/* Left hero */}
-      <div className="relative hidden flex-1 flex-col justify-center py-10 pl-14 pr-6 lg:flex xl:pl-16">
-        <div className="relative z-10 flex items-center">
-          <div className="w-[350px] shrink-0">
-            <InveonOneLogo className="w-[215px]" />
+      {/* Soft background glows */}
+      <div className="pointer-events-none absolute -left-40 -top-40 h-[32rem] w-[32rem] rounded-full bg-[var(--auth-glow)] blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-48 right-[-10rem] h-[36rem] w-[36rem] rounded-full bg-[var(--auth-glow)] blur-3xl" />
 
-            <h2 className="mt-8 text-[21px] font-bold leading-snug text-[#0b1a3a] dark:text-white">
-              Everything Your Business Needs.
-              <br />
-              <span className="text-[var(--primary)]">All in One Place.</span>
-            </h2>
-            <p className="mt-4 max-w-[290px] text-[13px] leading-relaxed text-slate-600">
-              One powerful platform to streamline operations, automate workflows, and grow your business with confidence.
-            </p>
-          </div>
-          <HeroArt className="ml-4 w-[320px] shrink-0 xl:w-[360px]" />
-        </div>
+      <div className="relative mx-auto flex min-h-screen w-full max-w-[90rem] flex-col px-4 py-4 sm:px-8 sm:py-6 lg:px-12 lg:py-8">
+        <header className="flex items-center justify-between gap-4">
+          <InveonOneLogo className="w-24 sm:w-28 lg:w-32" />
+          <ThemeToggle />
+        </header>
 
-        <div className="relative z-10 mt-2 flex gap-3">
-          {FEATURES.map((f) => (
-            <div
-              key={f.label}
-              className="flex w-[112px] flex-col items-center rounded-xl border border-white/70 bg-white/60 px-2 pb-3 pt-4 text-center shadow-sm backdrop-blur-sm dark:border-white/10 dark:bg-white/5"
-            >
-              <span className="text-[var(--primary)] [&_svg]:h-9 [&_svg]:w-9">{f.icon}</span>
-              <div className="mt-2 text-[15px] font-semibold text-[#0b1a3a] dark:text-white">{f.label}</div>
-              <div className="mt-0.5 whitespace-nowrap text-[10px] text-slate-500">{f.sub}</div>
-              <span className="mt-3 h-0.5 w-7 rounded-full bg-[var(--primary)]/70" />
-            </div>
-          ))}
-        </div>
+        <main className="flex flex-1 items-center py-6 sm:py-8 lg:py-4">
+          <div className="grid w-full items-center gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,28rem)] lg:gap-12 xl:grid-cols-[minmax(0,1fr)_30rem] xl:gap-20">
+            {/* Form card */}
+            <section className="mx-auto w-full max-w-[30rem] rounded-3xl border border-slate-200/70 bg-white p-6 shadow-[0_24px_60px_-24px_rgba(71,0,133,0.28)] sm:p-10 lg:order-2 lg:max-w-none">
+              {children}
+            </section>
 
-        <div className="relative z-10 mt-8 flex flex-wrap items-center gap-y-3 text-[12px] font-medium text-[#0b1a3a] dark:text-slate-700">
-          {QUICK_LINKS.map((q, i) => (
-            <span key={q.label} className="flex items-center">
-              {i > 0 && <span className="mx-3.5 h-5 w-px bg-slate-300 dark:bg-white/15" />}
-              <span className="flex items-center gap-2">
-                <span className="text-[#0b1a3a] dark:text-slate-700 [&_svg]:h-[18px] [&_svg]:w-[18px]">{q.icon}</span>
-                {q.label}
+            {/* Hero */}
+            <section className="mx-auto w-full max-w-[30rem] sm:max-w-2xl lg:order-1 lg:mx-0 lg:max-w-none">
+              <span className="inline-flex items-center gap-2 rounded-full bg-[var(--auth-tint)] px-3 py-1 text-xs font-bold uppercase tracking-wider text-[var(--primary)]">
+                <span className="h-1.5 w-1.5 rounded-full bg-[var(--primary)]" />
+                Inveon One CRM
               </span>
-            </span>
-          ))}
-        </div>
-      </div>
+              <h2 className="mt-4 text-2xl font-bold leading-tight tracking-tight text-slate-900 sm:text-3xl lg:text-4xl xl:text-5xl">
+                Everything your sales team needs.{' '}
+                <span className="text-[var(--primary)] lg:block">All in one place.</span>
+              </h2>
+              <p className="mt-4 hidden max-w-xl text-base leading-relaxed text-slate-600 sm:block lg:text-lg">
+                Capture leads, call customers, plan site visits and track every follow-up from one simple workspace.
+              </p>
 
-      {/* Right sign-in panel */}
-      <div className="relative z-10 flex w-full flex-col items-center justify-center px-4 py-8 sm:px-6 lg:w-[480px] lg:shrink-0 lg:items-stretch lg:py-4 lg:pl-0 lg:pr-5 xl:w-[470px]">
-        {children}
+              <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 lg:mt-8">
+                {FEATURES.map((f) => (
+                  <div
+                    key={f.label}
+                    className="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm transition-shadow hover:shadow-md sm:p-5"
+                  >
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--auth-tint)] text-[var(--primary)] sm:h-12 sm:w-12">
+                      {f.icon}
+                    </div>
+                    <div className="mt-3 text-sm font-bold text-slate-900 sm:text-base">{f.label}</div>
+                    <div className="mt-1 text-xs leading-snug text-slate-500 sm:text-sm">{f.sub}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-4 hidden flex-wrap items-center gap-x-5 gap-y-2 rounded-2xl bg-slate-100/80 px-5 py-3 text-sm font-semibold text-slate-700 sm:flex">
+                {HIGHLIGHTS.map((h) => (
+                  <span key={h} className="flex items-center gap-2">
+                    <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4 text-[var(--primary)]">
+                      <path d="m5 12.5 4.5 4.5L19 7.5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    {h}
+                  </span>
+                ))}
+              </div>
+            </section>
+          </div>
+        </main>
+
+        <footer className="flex flex-col items-center justify-between gap-3 border-t border-slate-200/70 pt-4 text-xs text-slate-500 sm:flex-row">
+          <span>© {new Date().getFullYear()} Inveon Technologies. All rights reserved.</span>
+          <span className="flex items-center gap-2">
+            Powered by
+            <InveonTechLogo className="w-20" />
+          </span>
+        </footer>
       </div>
     </div>
   );
