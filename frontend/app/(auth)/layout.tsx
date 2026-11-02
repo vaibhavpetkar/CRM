@@ -84,7 +84,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           <ThemeToggle />
         </header>
 
-        <main className="flex flex-1 items-center py-6 sm:py-10">
+        <main className="flex flex-1 items-center py-6 sm:py-8 lg:py-4">
           <div className="grid w-full items-center gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,28rem)] lg:gap-12 xl:grid-cols-[minmax(0,1fr)_30rem] xl:gap-20">
             {/* Form card */}
             <section className="mx-auto w-full max-w-[30rem] rounded-3xl border border-slate-200/70 bg-white p-6 shadow-[0_24px_60px_-24px_rgba(71,0,133,0.28)] sm:p-10 lg:order-2 lg:max-w-none">
@@ -99,7 +99,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
               </span>
               <h2 className="mt-4 text-2xl font-bold leading-tight tracking-tight text-slate-900 sm:text-3xl lg:text-4xl xl:text-5xl">
                 Everything your sales team needs.{' '}
-                <span className="text-[var(--primary)]">All in one place.</span>
+                <span className="text-[var(--primary)] lg:block">All in one place.</span>
               </h2>
               <p className="mt-4 hidden max-w-xl text-base leading-relaxed text-slate-600 sm:block lg:text-lg">
                 Capture leads, call customers, plan site visits and track every follow-up from one simple workspace.

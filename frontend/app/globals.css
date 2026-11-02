@@ -317,7 +317,7 @@ body {
 /* Large screens and TVs: scale the whole sign-in page up by raising the root
    font size (the layout is sized in rem). */
 @media (min-width: 1920px) {
-  html:has(.auth-shell) { font-size: 19px; }
+  html:has(.auth-shell) { font-size: 17px; }
 }
 @media (min-width: 2560px) {
   html:has(.auth-shell) { font-size: 24px; }
