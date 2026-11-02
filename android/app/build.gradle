@@ -1,0 +1,60 @@
+plugins {
+    id 'com.android.application'
+}
+
+// The CRM address and version can be set at build time:
+//   ./gradlew assembleRelease -PcrmUrl=https://crm.example.com -PappVersionName=2.0.1 -PappVersionCode=3
+def crmUrl = (project.findProperty('crmUrl') ?: 'https://crm.shreemahalaxmirealty.in').toString()
+def appVersionName = (project.findProperty('appVersionName') ?: '2.0.0').toString()
+def appVersionCode = (project.findProperty('appVersionCode') ?: '1').toString().toInteger()
+
+// Release signing comes from environment variables (set by the release
+// workflow from GitHub secrets). Without them the release APK is signed with
+// the debug key, which installs fine but cannot upgrade an APK signed with
+// the real key.
+def keystorePath = System.getenv('ANDROID_KEYSTORE_PATH')
+def hasReleaseKey = keystorePath && file(keystorePath).exists()
+
+android {
+    namespace 'com.inveon.onecrm'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'com.inveon.onecrm'
+        minSdk 26
+        targetSdk 35
+        versionCode appVersionCode
+        versionName appVersionName
+        buildConfigField 'String', 'CRM_URL', "\"${crmUrl}\""
+        manifestPlaceholders = [crmHost: new URI(crmUrl).host]
+    }
+
+    signingConfigs {
+        release {
+            if (hasReleaseKey) {
+                storeFile file(keystorePath)
+                storePassword System.getenv('ANDROID_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('ANDROID_KEY_ALIAS')
+                keyPassword System.getenv('ANDROID_KEY_PASSWORD')
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig hasReleaseKey ? signingConfigs.release : signingConfigs.debug
+        }
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}

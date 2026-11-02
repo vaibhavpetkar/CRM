@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Inveon One mark from the web login: a blue ring with an orange 1. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:pathData="M54,34 A20,20 0 1,1 53.99,34 Z"
+        android:strokeColor="@color/brand_blue"
+        android:strokeWidth="8.7"
+        android:fillColor="#00000000" />
+    <path
+        android:pathData="M50,46 L58.67,41.33 L58.67,67.33 L51.67,67.33 L51.67,50.67 L47,53 Z"
+        android:fillColor="@color/brand_orange" />
+</vector>

@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [2.0.0] - 2026-10-25 (tag `crm-v2.0.0`)
+
+Real-estate edition at https://crm.shreemahalaxmirealty.in, with the first
+Android app (APK attached to the GitHub release). Full notes:
+[docs/releases/crm-v2.0.0.md](docs/releases/crm-v2.0.0.md).
+
+---
+
 ## [v1.0.0] - 2026-08-08
 
 ### 🚀 Initial Production Release
