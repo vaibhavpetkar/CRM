@@ -289,35 +289,81 @@ body {
 }
 
 /* ─── Sign-in screens (app/(auth)/layout.tsx) ────────────────────────────────
-   Purple accent and Plus Jakarta Sans, scoped to .auth-shell so the rest of
-   the app keeps its own palette. */
+   Colours and Plus Jakarta Sans from the "Inveon One CRM — Sign In" design,
+   scoped to .auth-shell so the rest of the app keeps its own palette. */
 .auth-shell {
-  --primary: #5f259f;
-  --primary-hover: #470085;
-  --auth-btn: #5f259f;
-  --auth-btn-hover: #470085;
-  --auth-canvas: #f8f9fa;
-  --auth-tint: #f1e8fc;
-  --auth-glow: rgba(95, 37, 159, 0.09);
+  --primary: #1668e3;
+  --primary-hover: #1258c7;
+  --auth-blue: #1668e3;
+  --auth-ink: #0d1e3a;
+  --auth-text: #54647b;
+  --auth-sub: #64748b;
+  --auth-canvas: #e4e9f2;
+  --auth-glass: rgba(255, 255, 255, 0.78);
+  --auth-glass-hover: rgba(255, 255, 255, 0.94);
+  --auth-glass-border: rgba(255, 255, 255, 0.92);
   font-family: 'Plus Jakarta Sans', var(--font-sans);
 }
 
 .dark .auth-shell {
-  --primary: #c39cf5;
-  --primary-hover: #d4b6f8;
-  --auth-btn: #7b3fd4;
-  --auth-btn-hover: #8d55e0;
-  --auth-canvas: #0d0b14;
-  --auth-tint: rgba(167, 120, 240, 0.14);
-  --auth-glow: rgba(123, 63, 212, 0.16);
-  --card-bg: #17141f;
-  --border: #2c2738;
+  --primary: #4b8dff;
+  --primary-hover: #6aa1ff;
+  --auth-blue: #4b8dff;
+  --auth-ink: #f1f5f9;
+  --auth-text: #b4c0cf;
+  --auth-sub: #94a3b8;
+  --auth-canvas: #0b1220;
+  --auth-glass: rgba(17, 26, 43, 0.72);
+  --auth-glass-hover: rgba(17, 26, 43, 0.9);
+  --auth-glass-border: rgba(255, 255, 255, 0.08);
+}
+
+/* Frosted feature cards */
+.auth-glass {
+  background: var(--auth-glass);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--auth-glass-border);
+  box-shadow: 0 6px 24px -2px rgba(13, 30, 58, 0.05);
+}
+.auth-glass:hover {
+  background: var(--auth-glass-hover);
+  box-shadow: 0 10px 30px -4px rgba(22, 104, 227, 0.14);
+}
+
+/* Sign-in card */
+.auth-card {
+  box-shadow: 0 24px 60px -12px rgba(13, 30, 58, 0.13), 0 0 1px 1px rgba(255, 255, 255, 0.95) inset;
+}
+.dark .auth-card {
+  box-shadow: 0 24px 60px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.06) inset;
+}
+
+/* Floating ring badges and the waving hand */
+@keyframes auth-float {
+  0%, 100% { transform: translate(-50%, -50%) translateY(0); }
+  50% { transform: translate(-50%, -50%) translateY(-7px); }
+}
+@keyframes auth-wave {
+  0%, 100% { transform: rotate(0deg); }
+  20% { transform: rotate(14deg); }
+  40% { transform: rotate(-4deg); }
+  60% { transform: rotate(10deg); }
+  80% { transform: rotate(-2deg); }
+}
+.auth-float-1 { animation: auth-float 5.5s ease-in-out infinite; }
+.auth-float-2 { animation: auth-float 6.2s ease-in-out 1.2s infinite; }
+.auth-float-3 { animation: auth-float 5.8s ease-in-out 2.2s infinite; }
+.auth-wave { display: inline-block; transform-origin: 70% 70%; animation: auth-wave 2s infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .auth-float-1, .auth-float-2, .auth-float-3 { animation: none; transform: translate(-50%, -50%); }
+  .auth-wave { animation: none; }
 }
 
 /* Large screens and TVs: scale the whole sign-in page up by raising the root
    font size (the layout is sized in rem). */
 @media (min-width: 1920px) {
-  html:has(.auth-shell) { font-size: 17px; }
+  html:has(.auth-shell) { font-size: 18px; }
 }
 @media (min-width: 2560px) {
   html:has(.auth-shell) { font-size: 24px; }
