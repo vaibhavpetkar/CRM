@@ -63,15 +63,15 @@ export default function PrintButton({
     <div ref={ref} className={cn('relative inline-flex', className)}>
       {variant === 'icon' ? (
         <>
-          <button type="button" onClick={() => print()} className="text-slate-400 hover:text-[#168eea]" aria-label="Print" title="Print">
+          <button type="button" onClick={() => print()} className="text-slate-400 hover:text-[var(--primary)]" aria-label="Print" title="Print">
             <PrinterIcon className="h-4 w-4" />
           </button>
-          <button type="button" onClick={toggleMenu} className="-ml-0.5 text-slate-300 hover:text-[#168eea]" aria-label="Choose print format" title="Choose print format">
+          <button type="button" onClick={toggleMenu} className="-ml-0.5 text-slate-300 hover:text-[var(--primary)]" aria-label="Choose print format" title="Choose print format">
             <ChevronDownIcon className="h-3 w-3" />
           </button>
         </>
       ) : (
-        <div className="inline-flex overflow-hidden rounded-md border border-slate-200 bg-white text-xs font-medium text-slate-700">
+        <div className="inline-flex overflow-hidden rounded-lg border border-slate-200 bg-white text-xs font-medium text-slate-700">
           <button type="button" onClick={() => print()} className="inline-flex items-center gap-1.5 px-3 py-1.5 hover:bg-slate-50">
             <PrinterIcon className="h-4 w-4" /> Print
           </button>
@@ -82,7 +82,7 @@ export default function PrintButton({
       )}
 
       {open && (
-        <div className="absolute right-0 top-full z-30 mt-1 w-60 rounded-md border border-slate-200 bg-white py-1 text-left text-sm shadow-lg">
+        <div className="absolute right-0 top-full z-30 mt-1 w-60 rounded-lg border border-slate-200 bg-white py-1 text-left text-sm shadow-lg">
           <p className="px-3 py-1 text-[11px] font-medium uppercase tracking-wide text-slate-400">Print format</p>
           {formats === null ? (
             <p className="px-3 py-2 text-xs text-slate-400">Loading…</p>

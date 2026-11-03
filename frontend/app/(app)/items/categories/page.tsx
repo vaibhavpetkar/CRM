@@ -118,12 +118,12 @@ export default function ItemCategoriesPage() {
         }
       />
 
-      <div className="mb-4 flex items-center gap-3">
+      <div className="mb-4 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs flex items-center gap-3">
         <SearchInput value={search} onChange={setSearch} placeholder="Search categories..." className="sm:max-w-xs" />
         <span className="text-sm text-slate-500">{categories.length} categor{categories.length === 1 ? 'y' : 'ies'}</span>
       </div>
 
-      {error && <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
+      {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
 
       <Card>
         <DataTable
@@ -142,7 +142,7 @@ export default function ItemCategoriesPage() {
           emptyMessage='No categories found. Click "Add Category" to create one.'
           actions={(category) => (
             <div className="flex justify-end gap-3">
-              <button onClick={() => openEdit(category)} className="text-slate-400 hover:text-[#168eea]" aria-label="Edit">
+              <button onClick={() => openEdit(category)} className="text-slate-400 hover:text-[var(--primary)]" aria-label="Edit">
                 <PencilSquareIcon className="h-4 w-4" />
               </button>
               <button onClick={() => handleDelete(category)} className="text-slate-400 hover:text-red-600" aria-label="Delete">
@@ -171,7 +171,7 @@ export default function ItemCategoriesPage() {
                   required
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                  className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                 />
               </div>
 
@@ -180,7 +180,7 @@ export default function ItemCategoriesPage() {
                 <select
                   value={formData.parentCategoryId}
                   onChange={(e) => setFormData({ ...formData, parentCategoryId: e.target.value })}
-                  className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                  className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                 >
                   <option value="">None (top-level category)</option>
                   {categories
@@ -197,7 +197,7 @@ export default function ItemCategoriesPage() {
                   rows={3}
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                  className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                 />
               </div>
 

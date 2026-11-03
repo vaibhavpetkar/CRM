@@ -16,6 +16,7 @@ import { PlusIcon, XMarkIcon, PencilSquareIcon, TrashIcon, ShareIcon } from '@he
 import { useToast } from '@/components/ui/toast';
 import CompanyAutocomplete from '@/components/ui/company-autocomplete';
 import { ContactRows, LeadRows, DealRows, RelatedSection, companyHref } from '@/components/contacts/related-records';
+import { isModuleEnabled } from '@/lib/modules';
 import CallButton from '@/components/calls/call-button';
 import CallHistory from '@/components/calls/call-history';
 
@@ -203,7 +204,7 @@ export default function ContactsPage() {
       header: 'Company',
       accessor: (c) =>
         c.company ? (
-          <Link href={companyHref(c.company)} onClick={(e) => e.stopPropagation()} className="text-slate-600 hover:text-[#168eea] hover:underline">
+          <Link href={companyHref(c.company)} onClick={(e) => e.stopPropagation()} className="text-slate-600 hover:text-[var(--primary)] hover:underline">
             {c.company}
           </Link>
         ) : (
@@ -251,12 +252,12 @@ export default function ContactsPage() {
         }
       />
 
-      <div className="mb-4 flex items-center gap-3">
+      <div className="mb-4 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs flex items-center gap-3">
         <SearchInput value={search} onChange={setSearch} placeholder="Search contacts..." className="sm:max-w-xs" />
         <span className="text-sm text-slate-500">{contacts.length} contact{contacts.length === 1 ? '' : 's'}</span>
       </div>
 
-      {error && <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
+      {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
 
       <Card>
         <DataTable
@@ -277,7 +278,7 @@ export default function ContactsPage() {
           emptyMessage='No contacts found. Click "Add Contact" to create one.'
           actions={(contact) => (
             <div className="flex justify-end gap-3">
-              <button onClick={(e) => { e.stopPropagation(); openEdit(contact); }} className="text-slate-400 hover:text-[#168eea]" aria-label="Edit">
+              <button onClick={(e) => { e.stopPropagation(); openEdit(contact); }} className="text-slate-400 hover:text-[var(--primary)]" aria-label="Edit">
                 <PencilSquareIcon className="h-4 w-4" />
               </button>
               <button onClick={(e) => { e.stopPropagation(); handleDelete(contact); }} className="text-slate-400 hover:text-red-600" aria-label="Delete">
@@ -307,7 +308,7 @@ export default function ContactsPage() {
                     required
                     value={formData.firstName}
                     onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                   />
                 </div>
                 <div>
@@ -317,7 +318,7 @@ export default function ContactsPage() {
                     required
                     value={formData.lastName}
                     onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                   />
                 </div>
               </div>
@@ -328,7 +329,7 @@ export default function ContactsPage() {
                   type="email"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                  className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                 />
               </div>
 
@@ -341,7 +342,7 @@ export default function ContactsPage() {
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/\D/g, '') })}
                     placeholder="10-digit number"
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                   />
                 </div>
                 <div>
@@ -351,7 +352,7 @@ export default function ContactsPage() {
                     placeholder="e.g. VP Sales"
                     value={formData.title}
                     onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                   />
                 </div>
               </div>
@@ -371,7 +372,7 @@ export default function ContactsPage() {
                   <select
                     value={formData.leadSource}
                     onChange={(e) => setFormData({ ...formData, leadSource: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                   >
                     <option value="website">Website</option>
                     <option value="linkedin">LinkedIn</option>
@@ -413,7 +414,7 @@ export default function ContactsPage() {
                   {panelContact.firstName} {panelContact.lastName}
                 </p>
                 {panelContact.leadId && (
-                  <Link href={`/leads/${panelContact.leadId}`} className="text-xs font-medium text-[#168eea] hover:underline">
+                  <Link href={`/leads/${panelContact.leadId}`} className="text-xs font-medium text-[var(--primary)] hover:underline">
                     View source Lead {panelContact.leadNumber || `#${panelContact.leadId}`} →
                   </Link>
                 )}
@@ -421,7 +422,7 @@ export default function ContactsPage() {
               {canEditContacts && !panelEditing && (
                 <button
                   onClick={() => setPanelEditing(true)}
-                  className="ml-auto flex items-center gap-1 text-xs font-medium text-[#168eea] hover:underline"
+                  className="ml-auto flex items-center gap-1 text-xs font-medium text-[var(--primary)] hover:underline"
                 >
                   <PencilSquareIcon className="h-3.5 w-3.5" /> Edit
                 </button>
@@ -436,7 +437,7 @@ export default function ContactsPage() {
                     <input
                       value={panelForm.firstName}
                       onChange={(e) => setPanelForm({ ...panelForm, firstName: e.target.value })}
-                      className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                      className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                     />
                   </div>
                   <div>
@@ -444,7 +445,7 @@ export default function ContactsPage() {
                     <input
                       value={panelForm.lastName}
                       onChange={(e) => setPanelForm({ ...panelForm, lastName: e.target.value })}
-                      className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                      className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                     />
                   </div>
                 </div>
@@ -454,7 +455,7 @@ export default function ContactsPage() {
                     type="email"
                     value={panelForm.email}
                     onChange={(e) => setPanelForm({ ...panelForm, email: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -466,7 +467,7 @@ export default function ContactsPage() {
                       value={panelForm.phone}
                       onChange={(e) => setPanelForm({ ...panelForm, phone: e.target.value.replace(/\D/g, '') })}
                       placeholder="10-digit number"
-                      className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                      className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                     />
                   </div>
                   <div>
@@ -474,7 +475,7 @@ export default function ContactsPage() {
                     <input
                       value={panelForm.title}
                       onChange={(e) => setPanelForm({ ...panelForm, title: e.target.value })}
-                      className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                      className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                     />
                   </div>
                 </div>
@@ -521,7 +522,7 @@ export default function ContactsPage() {
                   <dt className="text-xs font-medium uppercase text-slate-400">Company</dt>
                   <dd className="text-slate-700">
                     {panelContact.company ? (
-                      <Link href={companyHref(panelContact.company)} className="text-[#168eea] hover:underline">
+                      <Link href={companyHref(panelContact.company)} className="text-[var(--primary)] hover:underline">
                         {panelContact.company}
                       </Link>
                     ) : (
@@ -545,7 +546,7 @@ export default function ContactsPage() {
               <div className="flex items-center justify-between">
                 <h4 className="text-sm font-semibold text-slate-900">Relationships</h4>
                 {panelContact.company && (
-                  <Link href={companyHref(panelContact.company)} className="text-xs font-medium text-[#168eea] hover:underline">
+                  <Link href={companyHref(panelContact.company)} className="text-xs font-medium text-[var(--primary)] hover:underline">
                     Open company page →
                   </Link>
                 )}
@@ -554,7 +555,7 @@ export default function ContactsPage() {
                 <p className="mt-2 text-xs text-slate-400">Loading...</p>
               ) : related.sameCompany.length + related.sharedPhone.length + related.sharedEmail.length + related.leads.length + related.deals.length === 0 ? (
                 <p className="mt-2 text-xs text-slate-400">
-                  {panelContact.company ? 'No other contacts, leads or deals are linked to this company yet.' : 'Add a company to link this contact with colleagues, leads and deals.'}
+                  {panelContact.company ? `No other contacts${isModuleEnabled('deals') ? ', leads or deals' : ' or leads'} are linked to this company yet.` : 'Add a company to link this contact with colleagues, leads and deals.'}
                 </p>
               ) : (
                 <>
@@ -578,7 +579,7 @@ export default function ContactsPage() {
                       <LeadRows leads={related.leads} />
                     </RelatedSection>
                   )}
-                  {related.deals.length > 0 && (
+                  {isModuleEnabled('deals') && related.deals.length > 0 && (
                     <RelatedSection title="Deals" count={related.deals.length}>
                       <DealRows deals={related.deals} />
                     </RelatedSection>

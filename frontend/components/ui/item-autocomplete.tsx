@@ -196,7 +196,7 @@ export default function ItemAutocomplete({
           placeholder={placeholder}
           disabled={disabled}
           className={cn(
-            'w-full rounded-md border-0 bg-slate-100/50 py-2 pl-9 pr-10 text-sm text-slate-900 placeholder:text-slate-400',
+            'w-full rounded-lg border-0 bg-slate-100/50 py-2 pl-9 pr-10 text-sm text-slate-900 placeholder:text-slate-400',
             'focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)] transition-all',
             disabled && 'opacity-50 cursor-not-allowed'
           )}
@@ -230,7 +230,7 @@ export default function ItemAutocomplete({
           <div
             ref={dropdownRef}
             id="item-suggestions"
-            className="fixed z-[1000] mt-1 max-h-60 overflow-y-auto rounded-md border border-slate-200 bg-white shadow-lg ring-1 ring-black ring-opacity-5"
+            className="fixed z-[1000] mt-1 max-h-60 overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg ring-1 ring-black ring-opacity-5"
             style={{ top: dropdownRect.top, left: dropdownRect.left, width: dropdownRect.width }}
             role="listbox"
           >
@@ -271,7 +271,7 @@ export default function ItemAutocomplete({
         typeof document !== 'undefined' &&
         createPortal(
           <div
-            className="fixed z-[1000] mt-1 rounded-md border border-slate-200 bg-white shadow-lg ring-1 ring-black ring-opacity-5 p-3 text-sm text-slate-500 text-center"
+            className="fixed z-[1000] mt-1 rounded-lg border border-slate-200 bg-white shadow-lg ring-1 ring-black ring-opacity-5 p-3 text-sm text-slate-500 text-center"
             style={{ top: dropdownRect.top, left: dropdownRect.left, width: dropdownRect.width }}
           >
             No items found

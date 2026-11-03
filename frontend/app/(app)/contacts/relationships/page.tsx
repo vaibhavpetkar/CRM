@@ -144,7 +144,7 @@ export default function ContactRelationshipsPage() {
         }
       />
 
-      {error && <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
+      {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
       {loading && <p className="text-sm text-slate-500">Loading...</p>}
 
       {!loading && !error && nodes.length === 0 && (
@@ -195,7 +195,7 @@ export default function ContactRelationshipsPage() {
                   onClick={() => router.push(companyHref(n.label))}
                   className="cursor-pointer"
                 >
-                  <circle cx={n.x} cy={n.y} r={22} fill="#168eea" opacity={hoveredId && !highlightedIds.has(n.id) ? 0.25 : 1} />
+                  <circle cx={n.x} cy={n.y} r={22} fill="var(--primary)" opacity={hoveredId && !highlightedIds.has(n.id) ? 0.25 : 1} />
                   <text x={n.x} y={n.y - 28} textAnchor="middle" className="fill-slate-700 text-[11px] font-semibold">
                     {n.label}
                   </text>
@@ -212,7 +212,7 @@ export default function ContactRelationshipsPage() {
                   </text>
                   {hoveredId === n.id && (n.email || n.phone) && (
                     <foreignObject x={n.x + 14} y={n.y - 10} width={200} height={60}>
-                      <div className="rounded-md border border-slate-200 bg-white p-1.5 text-[10px] text-slate-600 shadow-lg">
+                      <div className="rounded-lg border border-slate-200 bg-white p-1.5 text-[10px] text-slate-600 shadow-lg">
                         {n.jobTitle && <p className="font-medium text-slate-800">{n.jobTitle}</p>}
                         {n.email && <p>{n.email}</p>}
                         {n.phone && <p>{n.phone}</p>}
@@ -229,7 +229,7 @@ export default function ContactRelationshipsPage() {
         <div className="space-y-4">
           {Array.from(tree.groups.entries()).map(([company, contacts]) => (
             <div key={company} className="rounded-lg border border-slate-200 bg-white p-4">
-              <Link href={companyHref(company)} className="mb-2 block text-sm font-semibold text-slate-800 hover:text-[#168eea] hover:underline">
+              <Link href={companyHref(company)} className="mb-2 block text-sm font-semibold text-slate-800 hover:text-[var(--primary)] hover:underline">
                 {company} <span className="font-normal text-slate-400">({contacts.length})</span>
               </Link>
               <ul className="space-y-1.5 pl-3">

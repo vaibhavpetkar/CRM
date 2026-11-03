@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   // generic product name on a company domain is what Google Safe Browsing
   // flags as "possible phishing on user login".
   title: 'Inveon One CRM — Inveon Technologies',
-  description: 'Staff sign-in for the Inveon Technologies CRM at crm.inveontechnologies.in.',
+  description: 'Staff sign-in for the Inveon One CRM by Inveon Technologies.',
   robots: { index: false, follow: false },
 };
 

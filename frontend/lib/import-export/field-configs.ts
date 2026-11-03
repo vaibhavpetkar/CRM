@@ -1,4 +1,5 @@
 import type { ImportExportChildTable, ImportExportField } from './types';
+import { LEAD_SOURCE_OPTIONS } from '../lead-options';
 
 // Each list defines exactly the columns that matter for that module.
 // To add import/export to another form (Deals, Quotes, Meetings, Tasks, ...),
@@ -13,7 +14,8 @@ export const LEAD_FIELDS: ImportExportField[] = [
   { key: 'mobile', label: 'Mobile', type: 'text' },
   { key: 'company', label: 'Company', type: 'text' },
   { key: 'jobTitle', label: 'Job Title', type: 'text' },
-  { key: 'leadSource', label: 'Lead Source', type: 'select', options: ['website', 'facebook', 'instagram', 'linkedin', 'referral', 'event', 'social-media', 'cold-call', 'email', 'other'] },
+  { key: 'leadSource', label: 'Lead Source', type: 'select', options: LEAD_SOURCE_OPTIONS.map((o) => o.value) },
+  { key: 'subSource', label: 'Sub Source', type: 'text' },
   { key: 'status', label: 'Status', type: 'select', options: ['new', 'contacted', 'working', 'qualified', 'unqualified', 'converted', 'lost'] },
   { key: 'industry', label: 'Industry', type: 'text' },
   { key: 'noOfEmployees', label: 'No. of Employees', type: 'number', defaultExport: false },

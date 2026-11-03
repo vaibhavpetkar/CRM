@@ -1,15 +1,24 @@
 import { Router } from 'express';
-import { protect } from '../middleware/authMiddleware';
+import { protect, authorize } from '../middleware/authMiddleware';
 import * as callController from '../controllers/callController';
 
 // Click-to-call. Permission checks live in callService: calling a lead needs
 // leads:read, a contact needs contacts:read.
 const router = Router();
+const manage = [protect, authorize('integrations:manage')];
+
+// The company's calling numbers (caller IDs), managed by admins. Before /:id.
+router.get('/numbers', ...manage, callController.listCallerNumbers);
+router.post('/numbers', ...manage, callController.addCallerNumber);
+router.patch('/numbers/:id', ...manage, callController.updateCallerNumber);
+router.delete('/numbers/:id', ...manage, callController.removeCallerNumber);
 
 router.get('/config', protect, callController.getCallConfig);
 router.put('/my-number', protect, callController.setMyNumber);
 router.get('/', protect, callController.listCalls);
 router.post('/', protect, callController.startCall);
+// A call made outside the calling provider (e.g. from a personal mobile).
+router.post('/manual', protect, callController.logManualCall);
 router.get('/:id', protect, callController.getCall);
 router.patch('/:id', protect, callController.updateCallNotes);
 router.get('/:id/recording', protect, callController.getCallRecording);

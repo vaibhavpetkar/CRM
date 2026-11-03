@@ -56,6 +56,10 @@ export const recordPayment = async (req: Request & { user?: any }, res: Response
       return res.status(409).json({ message: 'Cannot record a payment against a cancelled invoice.' });
     }
 
+    // Money received means the invoice has been issued: move a draft into the
+    // payment-driven statuses so the status below reflects the payment.
+    if (invoice.status === 'draft') await invoice.update({ status: 'pending' });
+
     const payment = await Payment.create({
       invoiceId: invoice.id,
       amount: parsedAmount,

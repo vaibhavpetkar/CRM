@@ -67,7 +67,7 @@ export default function AIChatWidget() {
           <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
           <div className="fixed bottom-4 right-4 z-20 flex h-[520px] w-[360px] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl sm:absolute sm:bottom-auto sm:right-0 sm:top-full sm:mt-1">
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-slate-100 bg-gradient-to-r from-[#168eea] to-[#0f6fc0] px-4 py-3">
+            <div className="flex items-center justify-between border-b border-slate-100 bg-gradient-to-r from-[var(--primary)] to-[#0f6fc0] px-4 py-3">
               <div className="flex items-center gap-2 text-white">
                 <SparklesIcon className="h-4 w-4" />
                 <p className="text-sm font-semibold">AI Assistant</p>
@@ -112,7 +112,7 @@ export default function AIChatWidget() {
                       <div
                         className={`max-w-[80%] rounded-2xl px-3.5 py-2 text-sm ${
                           m.role === 'user'
-                            ? 'rounded-br-sm bg-[#168eea] text-white'
+                            ? 'rounded-br-sm bg-[var(--primary)] text-white'
                             : 'rounded-bl-sm bg-slate-100 text-slate-800'
                         }`}
                       >
@@ -150,12 +150,12 @@ export default function AIChatWidget() {
                     onChange={(e) => setInput(e.target.value)}
                     placeholder="Message..."
                     disabled={sending}
-                    className="flex-1 rounded-full border border-slate-200 bg-slate-50 px-3.5 py-2 text-sm focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea] disabled:opacity-60"
+                    className="flex-1 rounded-full border border-slate-200 bg-slate-50 px-3.5 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)] disabled:opacity-60"
                   />
                   <button
                     type="submit"
                     disabled={sending || !input.trim()}
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#168eea] text-white transition-opacity disabled:opacity-40"
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--primary)] text-white transition-opacity disabled:opacity-40"
                     aria-label="Send"
                   >
                     <PaperAirplaneIcon className="h-4 w-4" />

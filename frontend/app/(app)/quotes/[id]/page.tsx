@@ -122,6 +122,24 @@ export default function QuoteDetailPage() {
     }
   };
 
+  const addLineItem = () => setLineItems((prev) => [...prev, { itemId: '', productName: '', quantity: 1, unit: 'Nos', rate: 0 }]);
+
+  // An accepted quotation is locked; a revision copies it into a new,
+  // editable version so items can still be added or changed.
+  const [revising, setRevising] = useState(false);
+  const handleRevise = async () => {
+    setRevising(true);
+    try {
+      const res = await quotesApi.reviseQuote(quoteId);
+      toast.success(`Revision ${res.quote?.quoteNumber || ''} created. You can edit it now.`);
+      router.push(`/quotes/${res.quote.id}`);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to create a revision');
+    } finally {
+      setRevising(false);
+    }
+  };
+
   const runAction = async (action: 'send' | 'accept' | 'approve' | 'reject') => {
     setBusyAction(action);
     try {
@@ -165,7 +183,7 @@ export default function QuoteDetailPage() {
     );
   }
   if (error || !quote) {
-    return <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-600">{error || 'Quotation not found.'}</div>;
+    return <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-600">{error || 'Quotation not found.'}</div>;
   }
 
   const isLocked = quote.status === 'accepted';
@@ -179,12 +197,12 @@ export default function QuoteDetailPage() {
         <h1 className="text-2xl font-bold text-slate-900">{quote.quoteNumber}</h1>
         <StatusBadge status={quote.status} />
         {quote.leadId && (
-          <Link href={`/leads/${quote.leadId}`} className="text-xs font-medium text-[#168eea] hover:underline">
+          <Link href={`/leads/${quote.leadId}`} className="text-xs font-medium text-[var(--primary)] hover:underline">
             View Lead →
           </Link>
         )}
         {quote.dealId && (
-          <Link href="/pipeline" className="text-xs font-medium text-[#168eea] hover:underline">
+          <Link href="/pipeline" className="text-xs font-medium text-[var(--primary)] hover:underline">
             View Deal →
           </Link>
         )}
@@ -215,9 +233,12 @@ export default function QuoteDetailPage() {
         <StatusBadge status={quote.status} />
       </div>
       {isLocked && (
-        <p className="rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-700">
-          This quotation has been accepted and can no longer be edited directly — create a revision instead.
-        </p>
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs text-amber-700 no-print">
+          <span>This quotation has been accepted and can no longer be edited directly. Create a revision to add or change items.</span>
+          <Button type="button" variant="secondary" size="sm" onClick={handleRevise} disabled={revising} className="ml-auto">
+            {revising ? 'Creating...' : 'Create Revision'}
+          </Button>
+        </div>
       )}
 
       <Card title="Client Details">
@@ -229,6 +250,7 @@ export default function QuoteDetailPage() {
               onChange={(val) => setFormData({ ...formData, client: val })}
               onSelect={handleCompanySelect}
               placeholder="Type client name to search..."
+              scope="clients"
               disabled={isLocked}
             />
           </div>
@@ -239,7 +261,7 @@ export default function QuoteDetailPage() {
               disabled={isLocked}
               value={formData.customerEmail || ''}
               onChange={(e) => setFormData({ ...formData, customerEmail: e.target.value })}
-              className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none disabled:bg-slate-50"
+              className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none disabled:bg-slate-50"
             />
           </div>
 <div>
@@ -251,7 +273,7 @@ export default function QuoteDetailPage() {
                 value={formData.customerPhone || ''}
                 onChange={(e) => setFormData({ ...formData, customerPhone: e.target.value.replace(/\D/g, '') })}
                 placeholder="10-digit number"
-                className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none disabled:bg-slate-50"
+                className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none disabled:bg-slate-50"
               />
             </div>
           <div>
@@ -261,7 +283,7 @@ export default function QuoteDetailPage() {
               disabled={isLocked}
               value={formData.validUntil ? String(formData.validUntil).slice(0, 10) : ''}
               onChange={(e) => setFormData({ ...formData, validUntil: e.target.value })}
-              className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none disabled:bg-slate-50"
+              className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none disabled:bg-slate-50"
             />
           </div>
           <div className="col-span-2">
@@ -271,7 +293,7 @@ export default function QuoteDetailPage() {
               value={formData.customerAddress || ''}
               onChange={(e) => setFormData({ ...formData, customerAddress: e.target.value })}
               rows={2}
-              className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none disabled:bg-slate-50"
+              className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none disabled:bg-slate-50"
             />
           </div>
         </div>
@@ -283,8 +305,8 @@ export default function QuoteDetailPage() {
           !isLocked && (
             <button
               type="button"
-              onClick={() => setLineItems([...lineItems, { itemId: '', productName: '', quantity: 1, unit: 'Nos', rate: 0 }])}
-              className="flex items-center gap-1 text-xs font-medium text-[#168eea] hover:underline"
+              onClick={addLineItem}
+              className="flex items-center gap-1 text-xs font-medium text-[var(--primary)] hover:underline no-print"
             >
               <PlusIcon className="h-3.5 w-3.5" /> Add Item
             </button>
@@ -292,7 +314,14 @@ export default function QuoteDetailPage() {
         }
       >
         {lineItems.length === 0 ? (
-          <p className="py-6 text-center text-sm text-slate-400">No line items yet.</p>
+          <div className="py-6 text-center text-sm text-slate-400">
+            <p>No line items yet.</p>
+            {!isLocked && (
+              <Button type="button" size="sm" onClick={addLineItem} className="mx-auto mt-3 no-print">
+                <PlusIcon className="h-4 w-4" /> Add Item
+              </Button>
+            )}
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -344,7 +373,7 @@ export default function QuoteDetailPage() {
                           next[idx] = { ...next[idx], quantity: Number(e.target.value) };
                           setLineItems(next);
                         }}
-                        className="w-20 rounded-md border border-slate-200 p-1.5 text-sm focus:border-[#168eea] focus:outline-none disabled:bg-slate-50"
+                        className="w-20 rounded-lg border border-slate-200 p-1.5 text-sm focus:border-[var(--primary)] focus:outline-none disabled:bg-slate-50"
                       />
                     </td>
                     <td className="p-2 text-slate-500">{row.unit}</td>
@@ -358,7 +387,7 @@ export default function QuoteDetailPage() {
                           next[idx] = { ...next[idx], rate: Number(e.target.value) };
                           setLineItems(next);
                         }}
-                        className="w-28 rounded-md border border-slate-200 p-1.5 text-sm focus:border-[#168eea] focus:outline-none disabled:bg-slate-50"
+                        className="w-28 rounded-lg border border-slate-200 p-1.5 text-sm focus:border-[var(--primary)] focus:outline-none disabled:bg-slate-50"
                       />
                     </td>
                     <td className="p-2 font-medium text-slate-900">{formatCurrency(row.quantity * row.rate)}</td>
@@ -389,7 +418,7 @@ export default function QuoteDetailPage() {
                 disabled={isLocked}
                 value={formData.discountType || 'percentage'}
                 onChange={(e) => setFormData({ ...formData, discountType: e.target.value })}
-                className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none disabled:bg-slate-50"
+                className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none disabled:bg-slate-50"
               >
                 <option value="percentage">Percentage</option>
                 <option value="flat">Fixed Amount</option>
@@ -402,7 +431,7 @@ export default function QuoteDetailPage() {
                 disabled={isLocked}
                 value={formData.discountValue || 0}
                 onChange={(e) => setFormData({ ...formData, discountValue: Number(e.target.value) })}
-                className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none disabled:bg-slate-50"
+                className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none disabled:bg-slate-50"
               />
             </div>
             <div>
@@ -412,11 +441,11 @@ export default function QuoteDetailPage() {
                 disabled={isLocked}
                 value={formData.shippingCharges || 0}
                 onChange={(e) => setFormData({ ...formData, shippingCharges: Number(e.target.value) })}
-                className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none disabled:bg-slate-50"
+                className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none disabled:bg-slate-50"
               />
             </div>
           </div>
-          <div className="space-y-2 rounded-md bg-slate-50 p-4 text-sm">
+          <div className="space-y-2 rounded-lg bg-slate-50 p-4 text-sm">
             <div className="flex justify-between">
               <span className="text-slate-500">Subtotal</span>
               <span className="font-medium text-slate-900">{formatCurrency(totals.subtotal)}</span>
@@ -435,7 +464,7 @@ export default function QuoteDetailPage() {
             </div>
             <div className="flex justify-between border-t border-slate-200 pt-2 text-base">
               <span className="font-semibold text-slate-900">Grand Total</span>
-              <span className="font-bold text-[#168eea]">{formatCurrency(totals.grandTotal)}</span>
+              <span className="font-bold text-[var(--primary)]">{formatCurrency(totals.grandTotal)}</span>
             </div>
           </div>
         </div>

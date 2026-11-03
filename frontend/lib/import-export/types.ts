@@ -57,6 +57,13 @@ export type ImportExportConfig = {
   getExportData: () => any[] | Promise<any[]>;
   /** called once per row when the user clicks Import — should create the record */
   onImportRow: (row: Record<string, any>) => Promise<any>;
+  /**
+   * Optional bulk path for large files: creates many records in one request
+   * and returns one result per row, in order. Used instead of onImportRow
+   * when given, in batches of `importBatchSize` rows.
+   */
+  onImportBatch?: (rows: Record<string, any>[]) => Promise<{ ok: boolean; error?: string }[]>;
+  importBatchSize?: number;
   /** called after an import batch finishes so the parent list can refresh */
   onImportComplete?: () => void;
 };

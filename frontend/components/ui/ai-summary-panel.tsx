@@ -36,7 +36,7 @@ export default function AISummaryPanel({ onGenerate }: AISummaryPanelProps) {
     <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5 text-xs font-medium text-slate-700">
-          <SparklesIcon className="h-4 w-4 text-[#168eea]" />
+          <SparklesIcon className="h-4 w-4 text-[var(--primary)]" />
           AI Assistant
         </div>
         <Button type="button" variant="secondary" size="sm" disabled={loading} onClick={handleGenerate}>

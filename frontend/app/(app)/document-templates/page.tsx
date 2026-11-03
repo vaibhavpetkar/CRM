@@ -110,7 +110,7 @@ export default function DocumentTemplatesPage() {
             onClick={() => setPurpose(tab.value)}
             className={cn(
               '-mb-px inline-flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium',
-              purpose === tab.value ? 'border-[#168eea] text-[#168eea]' : 'border-transparent text-slate-500 hover:text-slate-700'
+              purpose === tab.value ? 'border-[var(--primary)] text-[var(--primary)]' : 'border-transparent text-slate-500 hover:text-slate-700'
             )}
           >
             <tab.icon className="h-4 w-4" /> {tab.label}
@@ -123,7 +123,7 @@ export default function DocumentTemplatesPage() {
         <select
           value={filterDocType}
           onChange={(e) => setFilterDocType(e.target.value)}
-          className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea]"
+          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
         >
           <option value="all">All document types</option>
           {docTypes.map((d) => (
@@ -133,7 +133,7 @@ export default function DocumentTemplatesPage() {
         <span className="text-sm text-slate-500">{visibleTemplates.length} template{visibleTemplates.length === 1 ? '' : 's'}</span>
       </div>
 
-      {error && <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
+      {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
 
       {loading ? (
         <div className="flex h-48 items-center justify-center"><LoadingSpinner size="md" /></div>
@@ -151,7 +151,7 @@ export default function DocumentTemplatesPage() {
             <Card key={template.id} className="!border-2">
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-2">
-                  <DocumentTextIcon className="h-5 w-5 text-[#168eea]" />
+                  <DocumentTextIcon className="h-5 w-5 text-[var(--primary)]" />
                   <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">{docTypeLabel(template.docType)}</span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -180,14 +180,14 @@ export default function DocumentTemplatesPage() {
                 <p className="mt-1 flex items-center gap-2 text-xs text-slate-500">
                   {template.layout ? 'Drag and drop design' : 'HTML template'}
                   {template.layout && (
-                    <button onClick={() => setEditing({ template })} className="text-[11px] text-slate-400 hover:text-[#168eea]">Edit HTML</button>
+                    <button onClick={() => setEditing({ template })} className="text-[11px] text-slate-400 hover:text-[var(--primary)]">Edit HTML</button>
                   )}
                 </p>
               )}
               {template.isDefault ? (
                 <p className="mt-2 text-[11px] font-medium text-amber-600">In use: the default for {docTypeLabel(template.docType)}</p>
               ) : (
-                <button onClick={() => makeDefault(template)} className="mt-2 text-[11px] font-medium text-[#168eea] hover:underline">
+                <button onClick={() => makeDefault(template)} className="mt-2 text-[11px] font-medium text-[var(--primary)] hover:underline">
                   Make default
                 </button>
               )}
@@ -380,7 +380,7 @@ function TemplateEditorModal({
                     required
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                     placeholder={purpose === 'print' ? 'e.g. Quotation with logo' : 'e.g. Standard Quote Email'}
                   />
                 </div>
@@ -390,7 +390,7 @@ function TemplateEditorModal({
                     value={purpose}
                     onChange={(e) => setPurpose(e.target.value as TemplatePurpose)}
                     disabled={!!template}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none disabled:bg-slate-50 disabled:text-slate-400"
+                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none disabled:bg-slate-50 disabled:text-slate-400"
                   >
                     <option value="print">Print Format</option>
                     <option value="email">Email</option>
@@ -402,7 +402,7 @@ function TemplateEditorModal({
                     value={docType}
                     onChange={(e) => setDocType(e.target.value)}
                     disabled={!!template}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none disabled:bg-slate-50 disabled:text-slate-400"
+                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none disabled:bg-slate-50 disabled:text-slate-400"
                   >
                     {docTypes.map((d) => (
                       <option key={d.value} value={d.value}>{d.label}</option>
@@ -419,7 +419,7 @@ function TemplateEditorModal({
               </label>
 
               {template?.layout && (
-                <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-2 text-[11px] text-amber-700">
+                <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-2 text-[11px] text-amber-700">
                   This format was designed with drag and drop. Saving changes to its HTML here turns it into a plain HTML template, and it will no longer open in the builder.
                 </p>
               )}
@@ -436,7 +436,7 @@ function TemplateEditorModal({
                       setTouched(true);
                       setSubject(e.target.value);
                     }}
-                    className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                     placeholder="e.g. Quotation {{quote_number}} from {{company_name}}"
                   />
                 </div>
@@ -452,7 +452,7 @@ function TemplateEditorModal({
                         if (touched && !confirm('Replace your changes with the standard layout?')) return;
                         setTouched(false);
                       }}
-                      className="text-[11px] text-[#168eea] hover:underline"
+                      className="text-[11px] text-[var(--primary)] hover:underline"
                     >
                       Reset to standard layout
                     </button>
@@ -466,7 +466,7 @@ function TemplateEditorModal({
                     setTouched(true);
                     setHtmlBody(e.target.value);
                   }}
-                  className="mt-1 h-80 resize-y rounded-md border border-slate-200 p-3 font-mono text-xs leading-relaxed focus:border-[#168eea] focus:outline-none"
+                  className="mt-1 h-80 resize-y rounded-lg border border-slate-200 p-3 font-mono text-xs leading-relaxed focus:border-[var(--primary)] focus:outline-none"
                   spellCheck={false}
                 />
               </div>
@@ -482,7 +482,7 @@ function TemplateEditorModal({
                           key={f.key}
                           type="button"
                           onClick={() => insertAtCursor(`{{${f.key}}}`)}
-                          className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 font-mono text-[11px] text-slate-600 hover:border-[#168eea] hover:text-[#168eea]"
+                          className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 font-mono text-[11px] text-slate-600 hover:border-[var(--primary)] hover:text-[var(--primary)]"
                           title={f.label}
                         >
                           {`{{${f.key}}}`}
@@ -500,7 +500,7 @@ function TemplateEditorModal({
                           key={list.key}
                           type="button"
                           onClick={() => insertList(list)}
-                          className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 font-mono text-[11px] text-emerald-700 hover:border-emerald-400"
+                          className="rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1 font-mono text-[11px] text-emerald-700 hover:border-emerald-400"
                           title={`Inserts a table that repeats for every ${list.label.toLowerCase()} row. Fields: ${list.fields.map((f) => f.key).join(', ')}`}
                         >
                           {`{{#${list.key}}} … {{/${list.key}}}`}
@@ -523,7 +523,7 @@ function TemplateEditorModal({
                     value={recordId}
                     onChange={(e) => setRecordId(e.target.value)}
                     placeholder={`${docLabel} ID`}
-                    className="w-24 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs focus:border-[#168eea] focus:outline-none"
+                    className="w-24 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs focus:border-[var(--primary)] focus:outline-none"
                     title="Preview with a real record by its ID (the number in its page address)"
                   />
                   <Button type="button" variant="secondary" size="sm" onClick={loadRecordPreview}>
@@ -539,7 +539,7 @@ function TemplateEditorModal({
               {unknownFields.length > 0 && recordPreview && (
                 <p className="mb-2 text-[11px] text-amber-600">Unknown fields (print blank): {unknownFields.map((f) => `{{${f}}}`).join(', ')}</p>
               )}
-              <div className="flex min-h-0 flex-1 flex-col rounded-md border border-slate-200 bg-white p-3">
+              <div className="flex min-h-0 flex-1 flex-col rounded-lg border border-slate-200 bg-white p-3">
                 {purpose === 'email' && (
                   <p className="mb-2 border-b border-slate-100 pb-2 text-sm font-medium text-slate-900">
                     {previewSubject || <span className="text-slate-300">Subject preview appears here</span>}

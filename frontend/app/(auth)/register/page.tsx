@@ -26,7 +26,7 @@ export default function RegisterPage() {
       </p>
       <p className="mt-4 text-sm text-slate-500">
         Redirecting to{' '}
-        <Link href="/login" className="font-medium text-[#168eea] hover:underline">
+        <Link href="/login" className="font-medium text-[var(--primary)] hover:underline">
           Sign In
         </Link>
         ...

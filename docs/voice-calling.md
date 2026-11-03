@@ -58,7 +58,7 @@ MyOperator adapter can be added later without touching the screens.
    EXOTEL_ACCOUNT_SID=your_sid
    EXOTEL_API_KEY=your_api_key
    EXOTEL_API_TOKEN=your_api_token
-   EXOTEL_CALLER_ID=08047112345      # your ExoPhone
+   EXOTEL_CALLER_ID=08047112345      # fallback ExoPhone (optional once numbers are added in Settings)
    EXOTEL_SUBDOMAIN=api.exotel.com
    ```
 
@@ -69,6 +69,34 @@ MyOperator adapter can be added later without touching the screens.
    for webhooks: the CRM sends the callback URL with every call.
 5. **Each user saves their own phone number** the first time they click a call
    icon (the panel asks for it). That phone rings first on every call.
+
+## A calling team: several people, several numbers
+
+Every click-to-call is its own call at Exotel, so **any number of sales people
+can be on calls at the same time**, each with their own recording and notes.
+How many calls can run at once is set by your Exotel plan (concurrent call
+channels), not by the CRM; ask Exotel for at least one channel per person who
+calls at the same time.
+
+To show customers different numbers, buy a few ExoPhones in Exotel and add them
+under **Settings > Integrations > Calling numbers**. For each number choose:
+
+- **A person**: that person always calls from it. Good when each sales person
+  should have "their" number that customers save and call back.
+- **Shared pool**: the CRM picks a number for every call automatically. It
+  takes one nobody is calling from right now (so people calling at the same
+  time show different numbers), prefers the number that customer was called
+  from last time (so they recognise it and can call back), and otherwise
+  rotates to the least recently used. If every pool number is busy, one is
+  shared, since an ExoPhone can carry several calls at once.
+
+The same card shows, live, who is on a call from which number. A person with no
+number of their own and an empty pool can't call until an admin adds one. With
+no numbers added at all, every call uses `EXOTEL_CALLER_ID` as before.
+
+Incoming calls to these numbers (a customer calling back) are routed by the
+call flow you set on each ExoPhone in Exotel's dashboard, for example to the
+sales person who owns it.
 
 ### Trying it without an account
 
@@ -100,7 +128,10 @@ nothing is charged.
   token) and from polling while the calling panel is open, downloads the
   recording into `uploads/recordings/`, and logs finished calls on the
   timeline.
-- API: `GET /api/calls/config`, `PUT /api/calls/my-number`,
+- `backend/src/services/callerNumbers.ts` picks the caller ID for each call
+  (`chooseCallerNumber`) from the `caller_numbers` table.
+- API: `GET/POST /api/calls/numbers`, `PATCH/DELETE /api/calls/numbers/:id`
+  (admins, `integrations:manage`), `GET /api/calls/config`, `PUT /api/calls/my-number`,
   `POST /api/calls`, `GET /api/calls?leadId=|contactId=`, `GET /api/calls/:id`,
   `PATCH /api/calls/:id` (notes), `GET /api/calls/:id/recording`.
 - Frontend: `frontend/components/calls/` (call button, floating calling panel,

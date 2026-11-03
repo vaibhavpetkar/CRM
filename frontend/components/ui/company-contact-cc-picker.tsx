@@ -54,7 +54,7 @@ export default function CompanyContactCcPicker({ companyName, value, onChange }:
       {loading ? (
         <p className="mt-1 text-xs text-slate-400">Looking for other contacts...</p>
       ) : (
-        <div className="mt-1 max-h-32 space-y-1 overflow-y-auto rounded-md border border-slate-200 p-2">
+        <div className="mt-1 max-h-32 space-y-1 overflow-y-auto rounded-lg border border-slate-200 p-2">
           {contacts.map((c) => (
             <label
               key={c.id}
@@ -65,7 +65,7 @@ export default function CompanyContactCcPicker({ companyName, value, onChange }:
                 disabled={!c.email}
                 checked={!!c.email && value.includes(c.email)}
                 onChange={() => c.email && toggle(c.email)}
-                className="rounded border-slate-300 text-[#168eea] focus:ring-[#168eea]"
+                className="rounded border-slate-300 text-[var(--primary)] focus:ring-[var(--primary)]"
               />
               <span className="text-slate-700">{c.name}</span>
               {c.jobTitle && <span className="text-slate-400">— {c.jobTitle}</span>}

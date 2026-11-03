@@ -6,7 +6,7 @@ import { leadsApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 export interface CompanySuggestion {
-  type: 'company' | 'contact';
+  type: 'company' | 'contact' | 'lead';
   id: number;
   name: string;
   email: string | null;
@@ -19,12 +19,18 @@ export interface CompanySuggestion {
 }
 
 interface CompanyAutocompleteProps {
+  /** Icon shown inside the box on the left (defaults to a search glass). */
+  icon?: React.ReactNode;
+  /** Extra classes for the text box itself. */
+  inputClassName?: string;
   value: string;
   onChange: (value: string) => void;
   onSelect?: (company: CompanySuggestion) => void;
   placeholder?: string;
   className?: string;
   disabled?: boolean;
+  /** 'clients' also suggests people (leads and contacts by name), for quotes and invoices. */
+  scope?: 'companies' | 'clients';
 }
 
 export default function CompanyAutocomplete({
@@ -33,7 +39,10 @@ export default function CompanyAutocomplete({
   onSelect,
   placeholder = 'Type company name to search...',
   className,
+  icon,
+  inputClassName,
   disabled = false,
+  scope = 'companies',
 }: CompanyAutocompleteProps) {
   const [suggestions, setSuggestions] = useState<CompanySuggestion[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -51,7 +60,7 @@ export default function CompanyAutocomplete({
 
     setIsLoading(true);
     try {
-      const res = await leadsApi.searchCompanies(query);
+      const res = await leadsApi.searchCompanies(query, scope);
       setSuggestions(res.results || []);
     } catch (error) {
       console.error('Failed to fetch company suggestions:', error);
@@ -59,7 +68,7 @@ export default function CompanyAutocomplete({
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [scope]);
 
   // Debounced search
   useEffect(() => {
@@ -153,7 +162,11 @@ export default function CompanyAutocomplete({
   return (
     <div className={cn('relative', className)}>
       <div className="relative">
-        <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        {icon ? (
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 [&_svg]:h-4 [&_svg]:w-4">{icon}</span>
+        ) : (
+          <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        )}
         <input
           ref={inputRef}
           type="text"
@@ -164,9 +177,10 @@ export default function CompanyAutocomplete({
           placeholder={placeholder}
           disabled={disabled}
           className={cn(
-            'w-full rounded-md border-0 bg-slate-100/50 py-2 pl-9 pr-10 text-sm text-slate-900 placeholder:text-slate-400',
+            'w-full rounded-lg border-0 bg-slate-100/50 py-2 pl-9 pr-10 text-sm text-slate-900 placeholder:text-slate-400',
             'focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)] transition-all',
-            disabled && 'opacity-50 cursor-not-allowed'
+            disabled && 'opacity-50 cursor-not-allowed',
+            inputClassName
           )}
           autoComplete="off"
           role="combobox"
@@ -195,14 +209,19 @@ export default function CompanyAutocomplete({
         <div
           ref={dropdownRef}
           id="company-suggestions"
-          className="absolute z-20 mt-1 w-full max-h-60 overflow-y-auto rounded-md border border-slate-200 bg-white shadow-lg ring-1 ring-black ring-opacity-5"
+          className="absolute z-20 mt-1 w-full max-h-60 overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg ring-1 ring-black ring-opacity-5"
           role="listbox"
         >
           {suggestions.map((suggestion, index) => (
             <button
               key={`${suggestion.type}-${suggestion.id}`}
               type="button"
-              onClick={() => handleSelect(suggestion)}
+              // mousedown, not click: the input's blur would otherwise close the
+              // list before a slow click lands on the option.
+              onMouseDown={(e) => {
+                e.preventDefault();
+                handleSelect(suggestion);
+              }}
               onMouseEnter={() => setHighlightedIndex(index)}
               className={cn(
                 'w-full px-3 py-2 text-left text-sm transition-colors',
@@ -226,6 +245,12 @@ export default function CompanyAutocomplete({
                       {suggestion.contactName}{suggestion.contactTitle ? `, ${suggestion.contactTitle}` : ''}
                     </p>
                   )}
+                  {/* Two people can share a name, so show their number to tell them apart */}
+                  {suggestion.type !== 'company' && !suggestion.industry && suggestion.phone && (
+                    <p className="truncate text-xs" style={{ opacity: index === highlightedIndex ? 0.8 : 0.6 }}>
+                      {suggestion.phone}
+                    </p>
+                  )}
                   {suggestion.industry && (
                     <p className="truncate text-xs" style={{ opacity: index === highlightedIndex ? 0.8 : 0.6 }}>
                       {suggestion.industry}
@@ -238,11 +263,6 @@ export default function CompanyAutocomplete({
         </div>
       )}
 
-      {isOpen && suggestions.length === 0 && value.length >= 2 && !isLoading && (
-        <div className="absolute z-20 mt-1 w-full rounded-md border border-slate-200 bg-white shadow-lg ring-1 ring-black ring-opacity-5 p-3 text-sm text-slate-500 text-center">
-          No companies or contacts found
-        </div>
-      )}
     </div>
   );
 }

@@ -340,13 +340,13 @@ function PrintBuilder() {
             setDirty(true);
           }}
           placeholder="Print format name"
-          className="w-56 rounded-md border border-slate-200 px-2 py-1.5 text-sm focus:border-[#168eea] focus:outline-none"
+          className="w-56 rounded-lg border border-slate-200 px-2 py-1.5 text-sm focus:border-[var(--primary)] focus:outline-none"
         />
         <select
           value={docType}
           onChange={(e) => changeDocType(e.target.value)}
           disabled={!!templateId}
-          className="rounded-md border border-slate-200 px-2 py-1.5 text-sm disabled:bg-slate-50 disabled:text-slate-400"
+          className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm disabled:bg-slate-50 disabled:text-slate-400"
           title="Document type"
         >
           {docTypes.map((d) => (
@@ -378,7 +378,7 @@ function PrintBuilder() {
             onChange={(e) => setRecordId(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && loadRecord()}
             placeholder={`${docLabel} ID`}
-            className="w-24 rounded-md border border-slate-200 px-2 py-1.5 text-xs focus:border-[#168eea] focus:outline-none"
+            className="w-24 rounded-lg border border-slate-200 px-2 py-1.5 text-xs focus:border-[var(--primary)] focus:outline-none"
             title="Show a real record's data on the canvas (the number in its page address)"
           />
           <Button variant="secondary" size="sm" onClick={loadRecord}>{recordId.trim() ? 'Use record' : 'Sample data'}</Button>
@@ -401,7 +401,7 @@ function PrintBuilder() {
                   e.dataTransfer.effectAllowed = 'copy';
                 }}
                 onDragEnd={() => setDropTarget(null)}
-                className="group flex cursor-grab items-start gap-2 rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5 hover:border-[#168eea] active:cursor-grabbing"
+                className="group flex cursor-grab items-start gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 hover:border-[var(--primary)] active:cursor-grabbing"
                 data-block-type={item.type}
               >
                 <div className="min-w-0 flex-1">
@@ -410,7 +410,7 @@ function PrintBuilder() {
                 </div>
                 <button
                   onClick={() => insertBlock(item.type, selectedId, true)}
-                  className="mt-0.5 text-slate-300 hover:text-[#168eea]"
+                  className="mt-0.5 text-slate-300 hover:text-[var(--primary)]"
                   title="Add after the selected block"
                   aria-label={`Add ${item.label}`}
                 >
@@ -467,7 +467,7 @@ function PrintBuilder() {
               }}
             >
               {layout.blocks.length === 0 && (
-                <div className="w-full rounded-md border-2 border-dashed border-slate-200 py-16 text-center text-sm text-slate-400">
+                <div className="w-full rounded-lg border-2 border-dashed border-slate-200 py-16 text-center text-sm text-slate-400">
                   Drag blocks here from the left
                 </div>
               )}
@@ -494,13 +494,13 @@ function PrintBuilder() {
                     }}
                     className={cn(
                       'relative min-h-[14px] cursor-move outline-offset-[-1px]',
-                      isSel ? 'outline outline-2 outline-[#168eea]' : 'hover:outline hover:outline-1 hover:outline-dashed hover:outline-slate-300'
+                      isSel ? 'outline outline-2 outline-[var(--primary)]' : 'hover:outline hover:outline-1 hover:outline-dashed hover:outline-slate-300'
                     )}
                     style={{ flex: `0 0 ${widthPercent(block.style.width)}%`, maxWidth: `${widthPercent(block.style.width)}%` }}
                   >
                     {indicator && (
                       <div
-                        className="pointer-events-none absolute z-10 bg-[#168eea]"
+                        className="pointer-events-none absolute z-10 bg-[var(--primary)]"
                         style={
                           side
                             ? { top: 0, bottom: 0, width: 3, [dropTarget!.after ? 'right' : 'left']: -2 }
@@ -516,7 +516,7 @@ function PrintBuilder() {
                       <BlockPreview html={renderTemplate(blockPreviewHtml(block, layout.page, docType), data, { escapeHtml: true })} label={BLOCK_LIBRARY.find((b) => b.type === block.type)?.label || ''} />
                     )}
                     {isSel && (
-                      <div className="absolute -top-7 right-0 z-20 flex items-center gap-0.5 rounded-md bg-[#168eea] px-1 py-0.5 text-white shadow" onClick={(e) => e.stopPropagation()}>
+                      <div className="absolute -top-7 right-0 z-20 flex items-center gap-0.5 rounded-lg bg-[var(--primary)] px-1 py-0.5 text-white shadow" onClick={(e) => e.stopPropagation()}>
                         <span className="px-1 text-[10px] font-medium">{BLOCK_LIBRARY.find((b) => b.type === block.type)?.label}</span>
                         <button onClick={() => nudge(block.id, -1)} className="rounded p-0.5 hover:bg-white/20" title="Move up"><ArrowUpIcon className="h-3.5 w-3.5" /></button>
                         <button onClick={() => nudge(block.id, 1)} className="rounded p-0.5 hover:bg-white/20" title="Move down"><ArrowDownIcon className="h-3.5 w-3.5" /></button>
@@ -573,7 +573,7 @@ function BlockPreview({ html, label }: { html: string; label: string }) {
 
 // ─── Property panels ────────────────────────────────────────────────────────
 
-const inputCls = 'w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs focus:border-[#168eea] focus:outline-none';
+const inputCls = 'w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs focus:border-[var(--primary)] focus:outline-none';
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -685,7 +685,7 @@ function FieldRows({ rows, fields, onChange }: { rows: { key: string; label: str
   return (
     <div className="space-y-2">
       {rows.map((r, i) => (
-        <div key={i} className="rounded-md border border-slate-200 p-2">
+        <div key={i} className="rounded-lg border border-slate-200 p-2">
           <div className="flex items-center gap-1">
             <input value={r.label} onChange={(e) => onChange(rows.map((x, k) => (k === i ? { ...x, label: e.target.value } : x)))} placeholder="Label" className={inputCls} />
             <button onClick={() => move(i, -1)} className="text-slate-300 hover:text-slate-600" title="Up"><ArrowUpIcon className="h-3.5 w-3.5" /></button>
@@ -702,7 +702,7 @@ function FieldRows({ rows, fields, onChange }: { rows: { key: string; label: str
           const f = fields[0];
           if (f) onChange([...rows, { key: f.key, label: f.label }]);
         }}
-        className="inline-flex items-center gap-1 text-xs font-medium text-[#168eea] hover:underline"
+        className="inline-flex items-center gap-1 text-xs font-medium text-[var(--primary)] hover:underline"
       >
         <PlusIcon className="h-3.5 w-3.5" /> Add field
       </button>
@@ -763,7 +763,7 @@ function BlockProperties({
     <div>
       <div className="mb-4 flex items-center justify-between">
         <h3 className="text-sm font-semibold text-slate-800">{label}</h3>
-        <button onClick={onClose} className="text-xs text-[#168eea] hover:underline">Page settings</button>
+        <button onClick={onClose} className="text-xs text-[var(--primary)] hover:underline">Page settings</button>
       </div>
 
       <Section title="Content">
@@ -851,7 +851,7 @@ function BlockProperties({
                   <button
                     key={w}
                     onClick={() => onStyle({ width: w })}
-                    className={cn('rounded border px-1.5 py-0.5 text-[11px]', s.width === w ? 'border-[#168eea] bg-sky-50 text-[#168eea]' : 'border-slate-200 text-slate-500')}
+                    className={cn('rounded border px-1.5 py-0.5 text-[11px]', s.width === w ? 'border-[var(--primary)] bg-sky-50 text-[var(--primary)]' : 'border-slate-200 text-slate-500')}
                   >
                     {w === 66 ? '2/3' : w === 33 ? '1/3' : `${w}%`}
                   </button>
@@ -861,7 +861,7 @@ function BlockProperties({
             <Row label="Align">
               <div className="flex gap-1">
                 {(['left', 'center', 'right'] as const).map((a) => (
-                  <button key={a} onClick={() => onStyle({ align: a })} className={cn('rounded border px-2 py-0.5 text-[11px] capitalize', s.align === a ? 'border-[#168eea] bg-sky-50 text-[#168eea]' : 'border-slate-200 text-slate-500')}>
+                  <button key={a} onClick={() => onStyle({ align: a })} className={cn('rounded border px-2 py-0.5 text-[11px] capitalize', s.align === a ? 'border-[var(--primary)] bg-sky-50 text-[var(--primary)]' : 'border-slate-200 text-slate-500')}>
                     {a}
                   </button>
                 ))}
@@ -908,7 +908,7 @@ function ItemColumnsEditor({ block, onChange }: { block: Block; onChange: (patch
     <div className="space-y-2">
       <p className="text-[11px] text-slate-400">One row prints per line item. Tick the columns to show; reorder with the arrows.</p>
       {cols.map((c, i) => (
-        <div key={c.key} className="rounded-md border border-slate-200 p-2">
+        <div key={c.key} className="rounded-lg border border-slate-200 p-2">
           <div className="flex items-center gap-1.5">
             <input type="checkbox" checked={c.visible} onChange={(e) => set(i, { visible: e.target.checked })} className="rounded border-slate-300" title="Show column" />
             <input value={c.label} onChange={(e) => set(i, { label: e.target.value })} className={inputCls} />

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, forwardRef } from 'react';
 import PageHeader from '@/components/ui/page-header';
 import SearchInput from '@/components/ui/search-input';
 import StatusBadge from '@/components/ui/status-badge';
@@ -12,14 +12,15 @@ import CompanyAutocomplete from '@/components/ui/company-autocomplete';
 import UserAutocomplete from '@/components/ui/user-autocomplete';
 import TerritoryAutocomplete from '@/components/ui/territory-autocomplete';
 import { LEAD_FIELDS } from '@/lib/import-export/field-configs';
-import { formatCurrency } from '@/lib/utils';
-import { leadsApi, usersApi, getStoredUser } from '@/lib/api';
-import { TERRITORY_OPTIONS } from '@/lib/lead-options';
+import { cn, formatCurrency } from '@/lib/utils';
+import { leadsApi, usersApi, salesApi, getStoredUser, PresenceState } from '@/lib/api';
+import { TERRITORY_OPTIONS, LEAD_SOURCE_OPTIONS, CONFIGURATION_OPTIONS, PROPERTY_TYPE_OPTIONS, BUDGET_OPTIONS, leadSourceLabel, budgetRange } from '@/lib/lead-options';
+import { AgentStatusDot } from '@/components/sales/agent-status';
 import { hasPermission } from '@/lib/permissions';
 import { useKeyboardShortcuts } from '@/lib/hooks/useKeyboardShortcuts';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { PlusIcon, FunnelIcon, XMarkIcon, PencilSquareIcon, TrashIcon, EyeIcon, Squares2X2Icon, ListBulletIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, FunnelIcon, XMarkIcon, PencilSquareIcon, TrashIcon, EyeIcon, Squares2X2Icon, ListBulletIcon, UserPlusIcon, UserIcon, UsersIcon, EnvelopeIcon, PhoneIcon, BuildingOffice2Icon, MegaphoneIcon, MapPinIcon, CalendarDaysIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -37,7 +38,7 @@ const emptyForm = {
   company: '',
   website: '',
   jobTitle: '',
-  leadSource: 'Website',
+  leadSource: 'website',
   status: 'new',
   industry: '',
   noOfEmployees: '',
@@ -91,14 +92,78 @@ const leadSchema = z.object({
   qualifiedById: z.union([z.string(), z.number()]).optional(),
   alternateMobile: z.string().optional().refine(val => !val || /^\d{10}$/.test(val), 'Alternate mobile must be 10 digits'),
   meetingStatus: z.string().optional(),
+  // Real-estate requirement
+  propertyType: z.string().optional(),
+  configuration: z.string().optional(),
+  preferredLocation: z.string().optional(),
+  projectName: z.string().optional(),
+  subSource: z.string().optional(),
+  budgetMin: z.string().optional(),
+  budgetMax: z.string().optional(),
 });
 type LeadFormValues = z.infer<typeof leadSchema>;
+
+// Add Lead popup building blocks.
+const POPUP_INPUT =
+  'w-full rounded-lg border border-slate-200 bg-slate-50/60 py-2.5 pl-10 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[var(--primary)] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20 transition-all';
+
+function LeadFormStep({ n, title, subtitle }: { n: number; title: string; subtitle: string }) {
+  return (
+    <div className="flex items-center gap-3">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50">
+        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--primary)] text-xs font-bold text-white">{n}</span>
+      </span>
+      <div>
+        <h4 className="text-[15px] font-semibold text-slate-900">{title}</h4>
+        <p className="text-xs text-slate-500">{subtitle}</p>
+      </div>
+    </div>
+  );
+}
+
+function LeadField({ label, required, error, hint, children }: { label: string; required?: boolean; error?: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="mb-1.5 block text-[13px] font-medium text-slate-800">
+        {label} {required && <span className="text-red-500">*</span>}
+      </label>
+      {children}
+      {error ? <p className="mt-1 text-[11px] text-red-500">{error}</p> : hint ? <p className="mt-1 text-[11px] text-slate-500">{hint}</p> : null}
+    </div>
+  );
+}
+
+const IconInput = forwardRef<HTMLInputElement, React.ComponentProps<'input'> & { icon: React.ReactNode; invalid?: boolean }>(
+  function IconInput({ icon, invalid, className = '', ...props }, ref) {
+    return (
+      <div className="relative">
+        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 [&_svg]:h-4 [&_svg]:w-4">{icon}</span>
+        <input ref={ref} {...props} className={cn(POPUP_INPUT, invalid && 'border-red-400 bg-red-50/40 focus:border-red-400 focus:ring-red-200', className)} />
+      </div>
+    );
+  }
+);
 
 export default function LeadsPage() {
   const toast = useToast();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
   const [territoryFilter, setTerritoryFilter] = useState('all');
+  // Real-estate filters ("More filters" panel). 'all' / '' means no filter.
+  const [sourceFilter, setSourceFilter] = useState('all');
+  const [assigneeFilter, setAssigneeFilter] = useState('all');
+  const [configFilter, setConfigFilter] = useState<string[]>([]);
+  const [propertyTypeFilter, setPropertyTypeFilter] = useState('all');
+  const [locationFilter, setLocationFilter] = useState('');
+  const [budgetFilter, setBudgetFilter] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+  // Typed text waits a moment before searching, so each key press doesn't reload every lead.
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [debouncedLocation, setDebouncedLocation] = useState('');
+  // Live green/red status of each sales person, for the Assigned To column.
+  const [agentStates, setAgentStates] = useState<Map<number, PresenceState>>(new Map());
   const [leads, setLeads] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -135,7 +200,7 @@ export default function LeadsPage() {
       email: '',
       mobile: '',
       company: '',
-      leadSource: 'Website',
+      leadSource: 'website',
       assignedToId: '',
     },
   });
@@ -150,7 +215,43 @@ export default function LeadsPage() {
       .getAssignableUsers()
       .then((res) => setAssignableUsers(res.users.map((u) => ({ id: u.id, name: u.name }))))
       .catch(() => setAssignableUsers([]));
+    salesApi
+      .getActivity()
+      .then((res) => setAgentStates(new Map(res.agents.map((a) => [a.userId, a.state]))))
+      .catch(() => {});
   }, []);
+
+  // Deep links from Lead Sources / Sales Activity: /leads?leadSource=99acres&dateFrom=...
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    let any = false;
+    const take = (key: string, set: (v: string) => void) => {
+      const v = q.get(key);
+      if (v) {
+        set(v);
+        any = true;
+      }
+    };
+    take('leadSource', setSourceFilter);
+    take('assignedToId', setAssigneeFilter);
+    take('dateFrom', setDateFrom);
+    take('dateTo', setDateTo);
+    take('location', setLocationFilter);
+    if (any) setShowFilters(true);
+    // Dashboard pipeline stages link here with ?status=..., a top-level filter.
+    const status = q.get('status');
+    if (status) setFilter(status);
+  }, []);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedLocation(locationFilter), 300);
+    return () => clearTimeout(t);
+  }, [locationFilter]);
 
   // Support deep-linking from the topbar's Quick Create menu (/leads?quickCreate=1)
   useEffect(() => {
@@ -162,7 +263,7 @@ export default function LeadsPage() {
         email: '',
         mobile: '',
         company: '',
-        leadSource: 'Website',
+        leadSource: 'website',
         assignedToId: '',
         territory: '',
         qualifiedById: '',
@@ -218,10 +319,20 @@ export default function LeadsPage() {
     setLoading(true);
     setError(null);
     try {
+      const budget = BUDGET_OPTIONS[Number(budgetFilter)];
       const rows = await leadsApi.getAllLeads({
-        search,
+        search: debouncedSearch,
         status: filter,
         territory: territoryFilter,
+        leadSource: sourceFilter,
+        assignedToId: assigneeFilter,
+        configuration: configFilter.join(','),
+        propertyType: propertyTypeFilter,
+        location: debouncedLocation,
+        budgetFrom: budgetFilter !== '' ? budget?.from : undefined,
+        budgetTo: budgetFilter !== '' ? budget?.to : undefined,
+        dateFrom,
+        dateTo,
       });
       setLeads(rows);
     } catch (err: any) {
@@ -230,7 +341,30 @@ export default function LeadsPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, filter, territoryFilter]);
+  }, [debouncedSearch, filter, territoryFilter, sourceFilter, assigneeFilter, configFilter, propertyTypeFilter, debouncedLocation, budgetFilter, dateFrom, dateTo]);
+
+  const activeFilterCount = [
+    sourceFilter !== 'all',
+    assigneeFilter !== 'all',
+    configFilter.length > 0,
+    propertyTypeFilter !== 'all',
+    !!locationFilter.trim(),
+    budgetFilter !== '',
+    !!dateFrom || !!dateTo,
+  ].filter(Boolean).length;
+
+  const clearFilters = () => {
+    setSourceFilter('all');
+    setAssigneeFilter('all');
+    setConfigFilter([]);
+    setPropertyTypeFilter('all');
+    setLocationFilter('');
+    setBudgetFilter('');
+    setDateFrom('');
+    setDateTo('');
+  };
+
+  const toggleConfig = (c: string) => setConfigFilter((prev) => (prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]));
 
   useEffect(() => {
     fetchLeads();
@@ -244,7 +378,7 @@ export default function LeadsPage() {
       email: '',
       mobile: '',
       company: '',
-      leadSource: 'Website',
+      leadSource: 'website',
       assignedToId: '',
     });
     setIsModalOpen(true);
@@ -310,12 +444,19 @@ export default function LeadsPage() {
       email: data.email,
       mobile: data.mobile,
       company: data.company,
-      leadSource: (data.leadSource || 'Website').toLowerCase().replace(/\s+/g, '-'),
+      leadSource: (data.leadSource || 'website').toLowerCase().replace(/\s+/g, '-'),
       assignedToId: resolvedAssignedToId,
       qualifiedById: resolvedQualifiedById,
       territory: data.territory,
       alternateMobile: data.alternateMobile,
       meetingStatus: data.meetingStatus,
+      propertyType: data.propertyType || null,
+      configuration: data.configuration || null,
+      preferredLocation: data.preferredLocation || null,
+      projectName: data.projectName || null,
+      subSource: data.subSource || null,
+      budgetMin: data.budgetMin ? Number(data.budgetMin) : null,
+      budgetMax: data.budgetMax ? Number(data.budgetMax) : null,
     } as Record<string, any>;
 
     // emptyForm defaults numeric fields to '' so the inputs render blank —
@@ -323,8 +464,12 @@ export default function LeadsPage() {
     // for type integer"). Convert to a number when filled, or drop the key
     // (-> backend defaults it to null) when left blank. Mirrors the same
     // sanitization already applied on the CSV import path below.
-    ['noOfEmployees', 'latitude', 'longitude', 'leadOwnerId', 'assignedToId', 'qualifiedById'].forEach((key) => {
-      if (payload[key] !== undefined && payload[key] !== '') payload[key] = Number(payload[key]);
+    // null must be checked too: Number(null) is 0, which reached the API as
+    // the user id "0" and blocked saving a lead with Assigned To or
+    // Qualified By left blank. A blank picker is sent as null so lead
+    // rotation can pick the assignee (and an edit can clear the field).
+    ['noOfEmployees', 'latitude', 'longitude', 'leadOwnerId'].forEach((key) => {
+      if (payload[key] !== undefined && payload[key] !== null && payload[key] !== '') payload[key] = Number(payload[key]);
       else delete payload[key];
     });
 
@@ -353,16 +498,21 @@ export default function LeadsPage() {
     }
   };
 
-  const handleImportRow = async (row: Record<string, any>) => {
+  const importPayload = (row: Record<string, any>) => {
     const payload: Record<string, any> = { ...row };
     if (payload.leadSource) payload.leadSource = String(payload.leadSource).toLowerCase().trim().replace(/\s+/g, '-');
     if (payload.status) payload.status = String(payload.status).toLowerCase().trim();
-    ['score', 'value', 'noOfEmployees', 'latitude', 'longitude'].forEach((key) => {
+    ['score', 'value', 'noOfEmployees', 'latitude', 'longitude', 'budgetMin', 'budgetMax'].forEach((key) => {
       if (payload[key] !== undefined && payload[key] !== '') payload[key] = Number(payload[key]);
       else delete payload[key];
     });
-    return leadsApi.createLead(payload);
+    return payload;
   };
+
+  const handleImportRow = async (row: Record<string, any>) => leadsApi.createLead(importPayload(row));
+
+  // Large files (tens of thousands of leads) go up in batches of 500 rows.
+  const handleImportBatch = async (rows: Record<string, any>[]) => (await leadsApi.importLeads(rows.map(importPayload))).results;
 
   const handleDelete = async (lead: any) => {
     const name = lead.name || `${lead.firstName || ''} ${lead.lastName || ''}`.trim() || 'this lead';
@@ -396,13 +546,16 @@ export default function LeadsPage() {
   // Name, Contact Person, Status. Everything else (Phone, Email, Title,
   // Source, Industry, Score, Value, Assigned To, Last Contact, Next Follow Up)
   // moved off the main table; still editable from the Lead detail page.
+  const filterField =
+    'mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]';
+
   const columns: DataTableColumn<any>[] = [
     {
       header: 'Series ID',
       accessor: (lead) => (
         <Link
           href={`/leads/${lead.id}`}
-          className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-mono text-slate-600 hover:text-[#168eea] hover:underline"
+          className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-mono text-slate-600 hover:text-[var(--primary)] hover:underline"
         >
           {lead.leadNumber || `#${lead.id}`}
         </Link>
@@ -419,13 +572,39 @@ export default function LeadsPage() {
       accessor: (lead) => {
         const leadName = lead.name || `${lead.firstName || ''} ${lead.lastName || ''}`.trim() || 'Unnamed';
         return (
-          <Link href={`/leads/${lead.id}`} className="text-slate-600 hover:text-[#168eea] hover:underline">
+          <Link href={`/leads/${lead.id}`} className="text-slate-600 hover:text-[var(--primary)] hover:underline">
             {leadName}
           </Link>
         );
       },
     },
     { header: 'Status', accessor: (lead) => <StatusBadge status={lead.status} /> },
+    {
+      header: 'Requirement',
+      id: 'requirement',
+      accessor: (lead) => {
+        const parts = [lead.configuration, lead.propertyType].filter(Boolean).join(' ');
+        const budget = budgetRange(lead.budgetMin, lead.budgetMax);
+        if (!parts && !budget) return <span className="text-slate-400">—</span>;
+        return (
+          <span className="text-slate-600">
+            {parts}
+            {budget && <span className="block text-xs text-slate-400">{budget}</span>}
+          </span>
+        );
+      },
+    },
+    {
+      header: 'Area',
+      id: 'preferredLocation',
+      accessor: (lead) => <span className="text-slate-600">{lead.preferredLocation || lead.city || '—'}</span>,
+    },
+    {
+      header: 'Project',
+      id: 'projectName',
+      optional: true,
+      accessor: (lead) => <span className="text-slate-600">{lead.projectName || '—'}</span>,
+    },
     // Task 2.16 removed these from the default view, but they're still real
     // lead fields — available on request via "Arrange & Hide Columns" -> Add.
     {
@@ -456,7 +635,13 @@ export default function LeadsPage() {
       header: 'Source',
       id: 'leadSource',
       optional: true,
-      accessor: (lead) => <span className="text-slate-600">{lead.source || lead.leadSource || '—'}</span>,
+      accessor: (lead) => <span className="text-slate-600">{lead.source || lead.leadSource ? leadSourceLabel(lead.source || lead.leadSource) : '—'}</span>,
+    },
+    {
+      header: 'Sub Source',
+      id: 'subSource',
+      optional: true,
+      accessor: (lead) => <span className="text-slate-600">{lead.subSource || '—'}</span>,
     },
     {
       header: 'Industry',
@@ -482,7 +667,15 @@ export default function LeadsPage() {
       header: 'Assigned To',
       id: 'assignedTo',
       optional: true,
-      accessor: (lead) => <span className="text-slate-600">{lead.assignedTo || '—'}</span>,
+      accessor: (lead) =>
+        lead.assignedTo ? (
+          <span className="flex items-center gap-2 text-slate-600">
+            <AgentStatusDot state={agentStates.get(Number(lead.assignedToId)) || 'offline'} />
+            {lead.assignedTo}
+          </span>
+        ) : (
+          <span className="text-slate-400">—</span>
+        ),
     },
   ];
 
@@ -500,6 +693,8 @@ export default function LeadsPage() {
                 fields: LEAD_FIELDS,
                 getExportData: () => leads,
                 onImportRow: handleImportRow,
+                onImportBatch: handleImportBatch,
+                importBatchSize: 500,
                 onImportComplete: fetchLeads,
               }}
             />
@@ -508,13 +703,13 @@ export default function LeadsPage() {
         }
       />
 
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
-        <SearchInput value={search} onChange={setSearch} placeholder="Search by Series ID or Company Name..." className="sm:max-w-xs" />
+      <div className="mb-4 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs flex flex-col gap-3 sm:flex-row sm:items-center">
+        <SearchInput value={search} onChange={setSearch} placeholder="Search name, number, area, 2 BHK..." className="sm:max-w-xs" />
         <div className="flex items-center gap-2">
           <select
             value={territoryFilter}
             onChange={(e) => setTerritoryFilter(e.target.value)}
-            className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea]"
+            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
           >
             <option value="all">All Territories</option>
             {TERRITORY_OPTIONS.map((opt) => (
@@ -527,7 +722,7 @@ export default function LeadsPage() {
           <select
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea]"
+            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
           >
             <option value="all">All Statuses</option>
             <option value="new">New</option>
@@ -539,12 +734,21 @@ export default function LeadsPage() {
             <option value="lost">Lost</option>
           </select>
         </div>
-        <span className="text-sm text-slate-500">{leads.length} lead{leads.length === 1 ? '' : 's'}</span>
-        <div className="ml-auto flex items-center gap-1 rounded-md border border-slate-200 bg-white p-1">
+        <button
+          type="button"
+          onClick={() => setShowFilters((v) => !v)}
+          className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border px-3 py-2 text-sm font-medium ${
+            showFilters || activeFilterCount ? 'border-[var(--primary)] text-[var(--primary)]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+          }`}
+        >
+          <FunnelIcon className="h-4 w-4" /> More filters{activeFilterCount ? ` (${activeFilterCount})` : ''}
+        </button>
+        <span className="whitespace-nowrap text-sm text-slate-500">{leads.length} lead{leads.length === 1 ? '' : 's'}</span>
+        <div className="ml-auto flex items-center gap-1 rounded-lg border border-slate-200 bg-white p-1">
           <button
             onClick={() => setView('list')}
             className={`flex items-center gap-1 rounded px-2 py-1 text-xs font-medium ${
-              view === 'list' ? 'bg-[#168eea] text-white' : 'text-slate-500 hover:text-slate-700'
+              view === 'list' ? 'bg-[var(--primary)] text-white' : 'text-slate-500 hover:text-slate-700'
             }`}
           >
             <ListBulletIcon className="h-4 w-4" /> List
@@ -552,7 +756,7 @@ export default function LeadsPage() {
           <button
             onClick={() => setView('kanban')}
             className={`flex items-center gap-1 rounded px-2 py-1 text-xs font-medium ${
-              view === 'kanban' ? 'bg-[#168eea] text-white' : 'text-slate-500 hover:text-slate-700'
+              view === 'kanban' ? 'bg-[var(--primary)] text-white' : 'text-slate-500 hover:text-slate-700'
             }`}
           >
             <Squares2X2Icon className="h-4 w-4" /> Kanban
@@ -560,7 +764,88 @@ export default function LeadsPage() {
         </div>
       </div>
 
-      {error && <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
+      {showFilters && (
+        <div className="mb-4 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div>
+              <label className="block text-xs font-medium text-slate-500">Lead source</label>
+              <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)} className={filterField}>
+                <option value="all">All sources</option>
+                {LEAD_SOURCE_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-500">Sales person</label>
+              <select value={assigneeFilter} onChange={(e) => setAssigneeFilter(e.target.value)} className={filterField}>
+                <option value="all">Everyone</option>
+                <option value="unassigned">Unassigned</option>
+                {assignableUsers.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {agentStates.size ? (agentStates.get(u.id) && agentStates.get(u.id) !== 'offline' ? '🟢 ' : '🔴 ') : ''}
+                    {u.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-500">Property type</label>
+              <select value={propertyTypeFilter} onChange={(e) => setPropertyTypeFilter(e.target.value)} className={filterField}>
+                <option value="all">Any type</option>
+                {PROPERTY_TYPE_OPTIONS.map((o) => (
+                  <option key={o} value={o}>{o}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-500">Budget</label>
+              <select value={budgetFilter} onChange={(e) => setBudgetFilter(e.target.value)} className={filterField}>
+                <option value="">Any budget</option>
+                {BUDGET_OPTIONS.map((o, i) => (
+                  <option key={o.label} value={i}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-500">Area / locality</label>
+              <input value={locationFilter} onChange={(e) => setLocationFilter(e.target.value)} placeholder="e.g. Baner, Wakad" className={filterField} />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-500">Lead date from</label>
+              <input type="date" value={dateFrom} max={dateTo || undefined} onChange={(e) => setDateFrom(e.target.value)} className={filterField} />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-500">Lead date to</label>
+              <input type="date" value={dateTo} min={dateFrom || undefined} onChange={(e) => setDateTo(e.target.value)} className={filterField} />
+            </div>
+            <div className="flex items-end">
+              <button type="button" onClick={clearFilters} disabled={!activeFilterCount} className="text-sm font-medium text-[var(--primary)] hover:underline disabled:text-slate-300 disabled:no-underline">
+                Clear filters
+              </button>
+            </div>
+          </div>
+          <div className="mt-3">
+            <span className="block text-xs font-medium text-slate-500">Configuration</span>
+            <div className="mt-1 flex flex-wrap gap-1.5">
+              {CONFIGURATION_OPTIONS.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => toggleConfig(c)}
+                  className={`rounded-full border px-3 py-1 text-xs font-semibold ${
+                    configFilter.includes(c) ? 'border-[var(--primary)] bg-[var(--primary)] text-white' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
 
       {view === 'kanban' ? (
         <LeadsKanban
@@ -604,10 +889,10 @@ export default function LeadsPage() {
           onRowClick={(lead) => router.push(`/leads/${lead.id}`)}
           actions={(lead) => (
             <div className="flex justify-end gap-3">
-              <button onClick={() => router.push(`/leads/${lead.id}`)} className="text-slate-400 hover:text-[#168eea]" aria-label="View Details">
+              <button onClick={() => router.push(`/leads/${lead.id}`)} className="text-slate-400 hover:text-[var(--primary)]" aria-label="View Details">
                 <EyeIcon className="h-4 w-4" />
               </button>
-              <button onClick={() => openEdit(lead)} className="text-slate-400 hover:text-[#168eea]" aria-label="Edit">
+              <button onClick={() => openEdit(lead)} className="text-slate-400 hover:text-[var(--primary)]" aria-label="Edit">
                 <PencilSquareIcon className="h-4 w-4" />
               </button>
               <button onClick={() => handleDelete(lead)} className="text-slate-400 hover:text-red-600" aria-label="Delete">
@@ -620,151 +905,127 @@ export default function LeadsPage() {
       )}
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-lg font-semibold text-slate-900">{editingId ? 'Edit Lead' : 'Add New Lead'}</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-[2px]">
+          <div className="flex max-h-[92vh] w-full max-w-[720px] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-start justify-between gap-4 px-6 pt-6 sm:px-8">
+              <div className="flex items-center gap-4">
+                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-[var(--primary)]">
+                  <UserPlusIcon className="h-6 w-6" />
+                </span>
+                <div>
+                  <h3 className="text-xl font-bold text-slate-900">{editingId ? 'Edit Lead' : 'Add New Lead'}</h3>
+                  <p className="mt-0.5 text-sm text-slate-500">Create a new lead and assign it to your sales team.</p>
+                </div>
+              </div>
+              <button type="button" onClick={() => setIsModalOpen(false)} aria-label="Close" className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
                 <XMarkIcon className="h-5 w-5" />
               </button>
             </div>
 
-            <form onSubmit={hookFormSubmit(onSubmitForm)} className="mt-4 space-y-4">
-              <div className="border-b border-slate-200 pb-4">
-                <h4 className="text-sm font-medium text-slate-700 mb-3">Mandatory Lead Details</h4>
-                
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700">First Name *</label>
-                    <input
-                      type="text"
-                      {...register('firstName')}
-                      className={`mt-1 w-full rounded-md border-0 bg-slate-100/50 p-2 text-sm focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)] ${errors.firstName ? 'ring-1 ring-red-500 bg-red-50' : ''}`}
-                    />
-                    {errors.firstName && <p className="mt-1 text-[10px] text-red-500">{errors.firstName.message}</p>}
+            <form onSubmit={hookFormSubmit(onSubmitForm)} className="flex min-h-0 flex-1 flex-col">
+              <div className="flex-1 overflow-y-auto px-6 pb-6 sm:px-8">
+                <div className="mt-4 border-t border-slate-100 pt-4">
+                  <LeadFormStep n={1} title="Mandatory Lead Details" subtitle="Enter the basic information about the lead." />
+                  <div className="mt-4 grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
+                    <LeadField label="First Name" required error={errors.firstName?.message}>
+                      <IconInput icon={<UserIcon />} placeholder="Enter first name" invalid={!!errors.firstName} {...register('firstName')} />
+                    </LeadField>
+                    <LeadField label="Last Name" required error={errors.lastName?.message}>
+                      <IconInput icon={<UserIcon />} placeholder="Enter last name" invalid={!!errors.lastName} {...register('lastName')} />
+                    </LeadField>
+                    <LeadField label="Email" required error={errors.email?.message}>
+                      <IconInput icon={<EnvelopeIcon />} type="email" placeholder="Enter email address" invalid={!!errors.email} {...register('email')} />
+                    </LeadField>
+                    <LeadField label="Mobile Number" required error={errors.mobile?.message}>
+                      <IconInput icon={<PhoneIcon />} type="tel" inputMode="numeric" maxLength={10} placeholder="10-digit mobile number" invalid={!!errors.mobile} {...register('mobile')} />
+                    </LeadField>
+                    <LeadField label="Company">
+                      <CompanyAutocomplete
+                        value={watchedCompany || ''}
+                        onChange={(val) => setValue('company', val, { shouldValidate: true })}
+                        onSelect={handleCompanySelect}
+                        placeholder="Search or enter company name"
+                        icon={<BuildingOffice2Icon />}
+                        inputClassName={POPUP_INPUT}
+                      />
+                    </LeadField>
+                    <LeadField label="Lead Source">
+                      <div className="relative">
+                        <MegaphoneIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                        <select {...register('leadSource')} className={`${POPUP_INPUT} appearance-none pr-9 font-medium text-slate-800`}>
+                          {LEAD_SOURCE_OPTIONS.map((o) => (
+                            <option key={o.value} value={o.value}>{o.label}</option>
+                          ))}
+                        </select>
+                        <ChevronDownIcon className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                      </div>
+                    </LeadField>
+                    <LeadField label="Territory">
+                      <TerritoryAutocomplete
+                        value={watch('territory') || ''}
+                        onChange={(val) => setValue('territory', val)}
+                        placeholder="Search territory..."
+                        icon={<MapPinIcon />}
+                        inputClassName={POPUP_INPUT}
+                      />
+                    </LeadField>
+                    <LeadField label="Qualified By">
+                      <UserAutocomplete
+                        value={watch('qualifiedById') || ''}
+                        onChange={(val) => setValue('qualifiedById', val)}
+                        placeholder="Search team member..."
+                        icon={<UsersIcon />}
+                        inputClassName={POPUP_INPUT}
+                      />
+                    </LeadField>
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700">Last Name *</label>
-                    <input
-                      type="text"
-                      {...register('lastName')}
-                      className={`mt-1 w-full rounded-md border-0 bg-slate-100/50 p-2 text-sm focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)] ${errors.lastName ? 'ring-1 ring-red-500 bg-red-50' : ''}`}
-                    />
-                    {errors.lastName && <p className="mt-1 text-[10px] text-red-500">{errors.lastName.message}</p>}
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700">Email *</label>
-                    <input
-                      type="email"
-                      {...register('email')}
-                      className={`mt-1 w-full rounded-md border-0 bg-slate-100/50 p-2 text-sm focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)] ${errors.email ? 'ring-1 ring-red-500 bg-red-50' : ''}`}
-                    />
-                    {errors.email && <p className="mt-1 text-[10px] text-red-500">{errors.email.message}</p>}
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700">Mobile Number *</label>
-                    <input
-                      type="tel"
-                      {...register('mobile')}
-                      placeholder="10-digit number"
-                      className={`mt-1 w-full rounded-md border-0 bg-slate-100/50 p-2 text-sm focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)] ${errors.mobile ? 'ring-1 ring-red-500 bg-red-50' : ''}`}
-                    />
-                    {errors.mobile && <p className="mt-1 text-[10px] text-red-500">{errors.mobile.message}</p>}
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700">Company</label>
-                    <CompanyAutocomplete
-                      value={watchedCompany || ''}
-                      onChange={(val) => setValue('company', val, { shouldValidate: true })}
-                      onSelect={handleCompanySelect}
-                      placeholder="Type company name to search..."
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700">Lead Source</label>
-                    <select
-                      {...register('leadSource')}
-                      className="mt-1 w-full rounded-md border-0 bg-slate-100/50 p-2 text-sm focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
-                    >
-                      <option value="Website">Website</option>
-                      <option value="LinkedIn">LinkedIn</option>
-                      <option value="Facebook">Facebook</option>
-                      <option value="Instagram">Instagram</option>
-                      <option value="Referral">Referral</option>
-                      <option value="Event">Event</option>
-                      <option value="Social Media">Social Media</option>
-                      <option value="Cold Call">Cold Call</option>
-                      <option value="Email">Email</option>
-                      <option value="Other">Other</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700">Territory</label>
-                    <TerritoryAutocomplete
-                      value={watch('territory') || ''}
-                      onChange={(val) => setValue('territory', val)}
-                      placeholder="Type territory to search..."
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700">Qualified By</label>
-                    <UserAutocomplete
-                      value={watch('qualifiedById') || ''}
-                      onChange={(val) => setValue('qualifiedById', val)}
-                      placeholder="Type user name to search..."
-                    />
+                </div>
+
+                <div className="mt-6 border-t border-slate-100 pt-4">
+                  <LeadFormStep n={2} title="Assignment & Scheduling" subtitle="Set ownership and follow-up details." />
+                  <div className="mt-4 grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
+                    <LeadField label="Assigned To (Lead Owner)" hint="The assignee is notified automatically when assigned.">
+                      <UserAutocomplete
+                        value={watch('assignedToId') || ''}
+                        onChange={(val) => setValue('assignedToId', val)}
+                        placeholder="Search team member..."
+                        icon={<UserIcon />}
+                        inputClassName={POPUP_INPUT}
+                      />
+                    </LeadField>
+                    <LeadField label="Schedule Meeting">
+                      <div className="relative">
+                        <CalendarDaysIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                        <select {...register('meetingStatus')} className={`${POPUP_INPUT} appearance-none pr-9 font-medium text-slate-800`}>
+                          <option value="">None</option>
+                          <option value="pending">Pending</option>
+                          <option value="scheduled">Scheduled</option>
+                          <option value="completed">Completed</option>
+                          <option value="rescheduled">Rescheduled</option>
+                          <option value="cancelled">Cancelled</option>
+                          <option value="no-show">No Show</option>
+                        </select>
+                        <ChevronDownIcon className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                      </div>
+                    </LeadField>
+                    <LeadField label="Alternate Mobile" error={errors.alternateMobile?.message}>
+                      <IconInput icon={<PhoneIcon />} type="tel" inputMode="numeric" maxLength={10} placeholder="10-digit mobile number" invalid={!!errors.alternateMobile} {...register('alternateMobile')} />
+                    </LeadField>
                   </div>
                 </div>
               </div>
 
-              <div className="border-b border-slate-200 pb-4">
-                <h4 className="text-sm font-medium text-slate-700 mb-3">Assignment & Scheduling</h4>
-                
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700">Assigned To (Lead Owner)</label>
-                    <UserAutocomplete
-                      value={watch('assignedToId') || ''}
-                      onChange={(val) => setValue('assignedToId', val)}
-                      placeholder="Type user name to search..."
-                    />
-                    <p className="mt-1 text-[11px] text-slate-400">The assignee is notified automatically when assigned.</p>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700">Schedule Meeting</label>
-                    <select
-                      {...register('meetingStatus')}
-                      className="mt-1 w-full rounded-md border-0 bg-slate-100/50 p-2 text-sm focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
-                    >
-                      <option value="">None</option>
-                      <option value="pending">Pending</option>
-                      <option value="scheduled">Scheduled</option>
-                      <option value="completed">Completed</option>
-                      <option value="rescheduled">Rescheduled</option>
-                      <option value="cancelled">Cancelled</option>
-                      <option value="no-show">No Show</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700">Alternate Mobile</label>
-                    <input
-                      type="tel"
-                      {...register('alternateMobile')}
-                      placeholder="10-digit number"
-                      className={`mt-1 w-full rounded-md border-0 bg-slate-100/50 p-2 text-sm focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)] ${errors.alternateMobile ? 'ring-1 ring-red-500 bg-red-50' : ''}`}
-                    />
-                    {errors.alternateMobile && <p className="mt-1 text-[10px] text-red-500">{errors.alternateMobile.message}</p>}
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-4 flex justify-end gap-2 pt-2">
-                <Button type="button" variant="secondary" size="sm" onClick={() => setIsModalOpen(false)}>
+              <div className="flex justify-end gap-3 border-t border-slate-100 bg-white px-6 py-4 sm:px-8">
+                <button type="button" onClick={() => setIsModalOpen(false)} className="rounded-lg border border-slate-200 bg-white px-6 py-2.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50">
                   Cancel
-                </Button>
-                <Button type="submit" size="sm" disabled={isSubmitting}>
+                </button>
+                <button type="submit" disabled={isSubmitting} className="inline-flex items-center gap-2 rounded-lg bg-[var(--primary)] px-6 py-2.5 text-sm font-medium text-white shadow-md shadow-blue-600/20 hover:bg-[var(--primary-hover)] disabled:opacity-60">
+                  <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
+                    <path d="M5 4h11l3 3v12a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4Z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+                    <path d="M8 4v5h7V4M8 20v-6h8v6" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+                  </svg>
                   {isSubmitting ? 'Saving...' : editingId ? 'Update Lead' : 'Save Lead'}
-                </Button>
+                </button>
               </div>
             </form>
           </div>
@@ -778,7 +1039,7 @@ export default function LeadsPage() {
             <p className="mt-2 text-sm text-slate-600">
               A lead with this email address or mobile number already exists.
             </p>
-            <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm">
+            <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
               <p className="font-medium text-slate-800">
                 {duplicateMatch.name || `${duplicateMatch.firstName || ''} ${duplicateMatch.lastName || ''}`.trim()}
               </p>
@@ -853,7 +1114,7 @@ function LeadsKanban({
           </div>
           <div
             className={`min-h-[80px] space-y-3 rounded-lg p-1 transition-colors ${
-              dragOverStatus === status ? 'bg-blue-50 ring-2 ring-[#168eea]/30' : ''
+              dragOverStatus === status ? 'bg-blue-50 ring-2 ring-[var(--primary)]/30' : ''
             }`}
           >
             {(leadsByStatus[status] || []).map((lead) => {
@@ -872,7 +1133,7 @@ function LeadsKanban({
                   <p className="text-sm font-medium text-slate-900">{leadName}</p>
                   <p className="mt-1 text-xs text-slate-500">{lead.company || 'No company'}</p>
                   <div className="mt-3 flex items-center justify-between">
-                    <span className="text-sm font-semibold text-[#168eea]">{formatCurrency(lead.value || 0)}</span>
+                    <span className="text-sm font-semibold text-[var(--primary)]">{formatCurrency(lead.value || 0)}</span>
                     <span className="text-xs text-slate-400">Score {lead.score || 0}</span>
                   </div>
                   <p className="mt-2 text-xs text-slate-400">{lead.assignedTo || 'Unassigned'}</p>

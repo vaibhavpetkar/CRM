@@ -204,7 +204,31 @@ export const authApi = {
 
 // ─── Team API ─────────────────────────────────────────────────────────────────
 
+export type PresenceState = 'on_call' | 'after_call' | 'available' | 'offline';
+
+export interface TeamPresenceAgent {
+  userId: number;
+  name: string;
+  role: string | null;
+  department: string | null;
+  state: PresenceState;
+  since: string | null;
+  online: boolean;
+  lastLogin: string | null;
+  call: { id: number; status: CallStatus; leadId: number | null; contactId: number | null; withName: string; fromNumber: string | null } | null;
+  today: { calls: number; talkSeconds: number };
+}
+
+export interface TeamPresence {
+  serverTime: string;
+  afterCallSeconds: number;
+  counts: Record<PresenceState, number>;
+  agents: TeamPresenceAgent[];
+}
+
 export const teamApi = {
+  getPresence: async () => request<TeamPresence>('/team/presence'),
+
   getMembers: async (params: { search?: string; department?: string; status?: string; roleId?: string } = {}) => {
     const query = new URLSearchParams();
     if (params.search) query.append('search', params.search);
@@ -277,30 +301,57 @@ export const rolesApi = {
 // need every row, otherwise "All Statuses" silently shows only the newest page
 // — which usually looks like a single status. This walks every page.
 const FETCH_ALL_PAGE_SIZE = 200;
+const FETCH_ALL_CONCURRENCY = 4;
 
 export async function fetchAllPages<R extends { pages?: number }, T>(
   fetchPage: (page: number, limit: number) => Promise<R>,
   pick: (res: R) => T[] | undefined
 ): Promise<T[]> {
   const first = await fetchPage(1, FETCH_ALL_PAGE_SIZE);
-  const rows = [...(pick(first) || [])];
   const pages = Math.max(1, Number(first.pages) || 1);
-  for (let page = 2; page <= pages; page++) {
-    rows.push(...(pick(await fetchPage(page, FETCH_ALL_PAGE_SIZE)) || []));
-  }
-  return rows;
+  const byPage: T[][] = [pick(first) || []];
+  // Fetch the remaining pages a few at a time rather than one after another:
+  // a 30,000-lead book is 150 pages, which took minutes in sequence.
+  let next = 2;
+  const worker = async () => {
+    while (next <= pages) {
+      const page = next++;
+      byPage[page - 1] = pick(await fetchPage(page, FETCH_ALL_PAGE_SIZE)) || [];
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(FETCH_ALL_CONCURRENCY, pages - 1) }, worker));
+  return byPage.flat();
 }
 
 // ─── Leads API ────────────────────────────────────────────────────────────────
 
+/** Leads page search box and filters (see backend LeadRepository.buildWhere). */
+export interface LeadListParams {
+  search?: string; // name, number, area, "2bhk", Series ID, company
+  status?: string;
+  territory?: string;
+  leadSource?: string; // comma separated for several
+  assignedToId?: string; // a user id, or 'unassigned'
+  configuration?: string; // comma separated, e.g. "2 BHK,3 BHK"
+  propertyType?: string;
+  location?: string; // area / locality / city
+  budgetFrom?: number | string;
+  budgetTo?: number | string;
+  dateFrom?: string; // YYYY-MM-DD
+  dateTo?: string;
+}
+
 export const leadsApi = {
-  getLeads: async (params: { page?: number; limit?: number; search?: string; status?: string; territory?: string } = {}) => {
+  getLeads: async (params: LeadListParams & { page?: number; limit?: number } = {}) => {
     const query = new URLSearchParams();
     if (params.page) query.append('page', String(params.page));
     if (params.limit) query.append('limit', String(params.limit));
-    if (params.search) query.append('search', params.search);
-    if (params.status && params.status !== 'all') query.append('status', params.status);
-    if (params.territory && params.territory !== 'all') query.append('territory', params.territory);
+    // 'all' / empty means "no filter" for every select on the Leads page.
+    for (const [key, value] of Object.entries(params)) {
+      if (key === 'page' || key === 'limit' || value === undefined || value === null) continue;
+      const v = String(value).trim();
+      if (v && v !== 'all') query.append(key, v);
+    }
 
     const qString = query.toString();
     return request<{ leads: any[]; total: number; page: number; pages: number }>(
@@ -309,12 +360,19 @@ export const leadsApi = {
   },
 
   /** Every lead matching the filters, across all backend pages. */
-  getAllLeads: async (params: { search?: string; status?: string; territory?: string } = {}) =>
+  getAllLeads: async (params: LeadListParams = {}) =>
     fetchAllPages((page, limit) => leadsApi.getLeads({ ...params, page, limit }), (res) => res.leads),
 
   getLead: async (id: string | number) => {
     return request<any>(`/leads/${id}`);
   },
+
+  /** Bulk import: one request per batch, one result per row (see POST /leads/import). */
+  importLeads: async (rows: Record<string, any>[]) =>
+    request<{ created: number; failed: number; results: { ok: boolean; id?: number; error?: string; duplicate?: boolean }[] }>('/leads/import', {
+      method: 'POST',
+      body: JSON.stringify({ rows }),
+    }),
 
   createLead: async (leadData: any) => {
     return request<{ message: string; lead: any }>('/leads', {
@@ -362,8 +420,8 @@ export const leadsApi = {
     });
   },
 
-  searchCompanies: async (query: string) => {
-    return request<{ results: CompanySuggestion[] }>(`/leads/company-search?q=${encodeURIComponent(query)}`);
+  searchCompanies: async (query: string, scope: 'companies' | 'clients' = 'companies') => {
+    return request<{ results: CompanySuggestion[] }>(`/leads/company-search?q=${encodeURIComponent(query)}&scope=${scope}`);
   },
 
   getStats: async () => {
@@ -424,6 +482,8 @@ export const dealsApi = {
       totalValue: number;
       averageValue: number;
       winRate: number;
+      wonDeals: number;
+      lostDeals: number;
     }>('/deals/stats');
   },
 };
@@ -766,6 +826,17 @@ export const campaignsApi = {
   deleteCampaign: async (id: string | number) => request<{ message: string }>(`/campaigns/${id}`, { method: 'DELETE' }),
 };
 
+// ─── Payments API ─────────────────────────────────────────────────────────────
+
+export type PaymentInput = { amount: number; method?: string; reference?: string; paidOn?: string; notes?: string };
+
+export const paymentsApi = {
+  getForInvoice: async (invoiceId: string | number) =>
+    request<{ payments: any[]; totalPaid: number; balanceDue: number | null }>(`/payments/invoice/${invoiceId}`),
+  record: async (invoiceId: string | number, data: PaymentInput) =>
+    request<{ message: string; payment: any }>(`/payments/invoice/${invoiceId}`, { method: 'POST', body: JSON.stringify(data) }),
+};
+
 // ─── Templates API ─────────────────────────────────────────────────────────────
 
 export const templatesApi = {
@@ -814,7 +885,7 @@ export interface GlobalSearchResult {
 }
 
 export interface CompanySuggestion {
-  type: 'company' | 'contact';
+  type: 'company' | 'contact' | 'lead';
   id: number;
   name: string;
   email: string | null;
@@ -1047,6 +1118,7 @@ export interface CallRow {
   isActive: boolean;
   customerNumber: string;
   agentNumber: string;
+  callerId: string | null;
   leadId: number | null;
   contactId: number | null;
   userId: number;
@@ -1067,7 +1139,20 @@ export interface CallConfig {
   providerLabel: string;
   missingEnvVars: string[];
   agentNumber: string | null;
+  /** Which company number this user's calls show; null when none are set up in the CRM. */
+  callerNumber: { mode: 'dedicated'; number: string } | { mode: 'pool'; number: null; poolSize: number } | null;
   recording: boolean;
+}
+
+export interface CallerNumberRow {
+  id: number;
+  number: string;
+  label: string;
+  userId: number | null;
+  assignedTo: string | null;
+  isActive: boolean;
+  lastUsedAt: string | null;
+  liveCalls: { callId: number; status: CallStatus; by: string | null; to: string; since: string }[];
 }
 
 export const callsApi = {
@@ -1076,6 +1161,16 @@ export const callsApi = {
   start: async (payload: { leadId?: number; contactId?: number; number: string }) =>
     request<CallRow>('/calls', { method: 'POST', body: JSON.stringify(payload) }),
   get: async (id: number) => request<CallRow>(`/calls/${id}`),
+  /** Logs a call made outside the calling provider, e.g. from a personal mobile. */
+  logManual: async (payload: {
+    leadId?: number;
+    number?: string;
+    direction: 'outbound' | 'inbound';
+    status: 'completed' | 'no-answer' | 'busy';
+    durationMinutes?: number;
+    calledAt?: string;
+    notes?: string;
+  }) => request<CallRow>('/calls/manual', { method: 'POST', body: JSON.stringify(payload) }),
   saveNotes: async (id: number, notes: string) =>
     request<CallRow>(`/calls/${id}`, { method: 'PATCH', body: JSON.stringify({ notes }) }),
   list: async (target: { leadId?: number | string; contactId?: number | string }) => {
@@ -1089,7 +1184,264 @@ export const callsApi = {
     if (!res.ok) throw new Error(res.status === 404 ? 'The recording is not available yet.' : 'Could not load the recording.');
     return URL.createObjectURL(await res.blob());
   },
+  /** The company's calling numbers (admins: integrations:manage). */
+  listNumbers: async () => request<CallerNumberRow[]>('/calls/numbers'),
+  addNumber: async (payload: { number: string; label?: string; userId?: number | null }) =>
+    request<CallerNumberRow[]>('/calls/numbers', { method: 'POST', body: JSON.stringify(payload) }),
+  updateNumber: async (id: number, payload: { label?: string; userId?: number | null; isActive?: boolean }) =>
+    request<CallerNumberRow[]>(`/calls/numbers/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
+  removeNumber: async (id: number) => request<CallerNumberRow[]>(`/calls/numbers/${id}`, { method: 'DELETE' }),
 };
+
+// ─── Real-estate sales team ───────────────────────────────────────────────────
+
+export interface SalesAgentActivity {
+  userId: number;
+  name: string;
+  department: string | null;
+  position: string | null;
+  state: PresenceState;
+  stateSince: string | null;
+  onCallWith: string | null;
+  calls: number;
+  incoming: number;
+  connected: number;
+  missed: number;
+  talkSeconds: number;
+  avgTalkSeconds: number;
+  visitsScheduled: number;
+  visitsCompleted: number;
+  visitsCancelled: number;
+  leadsAssigned: number;
+}
+
+export interface SalesActivity {
+  from: string;
+  to: string;
+  canSeeTeam: boolean;
+  totals: { calls: number; incoming: number; connected: number; missed: number; talkSeconds: number; visitsScheduled: number; visitsCompleted: number; leadsAssigned: number; onCall: number; online: number };
+  agents: SalesAgentActivity[];
+  daily: { date: string; calls: number; connected: number; visits: number }[];
+}
+
+export interface LeadSourceRow {
+  source: string;
+  total: number;
+  qualified: number;
+  converted: number;
+  lost: number;
+  unassigned: number;
+  share: number;
+  conversionRate: number;
+  daily: number[];
+}
+
+export interface LeadSourceReport {
+  from: string;
+  to: string;
+  total: number;
+  days: string[];
+  bySource: LeadSourceRow[];
+  daily: { date: string; leads: number }[];
+}
+
+export type CallDirection = 'outbound' | 'inbound';
+
+export interface CallLogRow {
+  id: number;
+  direction: CallDirection;
+  provider: string;
+  status: CallStatus;
+  isLive: boolean;
+  userId: number;
+  agentName: string | null;
+  leadId: number | null;
+  contactId: number | null;
+  withName: string | null;
+  leadNumber: string | null;
+  requirement: string | null;
+  customerNumber: string;
+  callerId: string | null;
+  durationSeconds: number | null;
+  startedAt: string | null;
+  endedAt: string | null;
+  createdAt: string;
+  notes: string;
+  hasRecording: boolean;
+  error: string | null;
+}
+
+export type SiteVisitStatus = 'scheduled' | 'completed' | 'cancelled' | 'no-show';
+
+export interface SiteVisitRow {
+  id: number;
+  leadId: number | null;
+  leadName: string | null;
+  leadNumber: string | null;
+  leadMobile: string | null;
+  userId: number;
+  agentName: string | null;
+  scheduledAt: string;
+  status: SiteVisitStatus;
+  projectName: string | null;
+  location: string | null;
+  notes: string;
+  completedAt: string | null;
+  createdAt: string;
+}
+
+export interface RotationSettings {
+  enabled: boolean;
+  userIds: number[];
+  onlyAvailable: boolean;
+  sources: string[];
+  lastUserId: number | null;
+  routingPath: string | null;
+}
+
+const qs = (params: Record<string, unknown>) => {
+  const query = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v === undefined || v === null || v === '' || v === 'all') continue;
+    query.append(k, String(v));
+  }
+  const s = query.toString();
+  return s ? `?${s}` : '';
+};
+
+export const salesApi = {
+  getActivity: async (params: { from?: string; to?: string; userId?: number | string } = {}) =>
+    request<SalesActivity>(`/sales/activity${qs(params)}`),
+  getLeadSources: async (params: { from?: string; to?: string } = {}) =>
+    request<LeadSourceReport>(`/sales/lead-sources${qs(params)}`),
+  getCallLog: async (params: { from?: string; to?: string; userId?: number | string; status?: string; direction?: string; number?: string; page?: number; limit?: number } = {}) =>
+    request<{ from: string; to: string; total: number; page: number; pages: number; calls: CallLogRow[] }>(`/sales/calls${qs(params)}`),
+  listVisits: async (params: { from?: string; to?: string; userId?: number | string; status?: string; leadId?: number | string } = {}) =>
+    request<{ visits: SiteVisitRow[] }>(`/sales/visits${qs(params)}`),
+  createVisit: async (payload: { leadId: number | string; userId?: number | string | null; scheduledAt: string; status?: SiteVisitStatus; projectName?: string; location?: string; notes?: string }) =>
+    request<SiteVisitRow>('/sales/visits', { method: 'POST', body: JSON.stringify(payload) }),
+  updateVisit: async (id: number, payload: Partial<{ userId: number | string; scheduledAt: string; status: SiteVisitStatus; projectName: string; location: string; notes: string }>) =>
+    request<SiteVisitRow>(`/sales/visits/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
+  deleteVisit: async (id: number) => request<{ deleted: boolean }>(`/sales/visits/${id}`, { method: 'DELETE' }),
+  getRotation: async () => request<RotationSettings>('/sales/rotation'),
+  saveRotation: async (payload: Partial<Omit<RotationSettings, 'routingPath' | 'lastUserId'>>) =>
+    request<RotationSettings>('/sales/rotation', { method: 'PUT', body: JSON.stringify(payload) }),
+  distributeUnassigned: async () => request<{ assigned: number; byUser: Record<string, number> }>('/sales/rotation/distribute', { method: 'POST' }),
+  listPortals: async () => request<PortalConnectionRow[]>('/sales/portals'),
+  updatePortal: async (source: string, payload: { isEnabled?: boolean; credentials?: Record<string, string | null> }) =>
+    request<PortalConnectionRow>(`/sales/portals/${encodeURIComponent(source)}`, { method: 'PUT', body: JSON.stringify(payload) }),
+  syncPortal: async (source: string) =>
+    request<PortalImportCounts & { portal: PortalConnectionRow }>(`/sales/portals/${encodeURIComponent(source)}/sync`, { method: 'POST' }),
+  sendPortalTestLead: async (source: string) =>
+    request<{ result: string; portal: PortalConnectionRow }>(`/sales/portals/${encodeURIComponent(source)}/test`, { method: 'POST' }),
+  importLeads: async (payload: { rows: Record<string, unknown>[]; leadSource?: string; subSource?: string; fileName?: string }) =>
+    request<PortalImportCounts & { portal: PortalConnectionRow }>('/sales/import', { method: 'POST', body: JSON.stringify(payload) }),
+  getIntegrationActivity: async (key: string, params: { page?: number; limit?: number } = {}) =>
+    request<IntegrationActivity>(`/sales/integrations/${encodeURIComponent(key)}/activity${qs(params)}`),
+  getIncomingCalls: async () => request<IncomingCallSettings>('/sales/incoming-calls'),
+  saveIncomingCalls: async (payload: { createLeads?: boolean; regenerate?: boolean }) =>
+    request<IncomingCallSettings>('/sales/incoming-calls', { method: 'PUT', body: JSON.stringify(payload) }),
+  getViCpaas: async () => request<ViCpaasSettings>('/sales/vi-cpaas'),
+  saveViCpaas: async (payload: Partial<ViCpaasForm> & { isEnabled?: boolean }) =>
+    request<ViCpaasSettings>('/sales/vi-cpaas', { method: 'PUT', body: JSON.stringify(payload) }),
+  pullViCpaas: async () =>
+    request<{ records: number; outgoing: number; incoming: number; skipped: number; settings: ViCpaasSettings }>('/sales/vi-cpaas/pull', { method: 'POST' }),
+};
+
+export interface PortalImportCounts {
+  created: number;
+  duplicate: number;
+  skipped: number;
+  failed: number;
+}
+
+export interface PortalConnectionRow {
+  source: string;
+  label: string;
+  isEnabled: boolean;
+  webhookUrl: string | null;
+  pushHelp: string;
+  pullHelp: string;
+  canPull: boolean;
+  credentialFields: { key: string; label: string; secret?: boolean; isSet: boolean; value: string }[];
+  hasCredentials: boolean;
+  leadsReceived: number;
+  lastLeadAt: string | null;
+  lastPolledAt: string | null;
+  lastError: string | null;
+  recent: { id: number; status: 'created' | 'duplicate' | 'failed'; name: string | null; mobile: string | null; projectName: string | null; leadId: number | null; error: string | null; createdAt: string }[];
+}
+
+export interface IntegrationActivityRow {
+  eventId: string;
+  result: 'created' | 'duplicate' | 'failed' | 'processing';
+  leadId: number | null;
+  leadNumber: string | null;
+  name: string | null;
+  mobile: string | null;
+  subSource: string | null;
+  leadStatus: string | null;
+  assignedTo: string | null;
+  error: string | null;
+  at: string;
+}
+
+export interface IntegrationActivity {
+  key: string;
+  page: number;
+  pages: number;
+  total: number;
+  stats: { leads: number; today: number; last7Days: number; last30Days: number };
+  bySubSource: { subSource: string; leads: number }[];
+  items: IntegrationActivityRow[];
+}
+
+export type ViAuthType = 'bearer' | 'basic' | 'header' | 'none';
+
+/** What the admin types on Settings > Integrations > Vi CPaaS. Secrets are write-only. */
+export interface ViCpaasForm {
+  ctcUrl: string;
+  callerId: string;
+  requestTemplate: string;
+  statusUrl: string;
+  authType: ViAuthType;
+  authHeader: string;
+  username: string;
+  password: string;
+  accountId: string;
+  pullUrl: string;
+  pullUsername: string;
+  pullPassword: string;
+  dni: string;
+  webhookUsername: string;
+  webhookPassword: string;
+  callStart: string;
+  callEnd: string;
+  aesKey: string;
+  aesIv: string;
+  encryptRequests: boolean;
+  encryptedTemplate: string;
+}
+
+export type ViSecretField = 'password' | 'pullPassword' | 'webhookPassword' | 'aesKey' | 'aesIv';
+
+export interface ViCpaasSettings extends Omit<ViCpaasForm, ViSecretField> {
+  isEnabled: boolean;
+  status: string;
+  lastError: string | null;
+  lastPullAt: string | null;
+  pullEveryMinutes: number;
+  eventsUrl: string | null;
+  secretsSet: Record<ViSecretField, boolean>;
+}
+
+export interface IncomingCallSettings {
+  webhookUrl: string | null;
+  createLeads: boolean;
+  lastCallAt: string | null;
+  callsLast7Days: number;
+  provider: string;
+}
 
 // ─── Document Templates API ──────────────────────────────────────────────────
 // Distinct from the marketing `templatesApi` above (campaign emails) — these

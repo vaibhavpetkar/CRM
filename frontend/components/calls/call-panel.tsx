@@ -140,10 +140,11 @@ export default function CallPanel({ target, call, config, placing, error, needsM
       {!minimized && (
         <div className="space-y-3 px-4 py-3">
           <p className="text-xs text-slate-600">{headline}</p>
+          {call?.callerId && <p className="text-[11px] text-slate-400">Customer sees {call.callerId}</p>}
 
           {error && (
             <div className="space-y-2">
-              <p className="rounded-md bg-red-50 p-2 text-xs text-red-600">{error}</p>
+              <p className="rounded-lg bg-red-50 p-2 text-xs text-red-600">{error}</p>
               {config?.enabled !== false && (
                 <Button type="button" size="sm" variant="secondary" onClick={onRetry} disabled={placing}>
                   Try again
@@ -152,7 +153,7 @@ export default function CallPanel({ target, call, config, placing, error, needsM
             </div>
           )}
 
-          {call?.error && !error && <p className="rounded-md bg-red-50 p-2 text-xs text-red-600">{call.error}</p>}
+          {call?.error && !error && <p className="rounded-lg bg-red-50 p-2 text-xs text-red-600">{call.error}</p>}
 
           {needsMyNumber && (
             <div className="space-y-2">
@@ -165,7 +166,7 @@ export default function CallPanel({ target, call, config, placing, error, needsM
                   value={myNumber}
                   onChange={(e) => setMyNumber(e.target.value)}
                   placeholder="98765 43210"
-                  className="w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                  className="w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                 />
                 <Button type="button" size="sm" onClick={submitMyNumber} disabled={savingMyNumber || !myNumber.trim()}>
                   {savingMyNumber ? 'Saving...' : 'Save & call'}
@@ -188,7 +189,7 @@ export default function CallPanel({ target, call, config, placing, error, needsM
                 onChange={(e) => onNotesChange(e.target.value)}
                 rows={5}
                 placeholder="What did they say? Next steps, requirements, follow-up date..."
-                className="w-full rounded-md border border-slate-200 p-2 text-sm focus:border-[#168eea] focus:outline-none"
+                className="w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
               />
             </div>
           )}

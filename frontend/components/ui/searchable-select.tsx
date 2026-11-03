@@ -109,7 +109,7 @@ export default function SearchableSelect({
           role="combobox"
           aria-expanded={isOpen && filtered.length > 0}
           className={cn(
-            'w-full rounded-md border border-slate-200 bg-white py-2 pl-9 pr-8 text-sm focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea]',
+            'w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-8 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]',
             disabled && 'opacity-50 cursor-not-allowed'
           )}
         />
@@ -129,7 +129,7 @@ export default function SearchableSelect({
       </div>
 
       {isOpen && filtered.length > 0 && (
-        <div className="absolute z-20 mt-1 w-full max-h-60 overflow-y-auto rounded-md border border-slate-200 bg-white shadow-lg ring-1 ring-black ring-opacity-5">
+        <div className="absolute z-20 mt-1 w-full max-h-60 overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg ring-1 ring-black ring-opacity-5">
           {filtered.map((option, index) => (
             <button
               key={option.value}
@@ -154,7 +154,7 @@ export default function SearchableSelect({
       )}
 
       {isOpen && query && filtered.length === 0 && (
-        <div className="absolute z-20 mt-1 w-full rounded-md border border-slate-200 bg-white p-3 text-center text-sm text-slate-500 shadow-lg ring-1 ring-black ring-opacity-5">
+        <div className="absolute z-20 mt-1 w-full rounded-lg border border-slate-200 bg-white p-3 text-center text-sm text-slate-500 shadow-lg ring-1 ring-black ring-opacity-5">
           No matches
         </div>
       )}

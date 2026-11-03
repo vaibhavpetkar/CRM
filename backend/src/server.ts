@@ -44,7 +44,11 @@ import googleBusinessRoutes from './routes/googleBusinessRoutes';
 import metaLeadsRoutes from './routes/metaLeadsRoutes';
 import metaWebhookRoutes from './routes/metaWebhookRoutes';
 import callRoutes from './routes/callRoutes';
+import salesRoutes from './routes/salesRoutes';
 import voiceWebhookRoutes from './routes/voiceWebhookRoutes';
+import portalWebhookRoutes from './routes/portalWebhookRoutes';
+import { startPortalPoller } from './services/portalLeadsService';
+import { startViPuller } from './services/viCpaasService';
 import expenseRoutes from './routes/expenseRoutes';
 import reportRoutes from './routes/reportRoutes';
 import documentTemplateRoutes from './routes/documentTemplateRoutes';
@@ -95,6 +99,7 @@ applyTenantScoping();
 
 // Import middleware
 import { protect } from './middleware/authMiddleware';
+import { moduleGate } from './middleware/moduleGate';
 
 dotenv.config();
 
@@ -117,11 +122,15 @@ app.use('/api/public', publicRoutes);
 app.use('/api/webhooks/meta', metaWebhookRoutes);
 // Call status updates from the telephony provider (click-to-call).
 app.use('/api/webhooks/voice', voiceWebhookRoutes);
+// Property portal lead push (99acres, MagicBricks, Housing.com).
+app.use('/api/webhooks/leads', portalWebhookRoutes);
 
+// Browser origins allowed to call the API: the CRM itself (CLIENT_URL), any
+// extra comma-separated CORS_ORIGINS, and local dev servers outside production.
 const allowedOrigins = [
   process.env.CLIENT_URL || 'http://localhost:3000',
-  'http://localhost:3000',
-  'http://localhost:3001',
+  ...(process.env.CORS_ORIGINS || '').split(',').map((o) => o.trim()).filter(Boolean),
+  ...(process.env.NODE_ENV === 'production' ? [] : ['http://localhost:3000', 'http://localhost:3001']),
 ];
 
 app.use(
@@ -156,6 +165,9 @@ app.use((req: Request, res: Response, next: express.NextFunction) => {
 });
 
 // ─── Routes ──────────────────────────────────────────────────────────────────
+
+// Switched-off modules (deals, quotes, tasks, ...) answer 404; see middleware/moduleGate.ts.
+app.use(moduleGate);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/leads', leadRoutes);
@@ -198,6 +210,7 @@ app.use('/api/expenses', expenseRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/document-templates', documentTemplateRoutes);
 app.use('/api/calls', callRoutes);
+app.use('/api/sales', salesRoutes);
 
 // Serve uploaded files (attachments, generated PDFs) statically — but only to
 // authenticated users. Nothing in the frontend loads these via raw <img>/<a>
@@ -330,6 +343,8 @@ const startServer = async () => {
     httpServer.listen(port, () => {
       logger.info(`🚀 Server is running on http://localhost:${port}`);
       logger.info(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
+      startPortalPoller();
+      startViPuller();
     });
   } catch (error) {
     logger.error(`❌ Unable to connect to the database: ${error}`);

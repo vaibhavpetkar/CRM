@@ -38,7 +38,7 @@ export default function FormField({
 
 // Standard input class strings for consistent styling across all forms
 export const inputBaseClass =
-  'w-full rounded-md border border-slate-200 bg-white px-3 py-2.5 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)] transition-colors disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed';
+  'w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)] transition-colors disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed';
 
 export const inputErrorClass =
   'border-red-300 bg-red-50/30 focus:border-red-500 focus:ring-red-500';

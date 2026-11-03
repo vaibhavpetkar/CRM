@@ -12,7 +12,8 @@ export type StoredUser = {
  * - Super admins and users whose role has the wildcard '*' permission can access everything.
  * - `permission` being undefined means the feature has no restriction (e.g. Dashboard).
  */
-export function hasPermission(user: StoredUser, permission?: string): boolean {
+export function hasPermission(user: StoredUser, permission?: string | string[]): boolean {
+  if (Array.isArray(permission)) return permission.length === 0 || permission.some((p) => hasPermission(user, p));
   if (!permission) return true;
   if (!user) return false;
   if (user.isSuperAdmin) return true;

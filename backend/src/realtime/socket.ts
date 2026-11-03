@@ -4,6 +4,7 @@ import { createAdapter } from '@socket.io/redis-adapter';
 import Redis from 'ioredis';
 import jwt, { JwtPayload } from 'jsonwebtoken';
 import logger from '../utils/logger';
+import { initPresence, trackPresence } from './presence';
 
 let io: SocketIOServer | null = null;
 
@@ -82,10 +83,11 @@ export const initRealtime = async (httpServer: HttpServer): Promise<SocketIOServ
     // even if they have the app open in multiple tabs/devices.
     socket.join(`user:${socket.userId}`);
 
-    socket.on('disconnect', () => {
-      // no-op — room membership is cleaned up automatically by Socket.IO
-    });
+    // Live team status: marks this user online in their company.
+    void trackPresence(socket, socket.userId);
   });
+
+  initPresence(io);
 
   return io;
 };

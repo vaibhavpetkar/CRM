@@ -13,6 +13,16 @@ type ShortcutHandlers = {
   enabled?: boolean;
 };
 
+/** Marks a key press as handled by a page, so the app-wide fallback leaves it alone. */
+export const SHORTCUT_HANDLED = '__crmShortcutHandled';
+
+export const isShortcutHandled = (e: KeyboardEvent) => Boolean((e as unknown as Record<string, unknown>)[SHORTCUT_HANDLED]);
+
+function claim(e: KeyboardEvent, run: () => void) {
+  (e as unknown as Record<string, unknown>)[SHORTCUT_HANDLED] = true;
+  run();
+}
+
 export function useKeyboardShortcuts({ onEscape, onSave, onDelete, enabled = true }: ShortcutHandlers) {
   useEffect(() => {
     if (!enabled) return;
@@ -25,21 +35,23 @@ export function useKeyboardShortcuts({ onEscape, onSave, onDelete, enabled = tru
         // Always prevent the browser's native "Save Page" dialog, even if there's
         // no onSave handler wired up on this particular view.
         e.preventDefault();
-        onSave?.();
+        if (onSave) claim(e, onSave);
         return;
       }
       if (isDelete) {
         // Always prevent the browser's native "Bookmark this page" dialog.
         e.preventDefault();
-        onDelete?.();
+        if (onDelete) claim(e, onDelete);
         return;
       }
-      if (e.key === 'Escape') {
-        onEscape?.();
+      if (e.key === 'Escape' && onEscape) {
+        claim(e, onEscape);
       }
     };
 
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
+    // Capture phase, so a page's own handler always runs before the app-wide
+    // fallback in components/layout/global-shortcuts.tsx.
+    window.addEventListener('keydown', handler, true);
+    return () => window.removeEventListener('keydown', handler, true);
   }, [onEscape, onSave, onDelete, enabled]);
 }

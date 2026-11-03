@@ -66,7 +66,7 @@ export default function PlanPicker({ plans, currentPlan }: { plans: Subscription
       </div>
       {!canRequest && <p className="mt-4 text-sm text-slate-500">Ask your company administrator to choose a plan.</p>}
       {result && (
-        <p className={cn('mt-4 rounded-md border p-3 text-sm', result.ok ? 'border-green-200 bg-green-50 text-green-700' : 'border-red-200 bg-red-50 text-red-600')}>
+        <p className={cn('mt-4 rounded-lg border p-3 text-sm', result.ok ? 'border-green-200 bg-green-50 text-green-700' : 'border-red-200 bg-red-50 text-red-600')}>
           {result.message}
         </p>
       )}

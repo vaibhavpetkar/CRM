@@ -40,10 +40,14 @@ export class MockProvider implements VoiceProvider {
     return [];
   }
 
-  async placeCall(_input: PlaceCallInput): Promise<PlaceCallResult> {
+  defaultCallerId() {
+    return '+910000000000';
+  }
+
+  async placeCall(input: PlaceCallInput): Promise<PlaceCallResult> {
     const id = `mock-${crypto.randomBytes(8).toString('hex')}`;
     started.set(id, Date.now());
-    return { providerCallId: id, status: 'ringing', callerId: '+910000000000' };
+    return { providerCallId: id, status: 'ringing', callerId: input.callerId || this.defaultCallerId() };
   }
 
   async getCall(providerCallId: string): Promise<CallUpdate> {

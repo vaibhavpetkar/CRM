@@ -6,6 +6,10 @@ import { TERRITORY_OPTIONS } from '@/lib/lead-options';
 import { cn } from '@/lib/utils';
 
 interface TerritoryAutocompleteProps {
+  /** Icon shown inside the box on the left (defaults to a search glass). */
+  icon?: React.ReactNode;
+  /** Extra classes for the text box itself. */
+  inputClassName?: string;
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
@@ -18,6 +22,8 @@ export default function TerritoryAutocomplete({
   onChange,
   placeholder = 'Type territory to search...',
   className,
+  icon,
+  inputClassName,
   disabled = false,
 }: TerritoryAutocompleteProps) {
   const [suggestions, setSuggestions] = useState<string[]>([]);
@@ -126,7 +132,11 @@ export default function TerritoryAutocomplete({
   return (
     <div className={cn('relative', className)}>
       <div className="relative">
-        <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        {icon ? (
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 [&_svg]:h-4 [&_svg]:w-4">{icon}</span>
+        ) : (
+          <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        )}
         <input
           ref={inputRef}
           type="text"
@@ -137,9 +147,10 @@ export default function TerritoryAutocomplete({
           placeholder={placeholder}
           disabled={disabled}
           className={cn(
-            'w-full rounded-md border-0 bg-slate-100/50 py-2 pl-9 pr-10 text-sm text-slate-900 placeholder:text-slate-400',
+            'w-full rounded-lg border-0 bg-slate-100/50 py-2 pl-9 pr-10 text-sm text-slate-900 placeholder:text-slate-400',
             'focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)] transition-all',
-            disabled && 'opacity-50 cursor-not-allowed'
+            disabled && 'opacity-50 cursor-not-allowed',
+            inputClassName
           )}
           autoComplete="off"
           role="combobox"
@@ -163,7 +174,7 @@ export default function TerritoryAutocomplete({
         <div
           ref={dropdownRef}
           id="territory-suggestions"
-          className="absolute z-20 mt-1 w-full max-h-60 overflow-y-auto rounded-md border border-slate-200 bg-white shadow-lg ring-1 ring-black ring-opacity-5"
+          className="absolute z-20 mt-1 w-full max-h-60 overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg ring-1 ring-black ring-opacity-5"
           role="listbox"
         >
           {suggestions.map((suggestion, index) => (
@@ -191,7 +202,7 @@ export default function TerritoryAutocomplete({
       )}
 
       {isOpen && suggestions.length === 0 && value.length >= 2 && (
-        <div className="absolute z-20 mt-1 w-full rounded-md border border-slate-200 bg-white shadow-lg ring-1 ring-black ring-opacity-5 p-3 text-sm text-slate-500 text-center">
+        <div className="absolute z-20 mt-1 w-full rounded-lg border border-slate-200 bg-white shadow-lg ring-1 ring-black ring-opacity-5 p-3 text-sm text-slate-500 text-center">
           No territories found
         </div>
       )}

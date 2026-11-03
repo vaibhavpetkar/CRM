@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { AuthRequest } from '../middleware/authMiddleware';
 import { asyncHandler } from '../utils/errorHandler';
 import * as callService from '../services/callService';
+import * as callerNumbers from '../services/callerNumbers';
 import logger from '../utils/logger';
 
 const optionalId = (value: unknown) => {
@@ -10,7 +11,7 @@ const optionalId = (value: unknown) => {
 };
 
 export const getCallConfig = asyncHandler(async (req: AuthRequest, res: Response) => {
-  return res.json(callService.getConfig(req.user));
+  return res.json(await callService.getConfig(req.user));
 });
 
 export const setMyNumber = asyncHandler(async (req: AuthRequest, res: Response) => {
@@ -20,6 +21,21 @@ export const setMyNumber = asyncHandler(async (req: AuthRequest, res: Response) 
 export const startCall = asyncHandler(async (req: AuthRequest, res: Response) => {
   const { leadId, contactId, number } = req.body || {};
   const call = await callService.startCall(req.user, { leadId: optionalId(leadId), contactId: optionalId(contactId), number });
+  return res.status(201).json(call);
+});
+
+export const logManualCall = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const { leadId, contactId, number, direction, status, durationMinutes, calledAt, notes } = req.body || {};
+  const call = await callService.logManualCall(req.user, {
+    leadId: optionalId(leadId),
+    contactId: optionalId(contactId),
+    number,
+    direction,
+    status,
+    durationMinutes,
+    calledAt,
+    notes,
+  });
   return res.status(201).json(call);
 });
 
@@ -49,7 +65,7 @@ export const getCallRecording = asyncHandler(async (req: AuthRequest, res: Respo
 export const receiveVoiceWebhook = (req: Request, res: Response) => {
   // Answer straight away; anything missed here is caught by status polling.
   res.sendStatus(200);
-  const body = req.body && typeof req.body === 'object' ? req.body : {};
+  const body = typeof req.body === 'string' && req.body.trim() ? { raw: req.body.trim() } : req.body && typeof req.body === 'object' ? req.body : {};
   callService
     .handleCallback(String(req.params.token || ''), body)
     .then((ok) => {
@@ -57,3 +73,21 @@ export const receiveVoiceWebhook = (req: Request, res: Response) => {
     })
     .catch((err) => logger.error(`[voice] Webhook processing failed: ${err}`));
 };
+
+// ─── Calling numbers (admin) ────────────────────────────────────────────────
+
+export const listCallerNumbers = asyncHandler(async (_req: AuthRequest, res: Response) => {
+  return res.json(await callerNumbers.listCallerNumbers());
+});
+
+export const addCallerNumber = asyncHandler(async (req: AuthRequest, res: Response) => {
+  return res.status(201).json(await callerNumbers.addCallerNumber(req.body || {}));
+});
+
+export const updateCallerNumber = asyncHandler(async (req: AuthRequest, res: Response) => {
+  return res.json(await callerNumbers.updateCallerNumber(Number(req.params.id), req.body || {}));
+});
+
+export const removeCallerNumber = asyncHandler(async (req: AuthRequest, res: Response) => {
+  return res.json(await callerNumbers.removeCallerNumber(Number(req.params.id)));
+});

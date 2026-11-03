@@ -75,7 +75,7 @@ export default function ActivityLogsPage() {
         description="Global system activity and audit trail."
       />
       
-      {error && <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
+      {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
 
       <Card>
         <DataTable

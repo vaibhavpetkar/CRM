@@ -1,15 +1,21 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f8fafc;
+  /* Inveon One palette: navy sidebar, bright blue accent, cool grey canvas. */
+  --background: #f4f7fc;
   --foreground: #0f172a;
-  --sidebar-bg: #ffffff;
-  --sidebar-hover: #f1f5f9;
-  --sidebar-active-bg: #e0f2fe;
-  --sidebar-active-text: #168eea;
-  --sidebar-collapsed-bg: #eaf6ff;
-  --primary: #168eea;
-  --primary-hover: #1278cc;
+  --sidebar-bg: #071533;
+  --sidebar-footer-bg: #051027;
+  --sidebar-border: rgba(30, 41, 59, 0.6);
+  --sidebar-text: #94a3b8;
+  --sidebar-section: #64748b;
+  --sidebar-hover: rgba(30, 41, 59, 0.6);
+  --sidebar-active-bg: #e6f0ff;
+  --sidebar-active-text: #0066ff;
+  --sidebar-collapsed-bg: #071533;
+  --primary: #0066ff;
+  --primary-hover: #0052cc;
+  --navy: #0a2540;
   --card-bg: #ffffff;
   --border: #e2e8f0;
   --muted: #64748b;
@@ -34,6 +40,7 @@
   --color-sidebar-active-bg: var(--sidebar-active-bg);
   --color-sidebar-active-text: var(--sidebar-active-text);
   --color-sidebar-collapsed-bg: var(--sidebar-collapsed-bg);
+  --color-navy: var(--navy);
   --color-border: var(--border);
   --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --font-mono: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
@@ -91,11 +98,15 @@ body {
   color-scheme: dark;
   --background: #0b1220;
   --foreground: #e2e8f0;
-  --sidebar-bg: #111a2b;
-  --sidebar-hover: #1e293b;
-  --sidebar-active-bg: rgba(22, 142, 234, 0.18);
-  --sidebar-active-text: #4fb0f5;
-  --sidebar-collapsed-bg: #0f2236;
+  --sidebar-bg: #060f24;
+  --sidebar-footer-bg: #040b1b;
+  --sidebar-border: rgba(39, 52, 73, 0.8);
+  --sidebar-active-bg: rgba(0, 102, 255, 0.18);
+  --sidebar-active-text: #5c9dff;
+  --sidebar-collapsed-bg: #060f24;
+  --primary: #2f7dff;
+  --primary-hover: #1f6cf0;
+  --navy: #1e3a5f;
   --card-bg: #111a2b;
   --border: #273449;
   --muted: #94a3b8;
@@ -204,12 +215,46 @@ body {
   --color-rose-900: #fda4af;
 }
 
+/* Chart tooltips (recharts) draw their own white box; match the dark cards. */
+.dark .recharts-default-tooltip {
+  background-color: var(--card-bg) !important;
+  border-color: var(--border) !important;
+  color: var(--foreground);
+}
+
 .dark * {
   scrollbar-color: #3b4a61 transparent;
 }
 
 .dark ::-webkit-scrollbar-thumb {
   background-color: #3b4a61;
+}
+
+/* Native dropdowns: the select itself is transparent, and browsers draw the
+   option list on their own surface, so without explicit colours the options
+   came out dark-on-dark (invisible) in dark mode. Give the list the dark card
+   colour with light text. The select rule sits in the base layer so a page's
+   own bg-/text- utilities still win. */
+@layer base {
+  .dark select {
+    background-color: var(--card-bg);
+    color: var(--foreground);
+  }
+}
+
+.dark select option,
+.dark select optgroup {
+  background-color: var(--card-bg);
+  color: var(--foreground);
+}
+
+.dark select option:checked {
+  background-color: var(--primary);
+  color: #ffffff;
+}
+
+.dark select option:disabled {
+  color: var(--muted);
 }
 
 /* White surfaces become the dark card colour. :where() keeps these at the
@@ -244,35 +289,81 @@ body {
 }
 
 /* ─── Sign-in screens (app/(auth)/layout.tsx) ────────────────────────────────
-   Purple accent and Plus Jakarta Sans, scoped to .auth-shell so the rest of
-   the app keeps its own palette. */
+   Colours and Plus Jakarta Sans from the "Inveon One CRM — Sign In" design,
+   scoped to .auth-shell so the rest of the app keeps its own palette. */
 .auth-shell {
-  --primary: #5f259f;
-  --primary-hover: #470085;
-  --auth-btn: #5f259f;
-  --auth-btn-hover: #470085;
-  --auth-canvas: #f8f9fa;
-  --auth-tint: #f1e8fc;
-  --auth-glow: rgba(95, 37, 159, 0.09);
+  --primary: #1668e3;
+  --primary-hover: #1258c7;
+  --auth-blue: #1668e3;
+  --auth-ink: #0d1e3a;
+  --auth-text: #54647b;
+  --auth-sub: #64748b;
+  --auth-canvas: #e4e9f2;
+  --auth-glass: rgba(255, 255, 255, 0.78);
+  --auth-glass-hover: rgba(255, 255, 255, 0.94);
+  --auth-glass-border: rgba(255, 255, 255, 0.92);
   font-family: 'Plus Jakarta Sans', var(--font-sans);
 }
 
 .dark .auth-shell {
-  --primary: #c39cf5;
-  --primary-hover: #d4b6f8;
-  --auth-btn: #7b3fd4;
-  --auth-btn-hover: #8d55e0;
-  --auth-canvas: #0d0b14;
-  --auth-tint: rgba(167, 120, 240, 0.14);
-  --auth-glow: rgba(123, 63, 212, 0.16);
-  --card-bg: #17141f;
-  --border: #2c2738;
+  --primary: #4b8dff;
+  --primary-hover: #6aa1ff;
+  --auth-blue: #4b8dff;
+  --auth-ink: #f1f5f9;
+  --auth-text: #b4c0cf;
+  --auth-sub: #94a3b8;
+  --auth-canvas: #0b1220;
+  --auth-glass: rgba(17, 26, 43, 0.72);
+  --auth-glass-hover: rgba(17, 26, 43, 0.9);
+  --auth-glass-border: rgba(255, 255, 255, 0.08);
+}
+
+/* Frosted feature cards */
+.auth-glass {
+  background: var(--auth-glass);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--auth-glass-border);
+  box-shadow: 0 6px 24px -2px rgba(13, 30, 58, 0.05);
+}
+.auth-glass:hover {
+  background: var(--auth-glass-hover);
+  box-shadow: 0 10px 30px -4px rgba(22, 104, 227, 0.14);
+}
+
+/* Sign-in card */
+.auth-card {
+  box-shadow: 0 24px 60px -12px rgba(13, 30, 58, 0.13), 0 0 1px 1px rgba(255, 255, 255, 0.95) inset;
+}
+.dark .auth-card {
+  box-shadow: 0 24px 60px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.06) inset;
+}
+
+/* Floating ring badges and the waving hand */
+@keyframes auth-float {
+  0%, 100% { transform: translate(-50%, -50%) translateY(0); }
+  50% { transform: translate(-50%, -50%) translateY(-7px); }
+}
+@keyframes auth-wave {
+  0%, 100% { transform: rotate(0deg); }
+  20% { transform: rotate(14deg); }
+  40% { transform: rotate(-4deg); }
+  60% { transform: rotate(10deg); }
+  80% { transform: rotate(-2deg); }
+}
+.auth-float-1 { animation: auth-float 5.5s ease-in-out infinite; }
+.auth-float-2 { animation: auth-float 6.2s ease-in-out 1.2s infinite; }
+.auth-float-3 { animation: auth-float 5.8s ease-in-out 2.2s infinite; }
+.auth-wave { display: inline-block; transform-origin: 70% 70%; animation: auth-wave 2s infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .auth-float-1, .auth-float-2, .auth-float-3 { animation: none; transform: translate(-50%, -50%); }
+  .auth-wave { animation: none; }
 }
 
 /* Large screens and TVs: scale the whole sign-in page up by raising the root
    font size (the layout is sized in rem). */
 @media (min-width: 1920px) {
-  html:has(.auth-shell) { font-size: 17px; }
+  html:has(.auth-shell) { font-size: 18px; }
 }
 @media (min-width: 2560px) {
   html:has(.auth-shell) { font-size: 24px; }

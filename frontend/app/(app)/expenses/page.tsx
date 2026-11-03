@@ -162,12 +162,12 @@ export default function ExpensesPage() {
         <StatCard label="Total Records" value={total} icon={<BanknotesIcon className="h-5 w-5" />} />
       </div>
 
-      <div className="mb-4 flex flex-wrap items-center gap-3">
+      <div className="mb-4 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs flex flex-wrap items-center gap-3">
         <SearchInput value={search} onChange={setSearch} placeholder="Search by description, vendor, category..." className="sm:max-w-xs" />
         <select
           value={category}
           onChange={(e) => setCategory(e.target.value)}
-          className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea]"
+          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
         >
           <option value="all">All categories</option>
           {categories.map((c) => (
@@ -177,7 +177,7 @@ export default function ExpensesPage() {
         <span className="text-sm text-slate-500">{expenses.length} expense{expenses.length === 1 ? '' : 's'}</span>
       </div>
 
-      {error && <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
+      {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
 
       <Card>
         <DataTable

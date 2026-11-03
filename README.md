@@ -113,6 +113,7 @@ CRM/
 │
 ├── docker-compose.yml        # Base orchestration (local + production)
 ├── docker-compose.prod.yml   # Production overrides (SSL, HTTPS)
+├── docker-compose.dev.yml    # Developer mode: everything on localhost with live reload
 └── CHANGELOG.md
 ```
 
@@ -130,8 +131,10 @@ git clone https://github.com/vaibhavpetkar/CRM.git
 cd CRM
 ```
 
-### 2. (Optional) Configure Environment
-Create a `.env` file in the root directory to override defaults:
+### 2. Configure Environment
+Copy `.env.example` to `.env` in the root directory. `DB_PASSWORD`,
+`JWT_SECRET` and `SUPER_ADMIN_PASSWORD` are required; Compose refuses to
+start without them. For example:
 ```env
 # Database
 DB_NAME=crm_db
@@ -162,6 +165,21 @@ docker compose up --build
 > the background — the app works immediately, the AI Assistant just needs a
 > minute or two after first startup before it responds.
 
+### Developer mode (live reload)
+For working on the code, `docker-compose.dev.yml` runs Postgres, Redis, the
+backend and the frontend from your local folders, so saved changes reload
+without rebuilding images. It needs no `.env`; it uses local-only defaults.
+```bash
+docker compose -f docker-compose.dev.yml up
+```
+The first start installs packages inside the containers, which takes a few
+minutes. Then open http://localhost:3000 and sign in with company code
+`my-company`, `admin@crmpro.com` / `Admin@123456`. Postgres is on
+`localhost:5432` (`postgres` / `postgres`). Add `--profile ai` for the local
+AI Assistant, and `down -v` to wipe the dev database. On Windows, Docker
+Desktop with the WSL 2 backend is recommended; keeping the repo inside WSL
+makes reloads much faster.
+
 ### 4. Access the App
 | Service | URL |
 |---|---|
@@ -178,6 +196,9 @@ docker compose up --build
 ---
 
 ## 🌐 Production Deployment (VPS)
+
+> For a fresh cloud server (AWS, GCP, Azure, DigitalOcean, any Linux VM) with
+> HTTPS handled by an nginx container, follow [docs/deployment.md](./docs/deployment.md). For AWS EC2, see [docs/deploy-aws.md](./docs/deploy-aws.md).
 
 ### Prerequisites on VPS
 - Ubuntu 20.04+ or similar Linux

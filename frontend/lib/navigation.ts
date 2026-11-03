@@ -14,7 +14,6 @@ import {
   MegaphoneIcon,
   EnvelopeIcon,
   DocumentDuplicateIcon,
-  PresentationChartLineIcon,
   ViewColumnsIcon,
   BuildingOffice2Icon,
   CreditCardIcon,
@@ -25,14 +24,18 @@ import {
   TagIcon,
   ReceiptRefundIcon,
   PuzzlePieceIcon,
+  BriefcaseIcon,
+  PhoneIcon,
+  MapPinIcon,
+  SignalIcon,
 } from '@heroicons/react/24/outline';
 
 export type NavItem = {
   name: string;
   href: string;
   icon: ComponentType<{ className?: string }>;
-  /** Permission key required to see/access this item. Omit for items open to every logged-in user. */
-  permission?: string;
+  /** Permission key required to see/access this item (a list means any one of them). Omit for items open to every logged-in user. */
+  permission?: string | string[];
 };
 
 export type NavSection = {
@@ -45,14 +48,19 @@ export const navigation: NavSection[] = [
     title: 'Overview',
     items: [
       { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
-      { name: 'Reports', href: '/reports', icon: ChartBarIcon, permission: 'reports:view' },
-      { name: 'Analytics', href: '/marketing/analytics', icon: PresentationChartLineIcon, permission: 'marketing:view' },
+      // One wizard page holds every report: overview, forecast, P&L,
+      // marketing analytics and lead sources (each step checks its own permission).
+      { name: 'Reports & Analytics', href: '/reports', icon: ChartBarIcon, permission: ['reports:view', 'marketing:view', 'leads:read'] },
     ],
   },
   {
     title: 'Sales',
     items: [
       { name: 'Leads', href: '/leads', icon: ClipboardDocumentListIcon, permission: 'leads:read' },
+      { name: 'Sales Activity', href: '/sales-activity', icon: SignalIcon },
+      { name: 'Call Tracking', href: '/call-tracking', icon: PhoneIcon },
+      { name: 'Site Visits', href: '/site-visits', icon: MapPinIcon, permission: 'leads:read' },
+      { name: 'Deals', href: '/deals', icon: BriefcaseIcon, permission: 'deals:read' },
       { name: 'Quotes', href: '/quotes', icon: DocumentTextIcon, permission: 'quotes:view' },
       { name: 'Tasks', href: '/tasks', icon: CheckCircleIcon, permission: 'tasks:view' },
       { name: 'Meetings', href: '/meetings', icon: CalendarDaysIcon, permission: 'meetings:view' },

@@ -45,7 +45,7 @@ export default function RecycleBinPage() {
     {
       header: 'Type',
       accessor: (record) => (
-        <span className="inline-flex items-center rounded-md bg-rose-50 px-2 py-1 text-xs font-medium text-rose-700 ring-1 ring-inset ring-rose-600/20">
+        <span className="inline-flex items-center rounded-lg bg-rose-50 px-2 py-1 text-xs font-medium text-rose-700 ring-1 ring-inset ring-rose-600/20">
           {record.type}
         </span>
       ),
@@ -74,7 +74,7 @@ export default function RecycleBinPage() {
         description="View and restore deleted records."
       />
 
-      {error && <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
+      {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
 
       <Card>
         <DataTable
@@ -88,7 +88,7 @@ export default function RecycleBinPage() {
           actions={(record) => (
             <button
               onClick={() => handleRestore(record.type, record.id)}
-              className="flex items-center gap-1 text-sm text-[#168eea] hover:text-blue-700 font-medium"
+              className="flex items-center gap-1 text-sm text-[var(--primary)] hover:text-blue-700 font-medium"
             >
               <ArrowUturnLeftIcon className="h-4 w-4" />
               Restore

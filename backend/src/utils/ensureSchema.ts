@@ -134,6 +134,46 @@ const SCHEMA_PATCHES: { name: string; sql: string }[] = [
       ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "notes" TEXT;
     `,
   },
+  {
+    // Real-estate buyer requirement on leads: searched and filtered on the
+    // Leads page (area, 1 BHK / 2 BHK, budget).
+    name: 'leads real-estate requirement',
+    sql: `
+      ALTER TABLE "leads" ADD COLUMN IF NOT EXISTS "propertyType" VARCHAR(50);
+      ALTER TABLE "leads" ADD COLUMN IF NOT EXISTS "configuration" VARCHAR(30);
+      ALTER TABLE "leads" ADD COLUMN IF NOT EXISTS "preferredLocation" VARCHAR(255);
+      ALTER TABLE "leads" ADD COLUMN IF NOT EXISTS "projectName" VARCHAR(255);
+      ALTER TABLE "leads" ADD COLUMN IF NOT EXISTS "budgetMin" DECIMAL(15,2);
+      ALTER TABLE "leads" ADD COLUMN IF NOT EXISTS "budgetMax" DECIMAL(15,2);
+    `,
+  },
+  {
+    // Sub source: the campaign / form / project / listing a lead came from,
+    // filled in automatically by the lead integrations.
+    name: 'leads.subSource',
+    sql: `ALTER TABLE "leads" ADD COLUMN IF NOT EXISTS "subSource" VARCHAR(255);`,
+  },
+  {
+    // Incoming calls (a customer calling the company's Vi / Exotel number)
+    // are logged next to click-to-call ones.
+    name: 'calls.direction',
+    sql: `ALTER TABLE "calls" ADD COLUMN IF NOT EXISTS "direction" VARCHAR(10) NOT NULL DEFAULT 'outbound';`,
+  },
+  {
+    // Large lead books (30,000+ leads): every create and import checks for a
+    // duplicate by mobile or email, the Leads page filters by assignee and
+    // status, and reports and the activity log read by date. Without these,
+    // each of those is a full scan of the company's rows.
+    name: 'lead scale indexes',
+    sql: `
+      CREATE INDEX IF NOT EXISTS "leads_company_mobile" ON "leads" ("companyId", "mobile");
+      CREATE INDEX IF NOT EXISTS "leads_company_email" ON "leads" ("companyId", "email");
+      CREATE INDEX IF NOT EXISTS "leads_company_assigned_status" ON "leads" ("companyId", "assignedToId", "status");
+      CREATE INDEX IF NOT EXISTS "leads_company_created" ON "leads" ("companyId", "createdAt" DESC);
+      CREATE INDEX IF NOT EXISTS "activity_logs_company_created" ON "activity_logs" ("companyId", "createdAt" DESC);
+      CREATE INDEX IF NOT EXISTS "calls_company_created" ON "calls" ("companyId", "createdAt" DESC);
+    `,
+  },
 ];
 
 export const runSchemaPatches = async (sequelize: Sequelize): Promise<void> => {

@@ -31,11 +31,11 @@ export default function ForgotPasswordPage() {
       <h1 className="text-2xl font-semibold text-slate-900">Reset your password</h1>
       <p className="mt-2 text-sm text-slate-500">
         Remember your password?{' '}
-        <Link href="/login" className="font-medium text-[#168eea] hover:underline">Sign in</Link>
+        <Link href="/login" className="font-medium text-[var(--primary)] hover:underline">Sign in</Link>
       </p>
 
       {error && (
-        <div className="mt-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-600">
+        <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">
           {error}
         </div>
       )}
@@ -57,7 +57,7 @@ export default function ForgotPasswordPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@company.com"
-              className="w-full rounded-md border border-slate-200 bg-white px-3 py-2.5 text-sm focus:border-[#168eea] focus:outline-none focus:ring-1 focus:ring-[#168eea]"
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
             />
           </div>
           <Button type="submit" className="w-full" disabled={loading}>

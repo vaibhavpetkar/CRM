@@ -96,3 +96,26 @@ test('reports Exotel refusals with their message', async () => {
     global.fetch = realFetch;
   }
 });
+
+test('places an Exotel call from the number the CRM picked', async () => {
+  const { ExotelProvider } = await import('../src/services/voice/exotel');
+  const realFetch = global.fetch;
+  let body = '';
+  global.fetch = (async (_url: any, init: any) => {
+    body = init.body;
+    return new Response(JSON.stringify({ Call: { Sid: 'sid43', Status: 'queued' } }), { status: 200 });
+  }) as any;
+  try {
+    const result = await new ExotelProvider().placeCall({
+      agentNumber: '+919123456789',
+      customerNumber: '+919876543210',
+      callerId: '+918047110002',
+      statusCallbackUrl: 'x',
+      record: true,
+    });
+    assert.equal(new URLSearchParams(body).get('CallerId'), '08047110002');
+    assert.equal(result.callerId, '08047110002');
+  } finally {
+    global.fetch = realFetch;
+  }
+});
