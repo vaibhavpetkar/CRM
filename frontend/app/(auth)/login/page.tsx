@@ -99,7 +99,7 @@ export default function LoginPage() {
   };
 
   const inputClass = (invalid: boolean) =>
-    `h-12 w-full rounded-xl border bg-slate-50 pl-11 pr-3 text-sm text-slate-900 placeholder:text-slate-400 transition-all focus:bg-white focus:outline-none focus:ring-4 focus:ring-[var(--primary)]/15 focus:border-[var(--primary)] sm:text-base ${
+    `w-full rounded-xl border bg-white py-2.5 pl-10 pr-3.5 text-[0.84rem] text-slate-800 placeholder:text-slate-400 outline-none transition-all focus:border-[var(--auth-blue)] focus:ring-[3px] focus:ring-[#1668e3]/15 sm:py-3 ${
       invalid ? 'border-red-400 focus:border-red-400 focus:ring-red-400/20' : 'border-slate-200'
     }`;
 
@@ -111,94 +111,101 @@ export default function LoginPage() {
         strategy="afterInteractive"
       />
 
-      <span className="text-xs font-bold uppercase tracking-wider text-[var(--primary)]">Secure sign-in</span>
-      <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Welcome back 👋</h1>
-      <p className="mt-2 text-sm text-slate-600 sm:text-base">
-        Sign in to continue to <span className="font-semibold text-[var(--primary)]">Inveon One CRM</span>
-      </p>
+      <div className="mb-5">
+        <h1 className="flex items-center gap-1.5 whitespace-nowrap text-[1.45rem] font-extrabold leading-tight tracking-tight text-[var(--auth-ink)] sm:text-[1.5rem]">
+          Welcome Back! <span className="auth-wave">👋</span>
+        </h1>
+        <p className="mt-1 text-[0.78rem] text-slate-500">
+          Sign in to continue to <span className="font-semibold text-[var(--auth-blue)]">Inveon One CRM</span>
+        </p>
+      </div>
 
       {error && (
-        <div role="alert" className="mt-5 rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-medium text-red-600">
+        <div role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-[0.8rem] font-medium text-red-600">
           {error}
         </div>
       )}
 
-      <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-5" noValidate>
-        <div>
-          <label htmlFor="email" className="mb-2 block text-sm font-semibold text-slate-800">
-            Email address
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+        <div className="space-y-1.5">
+          <label htmlFor="email" className="block text-[0.75rem] font-semibold text-slate-700">
+            Email Address
           </label>
           <div className="relative">
-            <svg viewBox="0 0 24 24" fill="none" className="pointer-events-none absolute left-4 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-slate-400">
-              <path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h15A1.5 1.5 0 0 1 21 6.5v11A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5v-11Z" stroke="currentColor" strokeWidth="1.6" />
-              <path d="m4 6.5 8 6 8-6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="pointer-events-none absolute left-3.5 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-slate-400">
+              <rect x="2" y="4" width="20" height="16" rx="2" />
+              <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
             </svg>
-            <input id="email" type="email" autoComplete="email" placeholder="you@company.com" {...register('email')} className={inputClass(!!errors.email)} />
+            <input id="email" type="email" autoComplete="email" placeholder="Enter your email" {...register('email')} className={inputClass(!!errors.email)} />
           </div>
-          {errors.email && <p className="mt-1.5 text-xs font-medium text-red-500">{errors.email.message}</p>}
+          {errors.email && <p className="text-xs font-medium text-red-500">{errors.email.message}</p>}
         </div>
 
-        <div>
-          <div className="mb-2 flex items-center justify-between">
-            <label htmlFor="password" className="text-sm font-semibold text-slate-800">
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <label htmlFor="password" className="text-[0.75rem] font-semibold text-slate-700">
               Password
             </label>
-            <Link href="/forgot-password" className="text-xs font-semibold text-[var(--primary)] hover:underline sm:text-sm">
-              Forgot password?
+            <Link href="/forgot-password" className="text-[0.72rem] font-semibold text-[var(--auth-blue)] hover:underline">
+              Forgot Password?
             </Link>
           </div>
           <div className="relative">
-            <svg viewBox="0 0 24 24" fill="none" className="pointer-events-none absolute left-4 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-slate-400">
-              <rect x="5" y="10.5" width="14" height="9" rx="2" stroke="currentColor" strokeWidth="1.6" />
-              <path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="pointer-events-none absolute left-3.5 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-slate-400">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
             </svg>
             <PasswordInput id="password" autoComplete="current-password" placeholder="Enter your password" {...register('password')} className={inputClass(!!errors.password)} />
           </div>
-          {errors.password && <p className="mt-1.5 text-xs font-medium text-red-500">{errors.password.message}</p>}
+          {errors.password && <p className="text-xs font-medium text-red-500">{errors.password.message}</p>}
         </div>
 
-        <label className="flex items-center gap-2 text-sm text-slate-700">
-          <input type="checkbox" defaultChecked className="h-4 w-4 rounded border-slate-300 accent-[var(--auth-btn)]" />
-          Keep me signed in
-        </label>
+        <div className="flex items-center justify-between pt-0.5">
+          <label className="flex cursor-pointer select-none items-center gap-2">
+            <input type="checkbox" defaultChecked className="h-4 w-4 cursor-pointer rounded border-slate-300 accent-[#1668e3]" />
+            <span className="text-[0.75rem] font-medium text-slate-700">Remember me</span>
+          </label>
+          <span className="text-[0.72rem] text-slate-400">Keep me signed in</span>
+        </div>
 
         <Button
           type="submit"
           disabled={loading}
-          className="h-12 w-full rounded-xl bg-[var(--auth-btn)] text-base font-semibold shadow-lg shadow-[#5f259f]/25 hover:bg-[var(--auth-btn-hover)]"
+          className="group w-full rounded-xl bg-[#1668e3] px-4 py-3 text-[0.84rem] font-bold text-white shadow-md shadow-blue-500/20 hover:bg-[#1258c7] active:scale-[0.99]"
         >
-          {loading ? 'Signing in…' : 'Sign in'}
+          {loading ? 'Signing in…' : 'Sign In'}
           {!loading && (
-            <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4">
-              <path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 transition-transform group-hover:translate-x-1">
+              <line x1="5" y1="12" x2="19" y2="12" />
+              <polyline points="12 5 19 12 12 19" />
             </svg>
           )}
         </Button>
+
+        <div className="flex items-center py-1">
+          <div className="h-px flex-1 bg-slate-200" />
+          <span className="px-3 text-[0.65rem] font-bold tracking-wider text-slate-400">OR</span>
+          <div className="h-px flex-1 bg-slate-200" />
+        </div>
+
+        {/* Our button is what you see; Google's real button sits invisibly on top and takes the click. */}
+        <div className="relative">
+          <div className="flex w-full items-center justify-center gap-2.5 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-[0.8125rem] font-medium text-slate-700 shadow-sm sm:py-3">
+            <svg viewBox="0 0 24 24" className="h-4 w-4">
+              <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z" />
+              <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z" />
+              <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z" />
+              <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z" />
+            </svg>
+            Continue with Google
+          </div>
+          <div id="googleSignInBtn" className="absolute inset-0 overflow-hidden opacity-0 [&>div]:!h-full [&_iframe]:!h-full [&_iframe]:!w-full" />
+        </div>
       </form>
 
-      <div className="my-6 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-slate-400">
-        <span className="h-px flex-1 bg-slate-200" />
-        or
-        <span className="h-px flex-1 bg-slate-200" />
-      </div>
-
-      {/* Our button is what you see; Google's real button sits invisibly on top and takes the click. */}
-      <div className="relative">
-        <div className="flex h-12 w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-800 shadow-sm sm:text-base">
-          <svg viewBox="0 0 48 48" className="h-5 w-5">
-            <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z" />
-            <path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z" />
-            <path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z" />
-            <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z" />
-          </svg>
-          Continue with Google
-        </div>
-        <div id="googleSignInBtn" className="absolute inset-0 overflow-hidden opacity-0 [&>div]:!h-full [&_iframe]:!h-full [&_iframe]:!w-full" />
-      </div>
-
-      <p className="mt-6 rounded-xl bg-slate-50 px-4 py-3 text-center text-sm text-slate-600">
+      <p className="mt-4 text-center text-[0.72rem] text-slate-500">
         Having trouble?{' '}
-        <Link href="/contact" className="font-semibold text-[var(--primary)] hover:underline">
+        <Link href="/contact" className="font-medium text-[var(--auth-blue)] hover:underline">
           Contact your administrator
         </Link>
       </p>
