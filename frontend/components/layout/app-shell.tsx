@@ -5,6 +5,7 @@ import Sidebar from './sidebar';
 import Topbar from './topbar';
 import GlobalShortcuts from './global-shortcuts';
 import AuthGuard from './auth-guard';
+import ActivityHeartbeat from './activity-heartbeat';
 import SubscriptionGate from '@/components/subscription/subscription-gate';
 import { cn } from '@/lib/utils';
 import { companyApi } from '@/lib/api';
@@ -33,6 +34,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-[var(--background)]">
       <GlobalShortcuts />
+      <ActivityHeartbeat />
       <Sidebar
         collapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}

@@ -52,8 +52,8 @@ export const navigation: NavSection[] = [
     title: 'Sales',
     items: [
       { name: 'Leads', href: '/leads', icon: ClipboardDocumentListIcon, permission: 'leads:read' },
-      { name: 'Sales Activity', href: '/sales-activity', icon: SignalIcon },
-      { name: 'Call Tracking', href: '/call-tracking', icon: PhoneIcon },
+      { name: 'Sales Activity', href: '/sales-activity', icon: SignalIcon, permission: 'sales:view' },
+      { name: 'Call Tracking', href: '/call-tracking', icon: PhoneIcon, permission: 'sales:view' },
       { name: 'Site Visits', href: '/site-visits', icon: MapPinIcon, permission: 'site_visits:read' },
       { name: 'Tasks', href: '/tasks', icon: CheckCircleIcon, permission: 'tasks:view' },
       { name: 'Meetings', href: '/meetings', icon: CalendarDaysIcon, permission: 'meetings:view' },

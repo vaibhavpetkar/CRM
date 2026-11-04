@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import PageHeader from '@/components/ui/page-header';
 import Card from '@/components/ui/card';
 import Button from '@/components/ui/button';
@@ -15,6 +15,10 @@ export default function RolesPage() {
   const toast = useToast();
   const [roles, setRoles] = useState<any[]>([]);
   const [groups, setGroups] = useState<PermissionGroup[]>([]);
+  const permLabels = useMemo(
+    () => new Map(groups.flatMap((g) => g.permissions.map((p) => [p.key, `${g.label.replace(/ pages?$/, '')}: ${p.label}`] as const))),
+    [groups]
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -176,11 +180,14 @@ export default function RolesPage() {
                       ) : rolePerms.length === 0 ? (
                         <span className="text-xs text-slate-400">No permissions assigned</span>
                       ) : (
-                        rolePerms.map((perm: string) => (
-                          <span key={perm} className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium capitalize text-slate-600">
-                            {perm.replace(':', ' · ')}
-                          </span>
-                        ))
+                        // Only permissions for pages this CRM shows, named like the role editor.
+                        rolePerms
+                          .filter((perm: string) => permLabels.has(perm))
+                          .map((perm: string) => (
+                            <span key={perm} className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
+                              {permLabels.get(perm)}
+                            </span>
+                          ))
                       )}
                     </div>
                   </div>
