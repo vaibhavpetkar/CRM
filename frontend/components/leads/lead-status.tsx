@@ -4,9 +4,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDownIcon } from '@heroicons/react/24/outline';
 import { cn } from '@/lib/utils';
 import { LEAD_STATUS_OPTIONS, leadStatusColor, leadStatusLabel } from '@/lib/lead-options';
+import { useLeadStatusColors } from './lead-status-colors';
 
 /** Coloured pill showing a lead's status by its label. */
 export function LeadStatusBadge({ status, className }: { status?: string | null; className?: string }) {
+  useLeadStatusColors();
   return (
     <span
       className={cn('lead-status-badge inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium', className)}
@@ -39,6 +41,7 @@ export function LeadStatusSelect({
   className?: string;
   placeholder?: string;
 }) {
+  useLeadStatusColors();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);

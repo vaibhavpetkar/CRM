@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { LeadStatusBadge } from '@/components/leads/lead-status';
+import { useLeadStatusColors } from '@/components/leads/lead-status-colors';
 import { leadStatusColor, leadStatusLabel } from '@/lib/lead-options';
 import Link from 'next/link';
 import LoadingSpinner from '@/components/ui/loading-spinner';
@@ -187,6 +188,7 @@ function PipelineChevrons({ counts }: { counts: Record<string, number> }) {
 }
 
 export default function DashboardPage() {
+  useLeadStatusColors();
   const [userName, setUserName] = useState('');
   const [range, setRange] = useState('30');
   const [metric, setMetric] = useState('value');

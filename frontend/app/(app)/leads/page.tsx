@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import PageHeader from '@/components/ui/page-header';
 import SearchInput from '@/components/ui/search-input';
 import { LeadStatusBadge, LeadStatusSelect } from '@/components/leads/lead-status';
+import { LeadStatusColorsButton, useLeadStatusColors } from '@/components/leads/lead-status-colors';
 import Button from '@/components/ui/button';
 import Card from '@/components/ui/card';
 import DataTable, { DataTableColumn } from '@/components/ui/data-table';
@@ -25,6 +26,8 @@ const LEADS_PAGE_SIZE = 200;
 
 export default function LeadsPage() {
   const toast = useToast();
+  // Re-render rows when anyone's status colours load or change.
+  useLeadStatusColors();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
   // Real-estate filters ("More filters" panel). 'all' / '' means no filter.
@@ -453,6 +456,7 @@ export default function LeadsPage() {
             placeholder="All Statuses"
             className="w-56"
           />
+          <LeadStatusColorsButton />
         </div>
         <button
           type="button"
@@ -659,6 +663,7 @@ function LeadsKanban({
   onMove: (leadId: string | number, newStatus: string) => void;
 }) {
   const router = useRouter();
+  useLeadStatusColors();
   // One column per current status, plus any older status some loaded lead
   // still has (those can be dragged out of, not into).
   const legacyStatuses: string[] = [...new Set<string>(leads.map((l) => l.status).filter((st) => st && !LEAD_STATUS_VALUES.includes(st)))];

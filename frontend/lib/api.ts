@@ -1037,6 +1037,27 @@ export const notificationsApi = {
   },
 };
 
+// ─── Preferences API ─────────────────────────────────────────────────────────
+export type PreferenceScope = 'user' | 'company' | 'global';
+export type LeadStatusColorLevels = {
+  global: Record<string, string> | null;
+  company: Record<string, string> | null;
+  user: Record<string, string> | null;
+  canSetCompany: boolean;
+  canSetGlobal: boolean;
+};
+
+export const preferencesApi = {
+  getLeadStatusColors: async () => request<LeadStatusColorLevels>('/preferences/lead-status-colors'),
+  setLeadStatusColors: async (scope: PreferenceScope, colors: Record<string, string>) =>
+    request<{ message: string; colors: Record<string, string> }>('/preferences/lead-status-colors', {
+      method: 'PUT',
+      body: JSON.stringify({ scope, colors }),
+    }),
+  resetLeadStatusColors: async (scope: PreferenceScope) =>
+    request<{ message: string }>(`/preferences/lead-status-colors?scope=${scope}`, { method: 'DELETE' }),
+};
+
 // ─── Expenses API ────────────────────────────────────────────────────────────
 
 export interface Expense {

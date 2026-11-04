@@ -206,14 +206,39 @@ export const leadStatusLabel = (status?: string | null) => {
   return STATUS_BY_VALUE[key]?.label || key.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) || '—';
 };
 
-/** Base colour (hex) of a status, for dots and charts. */
-export const leadStatusColor = (status?: string | null) => {
+// Colour choices layered over the built-in tones: the super admin's default
+// for all companies, then the company default, then the user's own (see
+// components/leads/lead-status-colors.tsx, which loads and saves them).
+let colorOverrides: Record<string, string> = {};
+let colorVersion = 0;
+const colorListeners = new Set<() => void>();
+
+export const setLeadStatusColorOverrides = (colors: Record<string, string>) => {
+  colorOverrides = { ...colors };
+  colorVersion += 1;
+  colorListeners.forEach((fn) => fn());
+};
+export const subscribeLeadStatusColors = (fn: () => void) => {
+  colorListeners.add(fn);
+  return () => {
+    colorListeners.delete(fn);
+  };
+};
+export const leadStatusColorVersion = () => colorVersion;
+
+/** Built-in colour (hex) of a status, ignoring anyone's choices. */
+export const defaultLeadStatusColor = (status?: string | null) => {
   const tone = STATUS_BY_VALUE[String(status || '').toLowerCase()]?.tone;
   return tone ? LEAD_STATUS_TONES[tone] : '#94a3b8';
 };
 
-/** Background for a lead's row or card, by its status. Unknown statuses stay plain. */
+/** Colour (hex) of a status, for dots, badges and charts. */
+export const leadStatusColor = (status?: string | null) =>
+  colorOverrides[String(status || '').toLowerCase()] || defaultLeadStatusColor(status);
+
+/** Background for a lead's row or card, by its status: a pale tint of its colour. */
 export const leadStatusRowColor = (status?: string | null) => {
-  const tone = STATUS_BY_VALUE[String(status || '').toLowerCase()]?.tone;
-  return tone ? `var(--lead-tone-${tone})` : undefined;
+  const key = String(status || '').toLowerCase();
+  if (!STATUS_BY_VALUE[key] && !colorOverrides[key]) return undefined;
+  return `color-mix(in srgb, ${leadStatusColor(key)} var(--lead-row-mix), var(--lead-row-base))`;
 };

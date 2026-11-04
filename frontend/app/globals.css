@@ -281,41 +281,18 @@ body {
 }
 
 /* ─── Lead status colours ────────────────────────────────────────────────────
-   Each lead status has a colour tone (LEAD_STATUS_OPTIONS in lib/lead-options).
-   --lead-tone-* tints whole rows on the Leads list and Kanban cards; they are
-   opaque on purpose because frozen (sticky) cells reuse the same colour.
+   Rows and Kanban cards are tinted with a status's colour (built-in tone or the
+   user's / company's choice) mixed into the card background; see
+   leadStatusRowColor in lib/lead-options. The result is opaque on purpose,
+   because frozen (sticky) cells reuse the same colour.
    .lead-status-badge colours a status pill from its --tone. */
 :root {
-  --lead-tone-blue: color-mix(in srgb, #3b82f6 12%, #ffffff);
-  --lead-tone-amber: color-mix(in srgb, #f59e0b 12%, #ffffff);
-  --lead-tone-indigo: color-mix(in srgb, #6366f1 12%, #ffffff);
-  --lead-tone-green: color-mix(in srgb, #22c55e 12%, #ffffff);
-  --lead-tone-slate: color-mix(in srgb, #94a3b8 12%, #ffffff);
-  --lead-tone-teal: color-mix(in srgb, #14b8a6 12%, #ffffff);
-  --lead-tone-red: color-mix(in srgb, #ef4444 12%, #ffffff);
-  --lead-tone-orange: color-mix(in srgb, #f97316 12%, #ffffff);
-  --lead-tone-yellow: color-mix(in srgb, #eab308 12%, #ffffff);
-  --lead-tone-rose: color-mix(in srgb, #f43f5e 12%, #ffffff);
-  --lead-tone-lime: color-mix(in srgb, #84cc16 12%, #ffffff);
-  --lead-tone-cyan: color-mix(in srgb, #06b6d4 12%, #ffffff);
-  --lead-tone-purple: color-mix(in srgb, #a855f7 12%, #ffffff);
-  --lead-tone-sky: color-mix(in srgb, #0ea5e9 12%, #ffffff);
+  --lead-row-base: #ffffff;
+  --lead-row-mix: 12%;
 }
 .dark {
-  --lead-tone-blue: color-mix(in srgb, #3b82f6 17%, #111a2b);
-  --lead-tone-amber: color-mix(in srgb, #f59e0b 17%, #111a2b);
-  --lead-tone-indigo: color-mix(in srgb, #6366f1 17%, #111a2b);
-  --lead-tone-green: color-mix(in srgb, #22c55e 17%, #111a2b);
-  --lead-tone-slate: color-mix(in srgb, #94a3b8 17%, #111a2b);
-  --lead-tone-teal: color-mix(in srgb, #14b8a6 17%, #111a2b);
-  --lead-tone-red: color-mix(in srgb, #ef4444 17%, #111a2b);
-  --lead-tone-orange: color-mix(in srgb, #f97316 17%, #111a2b);
-  --lead-tone-yellow: color-mix(in srgb, #eab308 17%, #111a2b);
-  --lead-tone-rose: color-mix(in srgb, #f43f5e 17%, #111a2b);
-  --lead-tone-lime: color-mix(in srgb, #84cc16 17%, #111a2b);
-  --lead-tone-cyan: color-mix(in srgb, #06b6d4 17%, #111a2b);
-  --lead-tone-purple: color-mix(in srgb, #a855f7 17%, #111a2b);
-  --lead-tone-sky: color-mix(in srgb, #0ea5e9 17%, #111a2b);
+  --lead-row-base: #111a2b;
+  --lead-row-mix: 18%;
 }
 .lead-status-badge {
   background-color: color-mix(in srgb, var(--tone) 15%, transparent);
