@@ -446,7 +446,7 @@ export default function LeadsPage() {
       />
 
       <div className="mb-4 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs flex flex-col gap-3 sm:flex-row sm:items-center">
-        <SearchInput value={search} onChange={setSearch} placeholder="Search name, number, area, 2 BHK..." className="sm:max-w-xs" />
+        <SearchInput value={search} onChange={setSearch} placeholder="Search name, number, area, 2 BHK, 20-11-26..." className="sm:max-w-xs" />
         <div className="flex items-center gap-2">
           <FunnelIcon className="h-4 w-4 text-slate-400" />
           <LeadStatusSelect

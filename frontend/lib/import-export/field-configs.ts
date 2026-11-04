@@ -1,6 +1,5 @@
-import { LEAD_STATUS_VALUES } from '@/lib/lead-options';
 import type { ImportExportChildTable, ImportExportField } from './types';
-import { LEAD_SOURCE_OPTIONS } from '../lead-options';
+import { LEAD_SOURCE_OPTIONS, LEAD_STATUS_VALUES } from '../lead-options';
 
 // Each list defines exactly the columns that matter for that module.
 // To add import/export to another form (Deals, Quotes, Meetings, Tasks, ...),
