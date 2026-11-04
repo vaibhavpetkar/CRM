@@ -6,18 +6,21 @@ import { useParams, useRouter } from 'next/navigation';
 import { leadsApi, usersApi, itemsApi, aiApi, getStoredUser } from '@/lib/api';
 import { isModuleEnabled } from '@/lib/modules';
 import { hasPermission } from '@/lib/permissions';
-import { DESIGNATION_OPTIONS, LEAD_SOURCE_OPTIONS, CONFIGURATION_OPTIONS, PROPERTY_TYPE_OPTIONS, leadSourceLabel, budgetRange } from '@/lib/lead-options';
+import { VISIT_LEAD_STATUSES, leadStatusLabel, LEAD_SOURCE_OPTIONS, CONFIGURATION_OPTIONS, PROPERTY_TYPE_OPTIONS, leadSourceLabel, budgetRange } from '@/lib/lead-options';
 import Button from '@/components/ui/button';
 import Card from '@/components/ui/card';
 import DataTable from '@/components/ui/data-table';
 import AISummaryPanel from '@/components/ui/ai-summary-panel';
 import SearchableSelect from '@/components/ui/searchable-select';
-import { ArrowLeftIcon, ChevronRightIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, ChevronRightIcon, PhoneIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { useToast } from '@/components/ui/toast';
 import { useKeyboardShortcuts } from '@/lib/hooks/useKeyboardShortcuts';
 import CallButton from '@/components/calls/call-button';
 import CallHistory from '@/components/calls/call-history';
+import LogCallModal from '@/components/calls/log-call-modal';
+import { LeadStatusSelect } from '@/components/leads/lead-status';
 import SiteVisitsCard from '@/components/sales/site-visits-card';
+import SiteVisitModal from '@/components/sales/site-visit-modal';
 import FollowUpHistoryDrawer from '@/components/leads/follow-up-history-drawer';
 
 // Today as YYYY-MM-DD in the browser's time zone, for the follow-up date picker's minimum.
@@ -37,6 +40,11 @@ export default function LeadDetailsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Manual call log, opened from the button next to Save.
+  const [logCallOpen, setLogCallOpen] = useState(false);
+  const [callsVersion, setCallsVersion] = useState(0);
+  // Saving the lead as "Site Visit Done" / "Revisit Done" first asks for the visit.
+  const [visitPrompt, setVisitPrompt] = useState(false);
 
   const [formData, setFormData] = useState<any>({});
   const [activeTab, setActiveTab] = useState('lead-form');
@@ -151,7 +159,7 @@ export default function LeadDetailsPage() {
     }
   };
 
-  const handleSave = async (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent, opts: { visitLogged?: boolean } = {}) => {
     e.preventDefault();
 
     // Task 2.7: Mobile Number is mandatory. The bottom form-submit button also
@@ -195,6 +203,13 @@ export default function LeadDetailsPage() {
     const savedFollowUp = lead?.nextFollowUp ? String(lead.nextFollowUp).slice(0, 10) : '';
     if (newFollowUp && newFollowUp !== savedFollowUp && newFollowUp < todayStr()) {
       toast.warning("Next Follow-up date can't be before today.");
+      return;
+    }
+
+    // Moving the lead to a site-visit status: log the visit first (the popup
+    // calls handleSave again once it is saved). Cancelling it leaves the lead unsaved.
+    if (VISIT_LEAD_STATUSES[formData.status] && formData.status !== lead?.status && !opts.visitLogged) {
+      setVisitPrompt(true);
       return;
     }
 
@@ -254,6 +269,9 @@ export default function LeadDetailsPage() {
         <h1 className="text-2xl font-bold text-slate-900 flex-1">
           {lead.firstName} {lead.lastName}
         </h1>
+        <Button type="button" size="sm" variant="secondary" onClick={() => setLogCallOpen(true)}>
+          <PhoneIcon className="h-4 w-4" /> Log Call
+        </Button>
         <Button
           type="button"
           size="sm"
@@ -332,19 +350,11 @@ export default function LeadDetailsPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700">Status</label>
-                <select
+                <LeadStatusSelect
                   value={formData.status || ''}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                  className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
-                >
-                  <option value="new">New</option>
-                  <option value="contacted">Contacted</option>
-                  <option value="working">Working / In Progress</option>
-                  <option value="qualified">Qualified</option>
-                  <option value="unqualified">Unqualified / Disqualified</option>
-                  <option value="converted">Converted</option>
-                  <option value="lost">Lost</option>
-                </select>
+                  onChange={(v) => setFormData({ ...formData, status: v })}
+                  className="mt-1"
+                />
               </div>
             </div>
 
@@ -394,19 +404,6 @@ export default function LeadDetailsPage() {
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                   />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700">Designation</label>
-                  <select
-                    value={formData.jobTitle || ''}
-                    onChange={(e) => setFormData({ ...formData, jobTitle: e.target.value })}
-                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
-                  >
-                    <option value="">— Select —</option>
-                    {DESIGNATION_OPTIONS.map((opt) => (
-                      <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                  </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700">Telephone</label>
@@ -617,7 +614,10 @@ export default function LeadDetailsPage() {
               </div>
             </div>
 
-            <div className="flex justify-end pt-4">
+            <div className="flex justify-end gap-2 pt-4">
+              <Button type="button" variant="secondary" onClick={() => setLogCallOpen(true)}>
+                <PhoneIcon className="h-4 w-4" /> Log Call
+              </Button>
               <Button type="submit" disabled={saving}>
                 {saving ? 'Saving...' : 'Save Changes'}
               </Button>
@@ -754,7 +754,7 @@ export default function LeadDetailsPage() {
 
       {activeTab === 'calls' && (
         <Card title="Calls">
-          <CallHistory leadId={leadId} />
+          <CallHistory key={callsVersion} leadId={leadId} />
         </Card>
       )}
 
@@ -765,6 +765,35 @@ export default function LeadDetailsPage() {
       )}
 
       <FollowUpHistoryDrawer leadId={leadId} leadName={leadName} open={remarksOpen} onClose={() => setRemarksOpen(false)} />
+      {visitPrompt && (
+        <SiteVisitModal
+          lead={{ id: Number(leadId), name: leadName || `Lead #${leadId}`, projectName: formData.projectName ?? lead.projectName, preferredLocation: formData.preferredLocation ?? lead.preferredLocation }}
+          agents={assignableUsers}
+          canPickAgent={hasPermission(getStoredUser(), 'users:read')}
+          currentUserId={getStoredUser()?.id}
+          initialStatus={VISIT_LEAD_STATUSES[formData.status]}
+          intro={`Log the site visit to save this lead as "${leadStatusLabel(formData.status)}". If you cancel, the lead is not saved.`}
+          onClose={() => {
+            setVisitPrompt(false);
+            toast.warning('Lead not saved. Log the site visit to save it with this status.');
+          }}
+          onSaved={() => {
+            setVisitPrompt(false);
+            handleSave({ preventDefault: () => {} } as FormEvent, { visitLogged: true });
+          }}
+        />
+      )}
+      {logCallOpen && (
+        <LogCallModal
+          lead={{ id: lead.id, name: leadName || lead.name || `Lead #${lead.id}`, mobile: lead.mobile || lead.phone }}
+          onClose={() => setLogCallOpen(false)}
+          onSaved={() => {
+            setLogCallOpen(false);
+            setCallsVersion((v) => v + 1);
+            fetchLead();
+          }}
+        />
+      )}
     </div>
   );
 }

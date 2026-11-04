@@ -10,15 +10,19 @@ import LoadingSpinner from '@/components/ui/loading-spinner';
 import { useToast } from '@/components/ui/toast';
 import DateRangePicker, { DateRange, presetRange } from '@/components/sales/date-range';
 import { AgentStatusDot } from '@/components/sales/agent-status';
-import SiteVisitModal, { VISIT_STATUS_CLASS, VISIT_STATUS_LABEL } from '@/components/sales/site-visit-modal';
+import SiteVisitModal, { VISIT_STATUS_LABEL } from '@/components/sales/site-visit-modal';
 import { getStoredUser, PresenceState, salesApi, SiteVisitRow, SiteVisitStatus, usersApi } from '@/lib/api';
 import { hasPermission } from '@/lib/permissions';
 import { cn } from '@/lib/utils';
+import { LeadStatusColorsButton, useLeadStatusColors } from '@/components/leads/lead-status-colors';
+import { leadStatusColor, leadStatusRowColor } from '@/lib/lead-options';
 
 // Site visits across the team: what's scheduled, what happened, feedback.
 
 export default function SiteVisitsPage() {
   const toast = useToast();
+  // Re-render when the visit status colours load or change.
+  useLeadStatusColors();
   const user = getStoredUser();
   const canEdit = hasPermission(user, 'leads:update');
   const canPickAgent = hasPermission(user, 'users:read');
@@ -54,7 +58,7 @@ export default function SiteVisitsPage() {
   }, [canPickAgent]);
 
   const counts = useMemo(() => {
-    const c = { scheduled: 0, completed: 0, cancelled: 0, 'no-show': 0 } as Record<SiteVisitStatus, number>;
+    const c = { scheduled: 0, completed: 0, 'revisit-done': 0, cancelled: 0, 'no-show': 0 } as Record<SiteVisitStatus, number>;
     for (const v of visits || []) c[v.status] += 1;
     return c;
   }, [visits]);
@@ -106,7 +110,7 @@ export default function SiteVisitsPage() {
             </select>
           )}
           <div className="flex flex-wrap gap-1">
-            {(['all', 'scheduled', 'completed', 'cancelled', 'no-show'] as const).map((s) => (
+            {(['all', 'scheduled', 'completed', 'revisit-done', 'cancelled', 'no-show'] as const).map((s) => (
               <button
                 key={s}
                 onClick={() => setStatus(s)}
@@ -115,11 +119,13 @@ export default function SiteVisitsPage() {
                   status === s ? 'border-[var(--primary)] bg-[var(--primary)] text-white' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
                 )}
               >
+                {s !== 'all' && <span className="mr-1.5 inline-block h-2 w-2 rounded-full" style={{ backgroundColor: leadStatusColor(`visit:${s}`) }} />}
                 {s === 'all' ? 'All' : VISIT_STATUS_LABEL[s]}
                 {s !== 'all' && status === 'all' && visits ? ` ${counts[s]}` : ''}
               </button>
             ))}
           </div>
+          <LeadStatusColorsButton kind="visit" />
         </div>
       </div>
 
@@ -147,7 +153,7 @@ export default function SiteVisitsPage() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {visits.map((v) => (
-                  <tr key={v.id} className="align-top hover:bg-slate-50/60">
+                  <tr key={v.id} className="align-top" style={{ backgroundColor: leadStatusRowColor(`visit:${v.status}`) }}>
                     <td className="whitespace-nowrap px-6 py-3 text-slate-700">
                       {new Date(v.scheduledAt).toLocaleString(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}
                     </td>
@@ -165,7 +171,12 @@ export default function SiteVisitsPage() {
                       </span>
                     </td>
                     <td className="px-3 py-3">
-                      <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-semibold', VISIT_STATUS_CLASS[v.status])}>{VISIT_STATUS_LABEL[v.status]}</span>
+                      <span
+                        className="lead-status-badge whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                        style={{ '--tone': leadStatusColor(`visit:${v.status}`) } as React.CSSProperties}
+                      >
+                        {VISIT_STATUS_LABEL[v.status]}
+                      </span>
                     </td>
                     <td className="max-w-xs px-3 py-3 text-slate-600"><p className="line-clamp-2">{v.notes || '—'}</p></td>
                     <td className="whitespace-nowrap px-6 py-3 text-right">
@@ -173,7 +184,8 @@ export default function SiteVisitsPage() {
                         <div className="flex justify-end gap-1">
                           {v.status === 'scheduled' && (
                             <>
-                              <Button size="sm" variant="secondary" onClick={() => update(v, 'completed')}>Done</Button>
+                              <Button size="sm" variant="secondary" onClick={() => update(v, 'completed')}>Visit done</Button>
+                              <Button size="sm" variant="secondary" onClick={() => update(v, 'revisit-done')}>Revisit done</Button>
                               <Button size="sm" variant="ghost" onClick={() => update(v, 'no-show')}>No show</Button>
                             </>
                           )}

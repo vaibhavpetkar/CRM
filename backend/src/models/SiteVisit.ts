@@ -3,8 +3,10 @@ import sequelize from '../config/database';
 
 // A property site visit: a sales person taking a lead to see a project or
 // flat. Counted next to calls in the per-agent activity view (Sales activity).
-export type SiteVisitStatus = 'scheduled' | 'completed' | 'cancelled' | 'no-show';
-export const SITE_VISIT_STATUSES: SiteVisitStatus[] = ['scheduled', 'completed', 'cancelled', 'no-show'];
+export type SiteVisitStatus = 'scheduled' | 'completed' | 'revisit-done' | 'cancelled' | 'no-show';
+/** A visit that took place: the first site visit or a revisit. */
+export const DONE_VISIT_STATUSES: SiteVisitStatus[] = ['completed', 'revisit-done'];
+export const SITE_VISIT_STATUSES: SiteVisitStatus[] = ['scheduled', 'completed', 'revisit-done', 'cancelled', 'no-show'];
 
 interface SiteVisitAttributes {
   id: number;

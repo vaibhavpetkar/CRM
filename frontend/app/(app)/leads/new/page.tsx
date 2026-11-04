@@ -1,6 +1,6 @@
 'use client';
 
-import { forwardRef, useState } from 'react';
+import { forwardRef, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -14,7 +14,6 @@ import {
   MegaphoneIcon,
   CalendarDaysIcon,
   ChevronDownIcon,
-  BriefcaseIcon,
   HomeModernIcon,
   BuildingOffice2Icon,
   MapPinIcon,
@@ -24,9 +23,12 @@ import {
 import UserAutocomplete from '@/components/ui/user-autocomplete';
 import { useToast } from '@/components/ui/toast';
 import { useKeyboardShortcuts } from '@/lib/hooks/useKeyboardShortcuts';
-import { leadsApi } from '@/lib/api';
+import { getStoredUser, leadsApi, salesApi, usersApi } from '@/lib/api';
+import { hasPermission } from '@/lib/permissions';
+import SiteVisitModal, { SiteVisitInput } from '@/components/sales/site-visit-modal';
 import { cn } from '@/lib/utils';
-import { CONFIGURATION_OPTIONS, DESIGNATION_OPTIONS, LEAD_SOURCE_OPTIONS, PROPERTY_TYPE_OPTIONS } from '@/lib/lead-options';
+import { LeadStatusSelect } from '@/components/leads/lead-status';
+import { VISIT_LEAD_STATUSES, leadStatusLabel, CONFIGURATION_OPTIONS, LEAD_SOURCE_OPTIONS, PROPERTY_TYPE_OPTIONS } from '@/lib/lead-options';
 
 // Today as YYYY-MM-DD in the browser's time zone.
 const todayStr = () => {
@@ -48,6 +50,7 @@ const leadSchema = z.object({
   phone: z.string().optional(),
   jobTitle: z.string().optional(),
   leadSource: z.string().optional(),
+  status: z.string().optional(),
   nextFollowUp: z.string().optional().refine((v) => !v || v >= todayStr(), "Follow-up date can't be before today"),
   followUpRemark: z.string().optional(),
   assignedToId: z.union([z.string(), z.number()]).optional(),
@@ -141,13 +144,13 @@ export default function NewLeadPage() {
     formState: { errors, isSubmitting },
   } = useForm<LeadFormValues>({
     resolver: zodResolver(leadSchema),
-    defaultValues: { leadSource: 'website', assignedToId: '' },
+    defaultValues: { leadSource: 'website', status: 'new', assignedToId: '' },
   });
 
   const toPayload = (data: LeadFormValues) => {
     const payload: Record<string, any> = {
       ...data,
-      status: 'new',
+      status: data.status || 'new',
       leadSource: (data.leadSource || 'website').toLowerCase().replace(/\s+/g, '-'),
       assignedToId: data.assignedToId ? Number(data.assignedToId) : null,
       budgetMin: data.budgetMin ? Number(data.budgetMin) : null,
@@ -160,10 +163,29 @@ export default function NewLeadPage() {
     return payload;
   };
 
-  const create = async (payload: Record<string, any>) => {
+  // A new lead saved as "Site Visit Done" / "Revisit Done": the visit is
+  // asked for first, and the lead is only created once it is filled in.
+  const [visitFor, setVisitFor] = useState<Record<string, any> | null>(null);
+  const [agents, setAgents] = useState<{ id: number; name: string }[]>([]);
+  useEffect(() => {
+    usersApi.getAssignableUsers().then((r) => setAgents(r.users.map((u) => ({ id: u.id, name: u.name })))).catch(() => {});
+  }, []);
+
+  const create = async (payload: Record<string, any>, visit?: SiteVisitInput) => {
+    if (VISIT_LEAD_STATUSES[payload.status] && !visit) {
+      setVisitFor(payload);
+      return;
+    }
     const res = await leadsApi.createLead(payload);
-    toast.success('Lead created.');
     const id = res?.lead?.id;
+    if (visit && id) {
+      try {
+        await salesApi.createVisit({ ...visit, leadId: id });
+      } catch (err: any) {
+        toast.error(`Lead created, but the site visit was not: ${err.message || 'unknown error'}`);
+      }
+    }
+    toast.success('Lead created.');
     router.push(id ? `/leads/${id}` : '/leads');
   };
 
@@ -200,6 +222,7 @@ export default function NewLeadPage() {
   });
 
   return (
+    <>
     <form onSubmit={handleSubmit(onSubmit)} noValidate className="mx-auto max-w-6xl space-y-6">
       <div className="flex items-center gap-4">
         <button type="button" onClick={() => router.push('/leads')} aria-label="Back to leads" className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
@@ -241,20 +264,15 @@ export default function NewLeadPage() {
         <Field label="Telephone">
           <IconInput icon={<PhoneIcon />} type="tel" placeholder="Landline (optional)" {...register('phone')} />
         </Field>
-        <Field label="Designation">
-          <IconSelect icon={<BriefcaseIcon />} {...register('jobTitle')}>
-            <option value="">— Select —</option>
-            {DESIGNATION_OPTIONS.map((o) => (
-              <option key={o} value={o}>{o}</option>
-            ))}
-          </IconSelect>
-        </Field>
         <Field label="Lead Source">
           <IconSelect icon={<MegaphoneIcon />} {...register('leadSource')}>
             {LEAD_SOURCE_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>
             ))}
           </IconSelect>
+        </Field>
+        <Field label="Status">
+          <LeadStatusSelect value={watch('status') || 'new'} onChange={(v) => setValue('status', v)} />
         </Field>
         <Field label="Assigned To (Lead Owner)">
           <UserAutocomplete
@@ -365,5 +383,30 @@ export default function NewLeadPage() {
         </div>
       )}
     </form>
+    {visitFor && (
+      <SiteVisitModal
+        lead={{ id: 0, name: `${visitFor.firstName || ''} ${visitFor.lastName || ''}`.trim() || 'New lead', projectName: visitFor.projectName, preferredLocation: visitFor.preferredLocation }}
+        agents={agents}
+        canPickAgent={hasPermission(getStoredUser(), 'users:read')}
+        currentUserId={getStoredUser()?.id}
+        initialStatus={VISIT_LEAD_STATUSES[visitFor.status]}
+        intro={`Log the site visit to save this lead as "${leadStatusLabel(visitFor.status)}". If you cancel, the lead is not saved.`}
+        onClose={() => {
+          setVisitFor(null);
+          toast.warning('Lead not saved. Log the site visit to save it with this status.');
+        }}
+        onSaved={() => setVisitFor(null)}
+        deferred={async (visit) => {
+          const payload = visitFor;
+          try {
+            await create(payload, visit);
+            setVisitFor(null);
+          } catch (err: any) {
+            toast.error(err.message || 'Failed to save lead');
+          }
+        }}
+      />
+    )}
+    </>
   );
 }

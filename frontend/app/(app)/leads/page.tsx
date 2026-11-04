@@ -3,7 +3,9 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import PageHeader from '@/components/ui/page-header';
 import SearchInput from '@/components/ui/search-input';
-import StatusBadge from '@/components/ui/status-badge';
+import { LeadStatusBadge, LeadStatusSelect } from '@/components/leads/lead-status';
+import { LeadStatusColorsButton, useLeadStatusColors } from '@/components/leads/lead-status-colors';
+import SiteVisitModal from '@/components/sales/site-visit-modal';
 import Button from '@/components/ui/button';
 import Card from '@/components/ui/card';
 import DataTable, { DataTableColumn } from '@/components/ui/data-table';
@@ -11,7 +13,7 @@ import ImportExportButtons from '@/components/ui/import-export-buttons';
 import { LEAD_FIELDS } from '@/lib/import-export/field-configs';
 import { formatCurrency } from '@/lib/utils';
 import { leadsApi, usersApi, salesApi, getStoredUser, PresenceState } from '@/lib/api';
-import { TERRITORY_OPTIONS, LEAD_SOURCE_OPTIONS, CONFIGURATION_OPTIONS, PROPERTY_TYPE_OPTIONS, BUDGET_OPTIONS, leadSourceLabel, budgetRange } from '@/lib/lead-options';
+import { VISIT_LEAD_STATUSES, leadStatusLabel, LEAD_SOURCE_OPTIONS, LEAD_STATUS_VALUES, leadStatusRowColor, CONFIGURATION_OPTIONS, PROPERTY_TYPE_OPTIONS, BUDGET_OPTIONS, leadSourceLabel, budgetRange } from '@/lib/lead-options';
 import { AgentStatusDot } from '@/components/sales/agent-status';
 import { hasPermission } from '@/lib/permissions';
 import { useKeyboardShortcuts } from '@/lib/hooks/useKeyboardShortcuts';
@@ -25,9 +27,10 @@ const LEADS_PAGE_SIZE = 200;
 
 export default function LeadsPage() {
   const toast = useToast();
+  // Re-render rows when anyone's status colours load or change.
+  useLeadStatusColors();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
-  const [territoryFilter, setTerritoryFilter] = useState('all');
   // Real-estate filters ("More filters" panel). 'all' / '' means no filter.
   const [sourceFilter, setSourceFilter] = useState('all');
   const [assigneeFilter, setAssigneeFilter] = useState('all');
@@ -64,6 +67,8 @@ export default function LeadsPage() {
   const [selectedLeadIds, setSelectedLeadIds] = useState<(string | number)[]>([]);
   // Users available to assign leads to (name typeahead datalist)
   const [assignableUsers, setAssignableUsers] = useState<{ id: number; name: string }[]>([]);
+  // Dragging a lead to "Site Visit Done" / "Revisit Done" first asks for the visit.
+  const [visitMove, setVisitMove] = useState<{ lead: any; status: string } | null>(null);
 
   useEffect(() => {
     usersApi
@@ -159,7 +164,6 @@ export default function LeadsPage() {
     return {
       search: debouncedSearch,
       status: filter,
-      territory: territoryFilter,
       leadSource: sourceFilter,
       assignedToId: assigneeFilter,
       configuration: configFilter.join(','),
@@ -170,7 +174,7 @@ export default function LeadsPage() {
       dateFrom,
       dateTo,
     };
-  }, [debouncedSearch, filter, territoryFilter, sourceFilter, assigneeFilter, configFilter, propertyTypeFilter, debouncedLocation, budgetFilter, dateFrom, dateTo]);
+  }, [debouncedSearch, filter, sourceFilter, assigneeFilter, configFilter, propertyTypeFilter, debouncedLocation, budgetFilter, dateFrom, dateTo]);
 
   // Ignores answers to an older filter once the filters have changed.
   const requestSeq = useRef(0);
@@ -323,7 +327,7 @@ export default function LeadsPage() {
         );
       },
     },
-    { header: 'Status', accessor: (lead) => <StatusBadge status={lead.status} /> },
+    { header: 'Status', accessor: (lead) => <LeadStatusBadge status={lead.status} /> },
     {
       header: 'Requirement',
       id: 'requirement',
@@ -369,12 +373,6 @@ export default function LeadsPage() {
       id: 'email',
       optional: true,
       accessor: (lead) => <span className="text-slate-600">{lead.email || '—'}</span>,
-    },
-    {
-      header: 'Title',
-      id: 'jobTitle',
-      optional: true,
-      accessor: (lead) => <span className="text-slate-600">{lead.designation || lead.jobTitle || '—'}</span>,
     },
     {
       header: 'Source',
@@ -424,6 +422,22 @@ export default function LeadsPage() {
     },
   ];
 
+  const moveLead = async (leadId: string | number, newStatus: string, visitLogged = false) => {
+    const lead = leads.find((l) => l.id === leadId);
+    if (!lead || lead.status === newStatus) return;
+    if (VISIT_LEAD_STATUSES[newStatus] && !visitLogged) {
+      setVisitMove({ lead, status: newStatus });
+      return;
+    }
+    setLeads((prev) => prev.map((l) => (l.id === leadId ? { ...l, status: newStatus } : l)));
+    try {
+      await leadsApi.updateLead(leadId, { status: newStatus });
+    } catch (err: any) {
+      setLeads((prev) => prev.map((l) => (l.id === leadId ? { ...l, status: lead.status } : l)));
+      toast.error(err.message || 'Failed to move lead. Please try again.');
+    }
+  };
+
   return (
     <>
       <PageHeader
@@ -451,35 +465,17 @@ export default function LeadsPage() {
       />
 
       <div className="mb-4 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs flex flex-col gap-3 sm:flex-row sm:items-center">
-        <SearchInput value={search} onChange={setSearch} placeholder="Search name, number, area, 2 BHK..." className="sm:max-w-xs" />
-        <div className="flex items-center gap-2">
-          <select
-            value={territoryFilter}
-            onChange={(e) => setTerritoryFilter(e.target.value)}
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
-          >
-            <option value="all">All Territories</option>
-            {TERRITORY_OPTIONS.map((opt) => (
-              <option key={opt} value={opt}>{opt}</option>
-            ))}
-          </select>
-        </div>
+        <SearchInput value={search} onChange={setSearch} placeholder="Search name, number, area, 2 BHK, 20-11-26..." className="sm:max-w-xs" />
         <div className="flex items-center gap-2">
           <FunnelIcon className="h-4 w-4 text-slate-400" />
-          <select
+          <LeadStatusSelect
             value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
-          >
-            <option value="all">All Statuses</option>
-            <option value="new">New</option>
-            <option value="contacted">Contacted</option>
-            <option value="working">Working / In Progress</option>
-            <option value="qualified">Qualified</option>
-            <option value="unqualified">Unqualified / Disqualified</option>
-            <option value="converted">Converted</option>
-            <option value="lost">Lost</option>
-          </select>
+            onChange={setFilter}
+            extraOptions={ALL_STATUSES_OPTION}
+            placeholder="All Statuses"
+            className="w-56"
+          />
+          <LeadStatusColorsButton />
         </div>
         <button
           type="button"
@@ -602,17 +598,7 @@ export default function LeadsPage() {
           setDraggedLeadId={setDraggedLeadId}
           dragOverStatus={dragOverStatus}
           setDragOverStatus={setDragOverStatus}
-          onMove={async (leadId, newStatus) => {
-            const lead = leads.find((l) => l.id === leadId);
-            if (!lead || lead.status === newStatus) return;
-            setLeads((prev) => prev.map((l) => (l.id === leadId ? { ...l, status: newStatus } : l)));
-            try {
-              await leadsApi.updateLead(leadId, { status: newStatus });
-            } catch (err: any) {
-              setLeads((prev) => prev.map((l) => (l.id === leadId ? { ...l, status: lead.status } : l)));
-              toast.error(err.message || 'Failed to move lead. Please try again.');
-            }
-          }}
+          onMove={moveLead}
         />
       ) : (
       <Card>
@@ -634,6 +620,7 @@ export default function LeadsPage() {
           totalEntries={totalLeads}
           emptyMessage='No leads found. Click "Add Lead" to create one.'
           onRowClick={(lead) => router.push(`/leads/${lead.id}`)}
+          rowBackground={(lead) => leadStatusRowColor(lead.status)}
           actions={(lead) => (
             <div className="flex justify-end gap-3">
               <button onClick={() => router.push(`/leads/${lead.id}`)} className="text-slate-400 hover:text-[var(--primary)]" aria-label="View Details">
@@ -661,11 +648,27 @@ export default function LeadsPage() {
           </span>
         </div>
       )}
+      {visitMove && (
+        <SiteVisitModal
+          lead={{ id: visitMove.lead.id, name: visitMove.lead.name || `${visitMove.lead.firstName || ''} ${visitMove.lead.lastName || ''}`.trim() || `Lead #${visitMove.lead.id}`, projectName: visitMove.lead.projectName, preferredLocation: visitMove.lead.preferredLocation }}
+          agents={assignableUsers}
+          canPickAgent={hasPermission(getStoredUser(), 'users:read')}
+          currentUserId={getStoredUser()?.id}
+          initialStatus={VISIT_LEAD_STATUSES[visitMove.status]}
+          intro={`Log the site visit to move this lead to "${leadStatusLabel(visitMove.status)}". If you cancel, the lead stays where it was.`}
+          onClose={() => setVisitMove(null)}
+          onSaved={() => {
+            const { lead, status } = visitMove;
+            setVisitMove(null);
+            moveLead(lead.id, status, true);
+          }}
+        />
+      )}
     </>
   );
 }
 
-const LEAD_STATUSES = ['new', 'contacted', 'working', 'qualified', 'unqualified', 'converted', 'lost'];
+const ALL_STATUSES_OPTION = [{ value: 'all', label: 'All Statuses' }];
 
 function LeadsKanban({
   leads,
@@ -682,22 +685,27 @@ function LeadsKanban({
   setDraggedLeadId: (id: string | number | null) => void;
   dragOverStatus: string | null;
   setDragOverStatus: (status: string | null) => void;
-  onMove: (leadId: string | number, newStatus: string) => void;
+  onMove: (leadId: string | number, newStatus: string, visitLogged?: boolean) => void;
 }) {
   const router = useRouter();
-  const leadsByStatus = LEAD_STATUSES.reduce((acc, status) => {
+  useLeadStatusColors();
+  // One column per current status, plus any older status some loaded lead
+  // still has (those can be dragged out of, not into).
+  const legacyStatuses: string[] = [...new Set<string>(leads.map((l) => l.status).filter((st) => st && !LEAD_STATUS_VALUES.includes(st)))];
+  const columns: string[] = [...LEAD_STATUS_VALUES, ...legacyStatuses];
+  const leadsByStatus = columns.reduce((acc, status) => {
     acc[status] = leads.filter((l) => l.status === status);
     return acc;
   }, {} as Record<string, any[]>);
 
   return (
     <div className="flex gap-4 overflow-x-auto pb-4">
-      {LEAD_STATUSES.map((status) => (
+      {columns.map((status) => (
         <div
           key={status}
           className="w-72 shrink-0"
           onDragOver={(e) => {
-            if (!canEdit) return;
+            if (!canEdit || !LEAD_STATUS_VALUES.includes(status)) return;
             e.preventDefault();
             setDragOverStatus(status);
           }}
@@ -705,12 +713,12 @@ function LeadsKanban({
           onDrop={(e) => {
             e.preventDefault();
             setDragOverStatus(null);
-            if (canEdit && draggedLeadId != null) onMove(draggedLeadId, status);
+            if (canEdit && draggedLeadId != null && LEAD_STATUS_VALUES.includes(status)) onMove(draggedLeadId, status);
             setDraggedLeadId(null);
           }}
         >
           <div className="mb-3 flex items-center justify-between">
-            <StatusBadge status={status} />
+            <LeadStatusBadge status={status} />
             <span className="text-xs text-slate-500">{leadsByStatus[status]?.length || 0}</span>
           </div>
           <div
@@ -727,6 +735,7 @@ function LeadsKanban({
                   onDragStart={() => canEdit && setDraggedLeadId(lead.id)}
                   onDragEnd={() => setDraggedLeadId(null)}
                   onClick={() => router.push(`/leads/${lead.id}`)}
+                  style={leadStatusRowColor(lead.status) ? { backgroundColor: leadStatusRowColor(lead.status) } : undefined}
                   className={`!border-2 transition-shadow hover:shadow-md ${canEdit ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'} ${
                     draggedLeadId === lead.id ? 'opacity-40' : ''
                   }`}

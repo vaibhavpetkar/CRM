@@ -64,6 +64,11 @@ type DataTableProps<T> = {
   onSelectionChange?: (selectedIds: (string | number)[]) => void;
   actions?: (row: T) => React.ReactNode;
   onRowClick?: (row: T) => void;
+  /**
+   * Optional background for a whole row (any CSS colour, e.g. a var()).
+   * Must be opaque, because frozen (sticky) cells reuse it.
+   */
+  rowBackground?: (row: T) => string | undefined;
   /** Optional full-width expansion panel underneath the row */
   expandedRowContent?: (row: T) => React.ReactNode;
   /** Enable top-right toolbar (density, total entries badge, settings cog) */
@@ -265,6 +270,7 @@ export default function DataTable<T>({
   onSelectionChange,
   actions,
   onRowClick,
+  rowBackground,
   expandedRowContent,
   showToolbar       = false,
   totalEntries,
@@ -894,6 +900,7 @@ export default function DataTable<T>({
                 const isSelected = selected.has(id);
                 const isExpanded = expandedId === id;
                 const isEven     = index % 2 === 0;
+                const rowBg      = isSelected ? 'var(--sidebar-active-bg)' : rowBackground?.(row) || '#fff';
 
                 return (
                   <React.Fragment key={id}>
@@ -906,6 +913,7 @@ export default function DataTable<T>({
                         if (expandedRowContent) toggleExpand(id);
                       }}
                       onContextMenu={(e) => handleContextMenu(e, row, 0)}
+                      style={!isSelected && rowBackground?.(row) ? { backgroundColor: rowBackground(row) } : undefined}
                       className={cn(
                         'transition-colors duration-150',
                         isSelected
@@ -920,7 +928,7 @@ export default function DataTable<T>({
                       {selectable && (
                         <td
                           className={cn('px-4 py-3', isLastFrozenKey('__checkbox') && 'shadow-[2px_0_4px_-2px_rgba(0,0,0,0.15)]')}
-                          style={getStickyStyle('__checkbox', isSelected ? 'var(--sidebar-active-bg)' : '#fff')}
+                          style={getStickyStyle('__checkbox', rowBg)}
                           onClick={(e) => e.stopPropagation()}
                         >
                           <input
@@ -936,7 +944,7 @@ export default function DataTable<T>({
                       {/* Sr. No. */}
                       <td
                         className={cn('px-4 py-3 text-center text-sm text-slate-400', isLastFrozenKey('__srno') && 'shadow-[2px_0_4px_-2px_rgba(0,0,0,0.15)]')}
-                        style={getStickyStyle('__srno', isSelected ? 'var(--sidebar-active-bg)' : '#fff')}
+                        style={getStickyStyle('__srno', rowBg)}
                       >
                         {index + 1}
                       </td>
@@ -953,7 +961,7 @@ export default function DataTable<T>({
                             col.className,
                             isLastFrozenKey(key) && 'shadow-[2px_0_4px_-2px_rgba(0,0,0,0.15)]'
                           )}
-                          style={getStickyStyle(key, isSelected ? 'var(--sidebar-active-bg)' : '#fff')}
+                          style={getStickyStyle(key, rowBg)}
                         >
                           {col.editValue && col.onEdit ? (
                             <EditableCell

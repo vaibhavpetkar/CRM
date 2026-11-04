@@ -9,6 +9,10 @@ import { callsApi, leadsApi } from '@/lib/api';
 // Logs a call a sales person made or took on their own mobile, outside the
 // calling provider, so it still shows in Call Tracking, the activity reports
 // and the lead's timeline.
+//
+// Opened from a lead's own page it gets `lead`: the lead and its number are
+// then fixed (the backend takes the lead's mobile), so only the call details
+// are asked for.
 
 type LeadRef = { id: number; name: string; mobile?: string | null };
 
@@ -20,9 +24,19 @@ const nowLocal = () => {
   return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 };
 
-export default function LogCallModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+export default function LogCallModal({
+  onClose,
+  onSaved,
+  lead,
+}: {
+  onClose: () => void;
+  onSaved: () => void;
+  /** The current lead. When set, the lead and phone number are not asked for. */
+  lead?: LeadRef;
+}) {
   const toast = useToast();
-  const [leadRef, setLeadRef] = useState<LeadRef | null>(null);
+  const fixedLead = !!lead;
+  const [leadRef, setLeadRef] = useState<LeadRef | null>(lead || null);
   const [leadQuery, setLeadQuery] = useState('');
   const [leadResults, setLeadResults] = useState<any[]>([]);
   const [number, setNumber] = useState('');
@@ -60,7 +74,7 @@ export default function LogCallModal({ onClose, onSaved }: { onClose: () => void
     try {
       await callsApi.logManual({
         leadId: leadRef?.id,
-        number: number.trim() || undefined,
+        number: fixedLead ? undefined : number.trim() || undefined,
         direction,
         status,
         durationMinutes: status === 'completed' && minutes ? Number(minutes) : undefined,
@@ -88,6 +102,13 @@ export default function LogCallModal({ onClose, onSaved }: { onClose: () => void
         <p className="mt-2 text-xs text-slate-500">For calls made or received on your own mobile.</p>
 
         <div className="mt-4 space-y-4">
+          {fixedLead ? (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+              <span className="font-medium text-slate-800">{lead!.name}</span>
+              {lead!.mobile && <span className="ml-2 text-slate-500">{lead!.mobile}</span>}
+            </div>
+          ) : (
+          <>
           <div>
             <label className="block text-xs font-medium text-slate-700">Lead</label>
             {leadRef ? (
@@ -123,11 +144,16 @@ export default function LogCallModal({ onClose, onSaved }: { onClose: () => void
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-slate-700">Phone number</label>
-              <input type="tel" value={number} onChange={(e) => setNumber(e.target.value)} placeholder="10-digit mobile" className={field} />
-            </div>
+          </>
+          )}
+
+          <div className={fixedLead ? '' : 'grid grid-cols-2 gap-3'}>
+            {!fixedLead && (
+              <div>
+                <label className="block text-xs font-medium text-slate-700">Phone number</label>
+                <input type="tel" value={number} onChange={(e) => setNumber(e.target.value)} placeholder="10-digit mobile" className={field} />
+              </div>
+            )}
             <div>
               <label className="block text-xs font-medium text-slate-700">When</label>
               <input type="datetime-local" value={calledAt} max={nowLocal()} onChange={(e) => setCalledAt(e.target.value)} className={field} />

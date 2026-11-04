@@ -1018,12 +1018,13 @@ export interface Notification {
 }
 
 export const notificationsApi = {
-  getNotifications: async (params: { unreadOnly?: boolean; limit?: number } = {}) => {
+  getNotifications: async (params: { unreadOnly?: boolean; limit?: number; page?: number } = {}) => {
     const query = new URLSearchParams();
     if (params.unreadOnly) query.append('unreadOnly', 'true');
     if (params.limit) query.append('limit', String(params.limit));
+    if (params.page) query.append('page', String(params.page));
     const qs = query.toString();
-    return request<{ notifications: Notification[]; unreadCount: number; total: number }>(`/notifications${qs ? `?${qs}` : ''}`);
+    return request<{ notifications: Notification[]; unreadCount: number; total: number; page?: number; totalPages?: number }>(`/notifications${qs ? `?${qs}` : ''}`);
   },
   markAsRead: async (id: string | number) => {
     return request<{ message: string; notification: Notification }>(`/notifications/${id}/read`, { method: 'PATCH' });
@@ -1034,6 +1035,27 @@ export const notificationsApi = {
   deleteNotification: async (id: string | number) => {
     return request<{ message: string }>(`/notifications/${id}`, { method: 'DELETE' });
   },
+};
+
+// ─── Preferences API ─────────────────────────────────────────────────────────
+export type PreferenceScope = 'user' | 'company' | 'global';
+export type LeadStatusColorLevels = {
+  global: Record<string, string> | null;
+  company: Record<string, string> | null;
+  user: Record<string, string> | null;
+  canSetCompany: boolean;
+  canSetGlobal: boolean;
+};
+
+export const preferencesApi = {
+  getLeadStatusColors: async () => request<LeadStatusColorLevels>('/preferences/lead-status-colors'),
+  setLeadStatusColors: async (scope: PreferenceScope, colors: Record<string, string>) =>
+    request<{ message: string; colors: Record<string, string> }>('/preferences/lead-status-colors', {
+      method: 'PUT',
+      body: JSON.stringify({ scope, colors }),
+    }),
+  resetLeadStatusColors: async (scope: PreferenceScope) =>
+    request<{ message: string }>(`/preferences/lead-status-colors?scope=${scope}`, { method: 'DELETE' }),
 };
 
 // ─── Expenses API ────────────────────────────────────────────────────────────
@@ -1379,7 +1401,7 @@ export interface CallLogRow {
   error: string | null;
 }
 
-export type SiteVisitStatus = 'scheduled' | 'completed' | 'cancelled' | 'no-show';
+export type SiteVisitStatus = 'scheduled' | 'completed' | 'revisit-done' | 'cancelled' | 'no-show';
 
 export interface SiteVisitRow {
   id: number;

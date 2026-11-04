@@ -1,9 +1,25 @@
 import { body } from 'express-validator';
 
-// Task 2.14: Lead Status is a fixed 7-value enum (also drives the Kanban columns
-// and the "All Statuses" list filter on the frontend — keep these in sync with
-// LEAD_STATUSES in frontend/app/(app)/leads/page.tsx if this list ever changes).
-export const LEAD_STATUSES = ['new', 'contacted', 'working', 'qualified', 'unqualified', 'converted', 'lost'];
+// Lead statuses a user can pick (keep in sync with LEAD_STATUS_OPTIONS in
+// frontend/lib/lead-options.ts). 'new' is the starting status of every lead.
+export const ACTIVE_LEAD_STATUSES = [
+  'new',
+  'cnr', 'call-busy', 'call-later', 'not-interested', 'invalid-number', 'wrong-number',
+  'whatsapp-done', 'details-shared', 'site-visit-done', 'revisit-done', 'ready-possession', 'budget-issue',
+  'loan-problem', 'final-rate-given', 'plan-dropped', 'plan-on-hold', 'postponed', 'nearing-possession',
+];
+
+// The earlier statuses are no longer offered, but leads saved with them stay
+// valid, so editing one of those leads doesn't fail on its untouched status.
+export const LEGACY_LEAD_STATUSES = ['contacted', 'working', 'qualified', 'unqualified', 'converted', 'lost'];
+
+export const LEAD_STATUSES = [...ACTIVE_LEAD_STATUSES, ...LEGACY_LEAD_STATUSES];
+
+// Statuses that mean the lead is closed as not going ahead (reports count these
+// as lost; lead rotation skips them).
+export const DEAD_LEAD_STATUSES = ['lost', 'unqualified', 'not-interested', 'invalid-number', 'wrong-number', 'plan-dropped'];
+// Statuses that mean the buyer is engaged (reports count these as qualified).
+export const ENGAGED_LEAD_STATUSES = ['qualified', 'converted', 'details-shared', 'site-visit-done', 'revisit-done', 'final-rate-given'];
 
 /** "+91 98765-43210", "098765 43210" or 9876543210 -> "9876543210"; anything else is left as typed for the error. */
 export const normalizeIndianMobile = (value: unknown) => {
@@ -26,7 +42,7 @@ export const createLeadValidation = [
     .bail()
     .matches(TEN_DIGITS).withMessage('Mobile number must be 10 digits'),
   body('alternateMobile').optional({ nullable: true, values: 'falsy' }).customSanitizer(normalizeIndianMobile).matches(TEN_DIGITS).withMessage('Alternate mobile must be 10 digits'),
-  body('status').optional().isIn(LEAD_STATUSES).withMessage(`status must be one of: ${LEAD_STATUSES.join(', ')}`),
+  body('status').optional().isIn(LEAD_STATUSES).withMessage(`status must be one of: ${ACTIVE_LEAD_STATUSES.join(', ')}`),
   body('leadSource').optional().isString(),
   body('products').optional().isArray().withMessage('products must be an array'),
   body('products.*.productName').if(body('products').exists()).notEmpty().withMessage('Each product row needs a productName'),
@@ -42,7 +58,7 @@ export const updateLeadValidation = [
   // Edits only tidy the format: older leads from portals may hold numbers that aren't 10 digits.
   body('mobile').optional({ nullable: true }).customSanitizer(normalizeIndianMobile),
   body('alternateMobile').optional({ nullable: true }).customSanitizer(normalizeIndianMobile),
-  body('status').optional().isIn(LEAD_STATUSES).withMessage(`status must be one of: ${LEAD_STATUSES.join(', ')}`),
+  body('status').optional().isIn(LEAD_STATUSES).withMessage(`status must be one of: ${ACTIVE_LEAD_STATUSES.join(', ')}`),
   body('products').optional().isArray().withMessage('products must be an array'),
   body('taxes').optional().isArray().withMessage('taxes must be an array'),
 ];

@@ -4,7 +4,7 @@ import User from '../models/User';
 import LeadProduct from '../models/LeadProduct';
 import LeadTax from '../models/LeadTax';
 import { BaseRepository, ListQueryParams, PaginatedResult } from './BaseRepository';
-import { startOfLocalDay } from '../utils/reportTime';
+import { localDay, startOfLocalDay } from '../utils/reportTime';
 
 const assignedToInclude = {
   model: User,
@@ -35,6 +35,91 @@ const PHONE_FIELDS = ['mobile', 'alternateMobile', 'phone'];
 
 const escapeLike = (s: string) => s.replace(/[\\%_]/g, (c) => `\\${c}`);
 
+
+// ─── Dates typed into the search box ─────────────────────────────────────────
+// "20-11-26", "20/11/2026", "20.11.26", "20-nov-26", "20 Nov 2026", "20-nov"
+// mean that day; "nov-26", "nov 2026", "nov" or "november" mean that month.
+// They filter on the date the lead was created (Indian time, like the date
+// filter), so "rahul 20-nov-26" finds Rahul's lead created that day.
+
+const MONTHS: Record<string, number> = {
+  jan: 1, january: 1, feb: 2, february: 2, mar: 3, march: 3, apr: 4, april: 4, may: 5, jun: 6, june: 6,
+  jul: 7, july: 7, aug: 8, august: 8, sep: 9, sept: 9, september: 9, oct: 10, october: 10,
+  nov: 11, november: 11, dec: 12, december: 12,
+};
+const MONTH_NAMES = Object.keys(MONTHS).sort((a, b) => b.length - a.length).join('|');
+const pad = (n: number) => String(n).padStart(2, '0');
+const fullYear = (y: string | undefined, month: number) => {
+  if (y) return y.length === 2 ? 2000 + Number(y) : Number(y);
+  // No year typed: the most recent one, so in January "dec" means last December.
+  const [cy, cm] = localDay(new Date()).split('-').map(Number);
+  return month > cm ? cy - 1 : cy;
+};
+const isRealDay = (y: number, m: number, d: number) => {
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
+};
+
+type DayRange = { from: string; to: string }; // inclusive YYYY-MM-DD days
+
+const DATE_PATTERNS: { re: RegExp; toRange: (m: RegExpMatchArray) => DayRange | null }[] = [
+  {
+    // 20-11-26, 20/11/2026, 20.11.26 (day first, the Indian way)
+    re: /(?<![\d])(\d{1,2})[-/.](\d{1,2})[-/.](\d{2}|\d{4})(?![\d])/g,
+    toRange: (m) => {
+      const d = Number(m[1]);
+      const mo = Number(m[2]);
+      const y = fullYear(m[3], mo);
+      if (!isRealDay(y, mo, d)) return null;
+      const day = `${y}-${pad(mo)}-${pad(d)}`;
+      return { from: day, to: day };
+    },
+  },
+  {
+    // 20-nov-26, 20 nov 2026, 20/november, 20-nov
+    re: new RegExp(`(?<![\\d\\w])(\\d{1,2})[-/. ]?(${MONTH_NAMES})(?:[-/., ]+(\\d{4}|\\d{2}))?(?![\\w])`, 'gi'),
+    toRange: (m) => {
+      const d = Number(m[1]);
+      const mo = MONTHS[m[2].toLowerCase()];
+      const y = fullYear(m[3], mo);
+      if (!isRealDay(y, mo, d)) return null;
+      const day = `${y}-${pad(mo)}-${pad(d)}`;
+      return { from: day, to: day };
+    },
+  },
+  {
+    // nov-26, nov 2026, nov, november (a whole month)
+    re: new RegExp(`(?<![\\w])(${MONTH_NAMES})(?:[-/., ]+(\\d{4}|\\d{2}))?(?![\\w])`, 'gi'),
+    toRange: (m) => {
+      const mo = MONTHS[m[1].toLowerCase()];
+      const y = fullYear(m[2], mo);
+      const last = new Date(Date.UTC(y, mo, 0)).getUTCDate();
+      return { from: `${y}-${pad(mo)}-01`, to: `${y}-${pad(mo)}-${pad(last)}` };
+    },
+  },
+];
+
+/** Pulls dates out of the search text; returns the rest of the text and the day range they cover. */
+export const extractSearchDates = (text: string): { rest: string; range: DayRange | null } => {
+  const ranges: DayRange[] = [];
+  let rest = text;
+  for (const { re, toRange } of DATE_PATTERNS) {
+    rest = rest.replace(re, (...args) => {
+      const r = toRange(args as unknown as RegExpMatchArray);
+      if (!r) return args[0];
+      ranges.push(r);
+      return ' ';
+    });
+  }
+  // A lone "to" / "-" between two dates ("1-11-26 to 20-11-26") is not a word to search for.
+  if (ranges.length) rest = rest.replace(/(^|\s)(to|till|until|and|-)(?=\s|$)/gi, ' ');
+  if (!ranges.length) return { rest: text, range: null };
+  // Several dates: everything from the earliest to the latest.
+  const from = ranges.map((r) => r.from).sort()[0];
+  const to = ranges.map((r) => r.to).sort().slice(-1)[0];
+  return { rest, range: { from, to } };
+};
+
 /**
  * Turns the search box text into a where clause. Every word has to match
  * somewhere, so "rahul baner 2bhk" finds Rahul's 2 BHK enquiry in Baner.
@@ -45,6 +130,13 @@ export const buildLeadSearch = (raw: string): WhereOptions | null => {
   let text = raw.trim();
   if (!text) return null;
   const and: any[] = [];
+
+  // Dates first: "20-11-26" would otherwise look like a phone number.
+  const dates = extractSearchDates(text);
+  if (dates.range) {
+    and.push({ createdAt: { [Op.gte]: startOfLocalDay(dates.range.from), [Op.lt]: startOfLocalDay(dates.range.to, true) } });
+    text = dates.rest;
+  }
 
   // "2 bhk" / "2bhk" / "1rk" -> configuration filter, then drop it from the text.
   text = text.replace(/\b(\d+(?:\.\d)?)\s*(bhk|rk)\b/gi, (_m, n, kind) => {

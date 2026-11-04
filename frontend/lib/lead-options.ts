@@ -138,3 +138,127 @@ export const budgetRange = (min?: number | string | null, max?: number | string 
   if (b) return `Up to ${b}`;
   return '';
 };
+
+// ─── Lead statuses ────────────────────────────────────────────────────────────
+
+// Lead statuses a user can pick, in the order the pickers list them. `value`
+// is what is stored on the lead (keep in sync with ACTIVE_LEAD_STATUSES in
+// backend/src/validations/leadValidation.ts), `tone` picks its colour.
+// 'new' is the starting status every lead gets.
+export const LEAD_STATUS_TONES = {
+  blue: '#3b82f6',
+  amber: '#f59e0b',
+  indigo: '#6366f1',
+  green: '#22c55e',
+  slate: '#94a3b8',
+  teal: '#14b8a6',
+  red: '#ef4444',
+  orange: '#f97316',
+  yellow: '#eab308',
+  rose: '#f43f5e',
+  lime: '#84cc16',
+  cyan: '#06b6d4',
+  purple: '#a855f7',
+  sky: '#0ea5e9',
+} as const;
+
+export type LeadStatusTone = keyof typeof LEAD_STATUS_TONES;
+
+export const LEAD_STATUS_OPTIONS: { value: string; label: string; tone: LeadStatusTone }[] = [
+  { value: 'new', label: 'New', tone: 'blue' },
+  { value: 'cnr', label: 'CNR (Call Not Received)', tone: 'orange' },
+  { value: 'call-busy', label: 'Call Busy', tone: 'orange' },
+  { value: 'call-later', label: 'Call Later', tone: 'yellow' },
+  { value: 'not-interested', label: 'Not Interested', tone: 'rose' },
+  { value: 'invalid-number', label: 'Invalid Number', tone: 'slate' },
+  { value: 'wrong-number', label: 'Wrong Number', tone: 'slate' },
+  { value: 'whatsapp-done', label: 'WhatsApp Done', tone: 'lime' },
+  { value: 'details-shared', label: 'Details Shared', tone: 'cyan' },
+  { value: 'site-visit-done', label: 'Site Visit Done', tone: 'teal' },
+  { value: 'revisit-done', label: 'Revisit Done', tone: 'purple' },
+  { value: 'ready-possession', label: 'Looking for Ready Possession', tone: 'sky' },
+  { value: 'budget-issue', label: 'Budget Issue', tone: 'rose' },
+  { value: 'loan-problem', label: 'Loan Problem', tone: 'rose' },
+  { value: 'final-rate-given', label: 'Final Rate Given', tone: 'green' },
+  { value: 'plan-dropped', label: 'Plan Dropped', tone: 'red' },
+  { value: 'plan-on-hold', label: 'Plan is on Hold', tone: 'yellow' },
+  { value: 'postponed', label: 'Postponed', tone: 'yellow' },
+  { value: 'nearing-possession', label: 'Looking for Nearing Possession', tone: 'sky' },
+];
+
+export const LEAD_STATUS_VALUES = LEAD_STATUS_OPTIONS.map((o) => o.value);
+
+// Lead statuses that mean a site visit just happened: saving a lead into one
+// first asks for the visit (it is logged on the Site Visits page), and
+// cancelling that leaves the lead unsaved. Maps to the visit's own status.
+export const VISIT_LEAD_STATUSES: Record<string, 'completed' | 'revisit-done'> = {
+  'site-visit-done': 'completed',
+  'revisit-done': 'revisit-done',
+};
+
+// Earlier statuses, no longer offered in any picker. Leads that still carry
+// one keep showing its name and colour until someone changes it.
+export const LEGACY_LEAD_STATUS_OPTIONS: { value: string; label: string; tone: LeadStatusTone }[] = [
+  { value: 'contacted', label: 'Contacted', tone: 'amber' },
+  { value: 'working', label: 'Working / In Progress', tone: 'indigo' },
+  { value: 'qualified', label: 'Qualified', tone: 'green' },
+  { value: 'unqualified', label: 'Unqualified / Disqualified', tone: 'slate' },
+  { value: 'converted', label: 'Converted', tone: 'teal' },
+  { value: 'lost', label: 'Lost', tone: 'red' },
+];
+
+const STATUS_BY_VALUE = Object.fromEntries([...LEAD_STATUS_OPTIONS, ...LEGACY_LEAD_STATUS_OPTIONS].map((o) => [o.value, o]));
+
+/** "cnr" -> "CNR (Call Not Received)"; unknown -> Title Case. */
+export const leadStatusLabel = (status?: string | null) => {
+  const key = String(status || '').toLowerCase();
+  return STATUS_BY_VALUE[key]?.label || key.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) || '—';
+};
+
+// Colour choices layered over the built-in tones: the super admin's default
+// for all companies, then the company default, then the user's own (see
+// components/leads/lead-status-colors.tsx, which loads and saves them).
+let colorOverrides: Record<string, string> = {};
+let colorVersion = 0;
+const colorListeners = new Set<() => void>();
+
+export const setLeadStatusColorOverrides = (colors: Record<string, string>) => {
+  colorOverrides = { ...colors };
+  colorVersion += 1;
+  colorListeners.forEach((fn) => fn());
+};
+export const subscribeLeadStatusColors = (fn: () => void) => {
+  colorListeners.add(fn);
+  return () => {
+    colorListeners.delete(fn);
+  };
+};
+export const leadStatusColorVersion = () => colorVersion;
+
+// Site visit statuses share the colour settings, keyed "visit:<status>".
+export const VISIT_STATUS_COLOR_OPTIONS: { value: string; label: string; tone: LeadStatusTone }[] = [
+  { value: 'visit:scheduled', label: 'Scheduled', tone: 'blue' },
+  { value: 'visit:completed', label: 'Site Visit Done', tone: 'green' },
+  { value: 'visit:revisit-done', label: 'Revisit Done', tone: 'purple' },
+  { value: 'visit:cancelled', label: 'Cancelled', tone: 'slate' },
+  { value: 'visit:no-show', label: 'No show', tone: 'orange' },
+];
+const VISIT_BY_KEY = Object.fromEntries(VISIT_STATUS_COLOR_OPTIONS.map((o) => [o.value, o]));
+
+/** Built-in colour (hex) of a status, ignoring anyone's choices. */
+export const defaultLeadStatusColor = (status?: string | null) => {
+  const key = String(status || '').toLowerCase();
+  const tone = (STATUS_BY_VALUE[key] || VISIT_BY_KEY[key])?.tone;
+  return tone ? LEAD_STATUS_TONES[tone] : '#94a3b8';
+};
+
+/** Colour (hex) of a status, for dots, badges and charts. */
+export const leadStatusColor = (status?: string | null) =>
+  colorOverrides[String(status || '').toLowerCase()] || defaultLeadStatusColor(status);
+
+/** Background for a lead's row or card, by its status: a pale tint of its colour. */
+export const leadStatusRowColor = (status?: string | null) => {
+  const key = String(status || '').toLowerCase();
+  if (!STATUS_BY_VALUE[key] && !VISIT_BY_KEY[key] && !colorOverrides[key]) return undefined;
+  return `color-mix(in srgb, ${leadStatusColor(key)} var(--lead-row-mix), var(--lead-row-base))`;
+};

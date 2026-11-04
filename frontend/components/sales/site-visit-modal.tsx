@@ -9,20 +9,23 @@ import { leadsApi, salesApi, SiteVisitRow, SiteVisitStatus } from '@/lib/api';
 // Schedule a site visit for a lead, log one that already happened, or edit
 // one (status, feedback, who takes it).
 
+export type SiteVisitInput = {
+  scheduledAt: string;
+  status: SiteVisitStatus;
+  projectName: string;
+  location: string;
+  notes: string;
+  userId?: number;
+};
+
 type LeadRef = { id: number; name: string; projectName?: string | null; preferredLocation?: string | null };
 
 export const VISIT_STATUS_LABEL: Record<SiteVisitStatus, string> = {
   scheduled: 'Scheduled',
-  completed: 'Visit done',
+  completed: 'Site Visit Done',
+  'revisit-done': 'Revisit Done',
   cancelled: 'Cancelled',
   'no-show': 'No show',
-};
-
-export const VISIT_STATUS_CLASS: Record<SiteVisitStatus, string> = {
-  scheduled: 'bg-blue-50 text-blue-700',
-  completed: 'bg-emerald-50 text-emerald-700',
-  cancelled: 'bg-slate-100 text-slate-500',
-  'no-show': 'bg-orange-50 text-orange-700',
 };
 
 const toLocalInput = (iso?: string | null) => {
@@ -42,6 +45,9 @@ export default function SiteVisitModal({
   currentUserId,
   onClose,
   onSaved,
+  initialStatus,
+  deferred,
+  intro,
 }: {
   lead?: LeadRef | null; // fixed lead (lead page); otherwise searched here
   visit?: SiteVisitRow | null; // editing
@@ -50,13 +56,23 @@ export default function SiteVisitModal({
   currentUserId?: number | null;
   onClose: () => void;
   onSaved: (visit: SiteVisitRow) => void;
+  /** Status the form starts on (a done status also starts the time at now). */
+  initialStatus?: SiteVisitStatus;
+  /**
+   * For a lead that isn't saved yet: the form hands its details here instead
+   * of creating the visit, and the caller creates it once the lead exists.
+   */
+  deferred?: (payload: SiteVisitInput) => Promise<void>;
+  /** A line shown under the title, e.g. why the popup opened. */
+  intro?: string;
 }) {
   const toast = useToast();
   const [leadRef, setLeadRef] = useState<LeadRef | null>(lead || (visit?.leadId ? { id: visit.leadId, name: visit.leadName || `Lead #${visit.leadId}` } : null));
   const [leadQuery, setLeadQuery] = useState('');
   const [leadResults, setLeadResults] = useState<any[]>([]);
-  const [scheduledAt, setScheduledAt] = useState(toLocalInput(visit?.scheduledAt));
-  const [status, setStatus] = useState<SiteVisitStatus>(visit?.status || 'scheduled');
+  const startsDone = !visit && (initialStatus === 'completed' || initialStatus === 'revisit-done');
+  const [scheduledAt, setScheduledAt] = useState(startsDone ? toLocalInput(new Date().toISOString()) : toLocalInput(visit?.scheduledAt));
+  const [status, setStatus] = useState<SiteVisitStatus>(visit?.status || initialStatus || 'scheduled');
   const [userId, setUserId] = useState<string>(String(visit?.userId || currentUserId || ''));
   const [projectName, setProjectName] = useState(visit?.projectName || lead?.projectName || '');
   const [location, setLocation] = useState(visit?.location || lead?.preferredLocation || '');
@@ -82,7 +98,7 @@ export default function SiteVisitModal({
     if (!scheduledAt) return toast.warning('Pick the visit date and time.');
     setSaving(true);
     try {
-      const payload = {
+      const payload: SiteVisitInput = {
         scheduledAt: new Date(scheduledAt).toISOString(),
         status,
         projectName,
@@ -90,8 +106,12 @@ export default function SiteVisitModal({
         notes,
         ...(canPickAgent && userId ? { userId: Number(userId) } : {}),
       };
+      if (deferred) {
+        await deferred(payload);
+        return;
+      }
       const saved = visit ? await salesApi.updateVisit(visit.id, payload) : await salesApi.createVisit({ ...payload, leadId: leadRef.id });
-      toast.success(visit ? 'Site visit updated.' : status === 'completed' ? 'Site visit logged.' : 'Site visit scheduled.');
+      toast.success(visit ? 'Site visit updated.' : status === 'completed' || status === 'revisit-done' ? 'Site visit logged.' : 'Site visit scheduled.');
       onSaved(saved);
     } catch (err: any) {
       toast.error(err.message || 'Could not save the site visit.');
@@ -105,10 +125,11 @@ export default function SiteVisitModal({
       <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
           <h3 className="text-lg font-bold text-slate-900">{visit ? 'Edit site visit' : 'Site visit'}</h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600" aria-label="Close">
+          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600" aria-label="Close">
             <XMarkIcon className="h-5 w-5" />
           </button>
         </div>
+        {intro && <p className="mt-3 rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-700">{intro}</p>}
 
         <div className="mt-4 space-y-4">
           <div>
@@ -194,8 +215,8 @@ export default function SiteVisitModal({
         </div>
 
         <div className="mt-6 flex justify-end gap-2 border-t border-slate-100 pt-4">
-          <Button variant="secondary" size="sm" onClick={onClose}>Cancel</Button>
-          <Button size="sm" onClick={save} disabled={saving}>{saving ? 'Saving...' : visit ? 'Save' : status === 'completed' ? 'Log visit' : 'Schedule visit'}</Button>
+          <Button type="button" variant="secondary" size="sm" onClick={onClose}>Cancel</Button>
+          <Button type="button" size="sm" onClick={save} disabled={saving}>{saving ? 'Saving...' : visit ? 'Save' : status === 'completed' || status === 'revisit-done' ? 'Log visit' : 'Schedule visit'}</Button>
         </div>
       </div>
     </div>

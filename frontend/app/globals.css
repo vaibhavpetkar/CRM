@@ -280,6 +280,30 @@ body {
   }
 }
 
+/* ─── Lead status colours ────────────────────────────────────────────────────
+   Rows and Kanban cards are tinted with a status's colour (built-in tone or the
+   user's / company's choice) mixed into the card background; see
+   leadStatusRowColor in lib/lead-options. The result is opaque on purpose,
+   because frozen (sticky) cells reuse the same colour.
+   .lead-status-badge colours a status pill from its --tone. */
+:root {
+  --lead-row-base: #ffffff;
+  --lead-row-mix: 12%;
+}
+.dark {
+  --lead-row-base: #111a2b;
+  --lead-row-mix: 18%;
+}
+.lead-status-badge {
+  background-color: color-mix(in srgb, var(--tone) 15%, transparent);
+  color: color-mix(in srgb, var(--tone) 68%, #000000);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone) 32%, transparent);
+}
+.dark .lead-status-badge {
+  background-color: color-mix(in srgb, var(--tone) 22%, transparent);
+  color: color-mix(in srgb, var(--tone) 55%, #ffffff);
+}
+
 /* Task 3.1: Print Format — elements marked .no-print (sidebar, topbar, action
    buttons) are hidden when printing/exporting to PDF via the browser dialog. */
 @media print {
