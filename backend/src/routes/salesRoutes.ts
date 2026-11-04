@@ -3,7 +3,7 @@ import { protect, authorize } from '../middleware/authMiddleware';
 import * as salesController from '../controllers/salesController';
 
 // Real-estate sales team: calls and site visits per sales person, lead
-// sources, call tracking and rotational calling. Managers (users:read) see
+// sources, call tracking and rotational calling. People with sales:team see
 // the whole team; everyone else sees their own numbers (see salesService).
 const router = Router();
 

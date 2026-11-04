@@ -5,7 +5,7 @@ import { protect, authorize } from '../middleware/authMiddleware';
 const router = Router();
 
 // IMPORTANT: /stats and /presence must come before /:id
-router.get('/presence', protect, authorize('users:read'), teamController.getTeamPresence);
+router.get('/presence', protect, authorize('users:read', 'sales:team'), teamController.getTeamPresence);
 router.get('/stats', protect, authorize('users:read'), teamController.getTeamStats);
 
 router.get('/', protect, authorize('users:read'), teamController.getTeamMembers);

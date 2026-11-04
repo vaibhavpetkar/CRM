@@ -7,7 +7,7 @@ import logger from '../utils/logger';
 
 // Live team status plumbing. Anyone with the CRM open holds a socket, which
 // joins `company:<id>`; that's how we know who is online, across every server
-// instance thanks to the Redis adapter. Managers (users:read) also join
+// instance thanks to the Redis adapter. Managers (users:read or sales:team) also join
 // `presence:<id>` and get a `presence:changed` nudge whenever someone comes
 // online, goes offline or a call changes, then re-read GET /api/team/presence.
 
@@ -25,7 +25,7 @@ const canWatch = (user: any) => {
   } catch {
     perms = [];
   }
-  return perms.includes('*') || perms.includes('users:read');
+  return perms.includes('*') || perms.includes('users:read') || perms.includes('sales:team');
 };
 
 // Calls and connections can change many times a second; one nudge per

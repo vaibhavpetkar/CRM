@@ -3,6 +3,8 @@
 import { PhoneIcon } from '@heroicons/react/24/solid';
 import { cn } from '@/lib/utils';
 import { useCalls, type CallTarget } from './call-context';
+import { getStoredUser } from '@/lib/api';
+import { hasPermission } from '@/lib/permissions';
 
 // Same rule as the backend (utils/indianPhone.ts): a 10-digit Indian number
 // after dropping +91 / 91 / 0091 / a trunk 0.
@@ -22,7 +24,7 @@ export const isCallableIndianNumber = (value?: string | null) => {
 /** A green phone icon next to a saved phone number. Clicking it opens the calling panel and dials. */
 export default function CallButton({ className, ...target }: CallTarget & { className?: string }) {
   const { startCall, busy } = useCalls();
-  if (!isCallableIndianNumber(target.number)) return null;
+  if (!isCallableIndianNumber(target.number) || !hasPermission(getStoredUser(), 'calls:make')) return null;
   return (
     <button
       type="button"

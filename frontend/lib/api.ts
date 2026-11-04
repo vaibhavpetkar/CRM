@@ -1343,15 +1343,50 @@ export interface SalesAgentActivity {
   visitsCompleted: number;
   visitsCancelled: number;
   leadsAssigned: number;
+  longestCallSeconds: number;
+  connectRate: number;
+  followUpsDone: number;
+  statusChanges: number;
+  conversions: number;
+  leadsWorked: number;
+  leadsCalled: number;
+  activeDays: number;
+  avgCallsPerDay: number;
+  firstActivityAt: string | null;
+  lastActivityAt: string | null;
+  followUpsOverdue: number;
+  followUpsDueToday: number;
+  callsToday: number;
+  connectedToday: number;
+  leadsWorkedToday: number;
 }
 
 export interface SalesActivity {
   from: string;
   to: string;
+  days: number;
   canSeeTeam: boolean;
-  totals: { calls: number; incoming: number; connected: number; missed: number; talkSeconds: number; visitsScheduled: number; visitsCompleted: number; leadsAssigned: number; onCall: number; online: number };
+  totals: {
+    calls: number;
+    incoming: number;
+    connected: number;
+    missed: number;
+    talkSeconds: number;
+    avgTalkSeconds: number;
+    visitsScheduled: number;
+    visitsCompleted: number;
+    leadsAssigned: number;
+    leadsWorked: number;
+    followUpsDone: number;
+    followUpsOverdue: number;
+    statusChanges: number;
+    conversions: number;
+    callsToday: number;
+    onCall: number;
+    online: number;
+  };
   agents: SalesAgentActivity[];
-  daily: { date: string; calls: number; connected: number; visits: number }[];
+  daily: { date: string; calls: number; connected: number; visits: number; leadsWorked: number }[];
 }
 
 export interface LeadSourceRow {
@@ -1446,7 +1481,7 @@ export const salesApi = {
     request<LeadSourceReport>(`/sales/lead-sources${qs(params)}`),
   getCallLog: async (params: { from?: string; to?: string; userId?: number | string; status?: string; direction?: string; number?: string; page?: number; limit?: number } = {}) =>
     request<{ from: string; to: string; total: number; page: number; pages: number; calls: CallLogRow[] }>(`/sales/calls${qs(params)}`),
-  listVisits: async (params: { from?: string; to?: string; userId?: number | string; status?: string; leadId?: number | string } = {}) =>
+  listVisits: async (params: { from?: string; to?: string; userId?: number | string; status?: string; leadId?: number | string; limit?: number } = {}) =>
     request<{ visits: SiteVisitRow[] }>(`/sales/visits${qs(params)}`),
   createVisit: async (payload: { leadId: number | string; userId?: number | string | null; scheduledAt: string; status?: SiteVisitStatus; projectName?: string; location?: string; notes?: string }) =>
     request<SiteVisitRow>('/sales/visits', { method: 'POST', body: JSON.stringify(payload) }),

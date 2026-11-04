@@ -1,6 +1,11 @@
 // Central catalog of all permission strings recognized by `authorize()`.
 // Keep this in sync with any `authorize('module:action')` calls in the routes.
 // Frontend fetches this via GET /api/roles/permissions to render the role editor.
+// Groups tied to a switched-off app module (DISABLED_MODULES) are left out of
+// the editor, so it only lists the pages and forms this build actually has.
+// Roles keep any permission they already hold for those modules.
+
+import { isModuleEnabled, ModuleKey } from '../middleware/moduleGate';
 
 export interface PermissionDef {
   key: string; // e.g. "leads:create"
@@ -9,7 +14,7 @@ export interface PermissionDef {
   label: string; // human readable
 }
 
-const modules: { module: string; label: string; actions: { action: string; label: string }[] }[] = [
+const modules: { module: string; label: string; appModule?: ModuleKey; actions: { action: string; label: string }[] }[] = [
   {
     module: 'leads',
     label: 'Leads',
@@ -18,10 +23,40 @@ const modules: { module: string; label: string; actions: { action: string; label
       { action: 'create', label: 'Create leads' },
       { action: 'update', label: 'Edit leads' },
       { action: 'delete', label: 'Delete leads' },
+      { action: 'import', label: 'Import leads from a file' },
+      { action: 'export', label: 'Export leads' },
+    ],
+  },
+  {
+    module: 'site_visits',
+    label: 'Site visits',
+    actions: [
+      { action: 'read', label: 'View site visits' },
+      { action: 'create', label: 'Log / schedule site visits' },
+      { action: 'update', label: 'Edit site visits and mark them done' },
+      { action: 'delete', label: 'Delete site visits' },
+      { action: 'export', label: 'Export site visits' },
+    ],
+  },
+  {
+    module: 'calls',
+    label: 'Calling',
+    actions: [
+      { action: 'make', label: 'Click-to-call and log calls on leads' },
+      { action: 'recordings', label: 'Listen to call recordings' },
+    ],
+  },
+  {
+    module: 'sales',
+    label: 'Sales activity & call tracking',
+    actions: [
+      { action: 'team', label: 'See the whole team (activity, call log, site visits, live calls); without it people see only their own' },
+      { action: 'export', label: 'Export sales performance' },
     ],
   },
   {
     module: 'deals',
+    appModule: 'deals',
     label: 'Deals',
     actions: [
       { action: 'read', label: 'View deals' },
@@ -32,6 +67,7 @@ const modules: { module: string; label: string; actions: { action: string; label
   },
   {
     module: 'contacts',
+    appModule: 'contacts',
     label: 'Contacts',
     actions: [
       { action: 'read', label: 'View contacts' },
@@ -62,26 +98,31 @@ const modules: { module: string; label: string; actions: { action: string; label
   },
   {
     module: 'quotes',
+    appModule: 'quotes',
     label: 'Quotes',
     actions: [{ action: 'view', label: 'View & manage quotes' }],
   },
   {
     module: 'invoices',
+    appModule: 'invoices',
     label: 'Invoices',
     actions: [{ action: 'view', label: 'View & manage invoices' }],
   },
   {
     module: 'meetings',
+    appModule: 'meetings',
     label: 'Meetings',
     actions: [{ action: 'view', label: 'View & manage meetings' }],
   },
   {
     module: 'tasks',
+    appModule: 'tasks',
     label: 'Tasks',
     actions: [{ action: 'view', label: 'View & manage tasks' }],
   },
   {
     module: 'marketing',
+    appModule: 'marketing',
     label: 'Marketing (campaigns & templates)',
     actions: [{ action: 'view', label: 'View & manage marketing' }],
   },
@@ -92,6 +133,7 @@ const modules: { module: string; label: string; actions: { action: string; label
   },
   {
     module: 'expenses',
+    appModule: 'finance',
     label: 'Expenses',
     actions: [
       { action: 'read', label: 'View expenses' },
@@ -112,6 +154,7 @@ const modules: { module: string; label: string; actions: { action: string; label
   },
   {
     module: 'items',
+    appModule: 'inventory',
     label: 'Items',
     actions: [
       { action: 'read', label: 'View items' },
@@ -122,6 +165,7 @@ const modules: { module: string; label: string; actions: { action: string; label
   },
   {
     module: 'item_categories',
+    appModule: 'inventory',
     label: 'Item Categories',
     actions: [
       { action: 'read', label: 'View item categories' },
@@ -132,6 +176,7 @@ const modules: { module: string; label: string; actions: { action: string; label
   },
   {
     module: 'taxes',
+    appModule: 'inventory',
     label: 'Tax Master',
     actions: [
       { action: 'read', label: 'View taxes' },
@@ -171,7 +216,7 @@ export const PERMISSION_CATALOG: PermissionDef[] = modules.flatMap((m) =>
   }))
 );
 
-export const PERMISSION_GROUPS = modules.map((m) => ({
+export const PERMISSION_GROUPS = modules.filter((m) => !m.appModule || isModuleEnabled(m.appModule)).map((m) => ({
   module: m.module,
   label: m.label,
   permissions: m.actions.map((a) => ({ key: `${m.module}:${a.action}`, label: a.label })),
@@ -187,7 +232,10 @@ export const DEFAULT_ROLES: { name: string; description: string; permissions: st
     name: 'Sales Manager',
     description: 'Manage the sales team, leads, deals, contacts, and reports',
     permissions: [
-      'leads:read', 'leads:create', 'leads:update', 'leads:delete',
+      'leads:read', 'leads:create', 'leads:update', 'leads:delete', 'leads:import', 'leads:export',
+      'site_visits:read', 'site_visits:create', 'site_visits:update', 'site_visits:delete', 'site_visits:export',
+      'calls:make', 'calls:recordings',
+      'sales:team', 'sales:export',
       'deals:read', 'deals:create', 'deals:update', 'deals:delete',
       'contacts:read', 'contacts:create', 'contacts:update', 'contacts:delete',
       'quotes:view', 'invoices:view', 'tasks:view', 'meetings:view',
@@ -205,6 +253,8 @@ export const DEFAULT_ROLES: { name: string; description: string; permissions: st
     description: 'Manage assigned leads, deals, and contacts',
     permissions: [
       'leads:read', 'leads:create', 'leads:update',
+      'site_visits:read', 'site_visits:create', 'site_visits:update',
+      'calls:make', 'calls:recordings',
       'deals:read', 'deals:create', 'deals:update',
       'contacts:read', 'contacts:create', 'contacts:update',
       'quotes:view', 'tasks:view', 'meetings:view',
@@ -217,4 +267,17 @@ export const DEFAULT_ROLES: { name: string; description: string; permissions: st
     description: 'Manage marketing campaigns, templates, and analytics',
     permissions: ['marketing:view', 'reports:view', 'contacts:read'],
   },
+];
+
+/**
+ * Permissions added after roles were already in use. Each runs once per
+ * database (see runDataMigrations): every role holding `ifHas` also gets
+ * `grant`, so people keep what they could do before the new permission
+ * existed. Later changes in the role editor are never overwritten.
+ */
+export const PERMISSION_GRANTS: { name: string; ifHas: string; grant: string[] }[] = [
+  { name: 'perm-2026-11-leads-import', ifHas: 'leads:create', grant: ['leads:import'] },
+  { name: 'perm-2026-11-leads-read', ifHas: 'leads:read', grant: ['leads:export', 'site_visits:read', 'site_visits:export', 'calls:make', 'calls:recordings'] },
+  { name: 'perm-2026-11-leads-update', ifHas: 'leads:update', grant: ['site_visits:create', 'site_visits:update', 'site_visits:delete'] },
+  { name: 'perm-2026-11-team', ifHas: 'users:read', grant: ['sales:team', 'sales:export'] },
 ];

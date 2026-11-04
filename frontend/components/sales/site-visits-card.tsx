@@ -16,8 +16,9 @@ export default function SiteVisitsCard({ lead }: { lead: { id: number; name: str
   const toast = useToast();
   useLeadStatusColors();
   const user = getStoredUser();
-  const canEdit = hasPermission(user, 'leads:update');
-  const canPickAgent = hasPermission(user, 'users:read');
+  const canCreate = hasPermission(user, 'site_visits:create');
+  const canEdit = hasPermission(user, 'site_visits:update');
+  const canPickAgent = hasPermission(user, 'sales:team');
   const [visits, setVisits] = useState<SiteVisitRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [agents, setAgents] = useState<{ id: number; name: string }[]>([]);
@@ -53,7 +54,7 @@ export default function SiteVisitsCard({ lead }: { lead: { id: number; name: str
     <Card
       title="Site visits"
       action={
-        canEdit && (
+        canCreate && (
           <Button size="sm" onClick={() => setEditing('new')}>
             <PlusIcon className="h-4 w-4" /> Schedule visit
           </Button>
