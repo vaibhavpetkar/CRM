@@ -14,7 +14,6 @@ import {
   MegaphoneIcon,
   CalendarDaysIcon,
   ChevronDownIcon,
-  BriefcaseIcon,
   HomeModernIcon,
   BuildingOffice2Icon,
   MapPinIcon,
@@ -26,7 +25,7 @@ import { useToast } from '@/components/ui/toast';
 import { useKeyboardShortcuts } from '@/lib/hooks/useKeyboardShortcuts';
 import { leadsApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
-import { CONFIGURATION_OPTIONS, DESIGNATION_OPTIONS, LEAD_SOURCE_OPTIONS, PROPERTY_TYPE_OPTIONS } from '@/lib/lead-options';
+import { CONFIGURATION_OPTIONS, LEAD_SOURCE_OPTIONS, PROPERTY_TYPE_OPTIONS } from '@/lib/lead-options';
 
 // Today as YYYY-MM-DD in the browser's time zone.
 const todayStr = () => {
@@ -240,14 +239,6 @@ export default function NewLeadPage() {
         </Field>
         <Field label="Telephone">
           <IconInput icon={<PhoneIcon />} type="tel" placeholder="Landline (optional)" {...register('phone')} />
-        </Field>
-        <Field label="Designation">
-          <IconSelect icon={<BriefcaseIcon />} {...register('jobTitle')}>
-            <option value="">— Select —</option>
-            {DESIGNATION_OPTIONS.map((o) => (
-              <option key={o} value={o}>{o}</option>
-            ))}
-          </IconSelect>
         </Field>
         <Field label="Lead Source">
           <IconSelect icon={<MegaphoneIcon />} {...register('leadSource')}>

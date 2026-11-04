@@ -11,7 +11,7 @@ import ImportExportButtons from '@/components/ui/import-export-buttons';
 import { LEAD_FIELDS } from '@/lib/import-export/field-configs';
 import { formatCurrency } from '@/lib/utils';
 import { leadsApi, usersApi, salesApi, getStoredUser, PresenceState } from '@/lib/api';
-import { TERRITORY_OPTIONS, LEAD_SOURCE_OPTIONS, CONFIGURATION_OPTIONS, PROPERTY_TYPE_OPTIONS, BUDGET_OPTIONS, leadSourceLabel, budgetRange } from '@/lib/lead-options';
+import { LEAD_SOURCE_OPTIONS, leadStatusRowColor, CONFIGURATION_OPTIONS, PROPERTY_TYPE_OPTIONS, BUDGET_OPTIONS, leadSourceLabel, budgetRange } from '@/lib/lead-options';
 import { AgentStatusDot } from '@/components/sales/agent-status';
 import { hasPermission } from '@/lib/permissions';
 import { useKeyboardShortcuts } from '@/lib/hooks/useKeyboardShortcuts';
@@ -27,7 +27,6 @@ export default function LeadsPage() {
   const toast = useToast();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
-  const [territoryFilter, setTerritoryFilter] = useState('all');
   // Real-estate filters ("More filters" panel). 'all' / '' means no filter.
   const [sourceFilter, setSourceFilter] = useState('all');
   const [assigneeFilter, setAssigneeFilter] = useState('all');
@@ -159,7 +158,6 @@ export default function LeadsPage() {
     return {
       search: debouncedSearch,
       status: filter,
-      territory: territoryFilter,
       leadSource: sourceFilter,
       assignedToId: assigneeFilter,
       configuration: configFilter.join(','),
@@ -170,7 +168,7 @@ export default function LeadsPage() {
       dateFrom,
       dateTo,
     };
-  }, [debouncedSearch, filter, territoryFilter, sourceFilter, assigneeFilter, configFilter, propertyTypeFilter, debouncedLocation, budgetFilter, dateFrom, dateTo]);
+  }, [debouncedSearch, filter, sourceFilter, assigneeFilter, configFilter, propertyTypeFilter, debouncedLocation, budgetFilter, dateFrom, dateTo]);
 
   // Ignores answers to an older filter once the filters have changed.
   const requestSeq = useRef(0);
@@ -371,12 +369,6 @@ export default function LeadsPage() {
       accessor: (lead) => <span className="text-slate-600">{lead.email || '—'}</span>,
     },
     {
-      header: 'Title',
-      id: 'jobTitle',
-      optional: true,
-      accessor: (lead) => <span className="text-slate-600">{lead.designation || lead.jobTitle || '—'}</span>,
-    },
-    {
       header: 'Source',
       id: 'leadSource',
       optional: true,
@@ -452,18 +444,6 @@ export default function LeadsPage() {
 
       <div className="mb-4 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs flex flex-col gap-3 sm:flex-row sm:items-center">
         <SearchInput value={search} onChange={setSearch} placeholder="Search name, number, area, 2 BHK..." className="sm:max-w-xs" />
-        <div className="flex items-center gap-2">
-          <select
-            value={territoryFilter}
-            onChange={(e) => setTerritoryFilter(e.target.value)}
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
-          >
-            <option value="all">All Territories</option>
-            {TERRITORY_OPTIONS.map((opt) => (
-              <option key={opt} value={opt}>{opt}</option>
-            ))}
-          </select>
-        </div>
         <div className="flex items-center gap-2">
           <FunnelIcon className="h-4 w-4 text-slate-400" />
           <select
@@ -634,6 +614,7 @@ export default function LeadsPage() {
           totalEntries={totalLeads}
           emptyMessage='No leads found. Click "Add Lead" to create one.'
           onRowClick={(lead) => router.push(`/leads/${lead.id}`)}
+          rowBackground={(lead) => leadStatusRowColor(lead.status)}
           actions={(lead) => (
             <div className="flex justify-end gap-3">
               <button onClick={() => router.push(`/leads/${lead.id}`)} className="text-slate-400 hover:text-[var(--primary)]" aria-label="View Details">
@@ -727,6 +708,7 @@ function LeadsKanban({
                   onDragStart={() => canEdit && setDraggedLeadId(lead.id)}
                   onDragEnd={() => setDraggedLeadId(null)}
                   onClick={() => router.push(`/leads/${lead.id}`)}
+                  style={leadStatusRowColor(lead.status) ? { backgroundColor: leadStatusRowColor(lead.status) } : undefined}
                   className={`!border-2 transition-shadow hover:shadow-md ${canEdit ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'} ${
                     draggedLeadId === lead.id ? 'opacity-40' : ''
                   }`}

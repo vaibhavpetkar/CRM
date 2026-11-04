@@ -138,3 +138,15 @@ export const budgetRange = (min?: number | string | null, max?: number | string 
   if (b) return `Up to ${b}`;
   return '';
 };
+
+// ─── Lead status colours ──────────────────────────────────────────────────────
+
+// Statuses that get their own row colour on the Leads list (see the
+// --lead-row-* variables in app/globals.css).
+export const LEAD_STATUS_COLOR_KEYS = ['new', 'contacted', 'working', 'qualified', 'unqualified', 'converted', 'lost'];
+
+/** Background for a lead's row or card, by its status. Unknown statuses stay plain. */
+export const leadStatusRowColor = (status?: string | null) => {
+  const key = String(status || '').toLowerCase();
+  return LEAD_STATUS_COLOR_KEYS.includes(key) ? `var(--lead-row-${key})` : undefined;
+};

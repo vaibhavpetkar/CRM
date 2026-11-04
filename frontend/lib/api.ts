@@ -1018,12 +1018,13 @@ export interface Notification {
 }
 
 export const notificationsApi = {
-  getNotifications: async (params: { unreadOnly?: boolean; limit?: number } = {}) => {
+  getNotifications: async (params: { unreadOnly?: boolean; limit?: number; page?: number } = {}) => {
     const query = new URLSearchParams();
     if (params.unreadOnly) query.append('unreadOnly', 'true');
     if (params.limit) query.append('limit', String(params.limit));
+    if (params.page) query.append('page', String(params.page));
     const qs = query.toString();
-    return request<{ notifications: Notification[]; unreadCount: number; total: number }>(`/notifications${qs ? `?${qs}` : ''}`);
+    return request<{ notifications: Notification[]; unreadCount: number; total: number; page?: number; totalPages?: number }>(`/notifications${qs ? `?${qs}` : ''}`);
   },
   markAsRead: async (id: string | number) => {
     return request<{ message: string; notification: Notification }>(`/notifications/${id}/read`, { method: 'PATCH' });

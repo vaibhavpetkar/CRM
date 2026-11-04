@@ -9,15 +9,17 @@ type CardProps = {
   draggable?: boolean;
   onDragStart?: React.DragEventHandler<HTMLDivElement>;
   onDragEnd?: React.DragEventHandler<HTMLDivElement>;
+  style?: React.CSSProperties;
 };
 
-export default function Card({ children, className, title, action, onClick, draggable, onDragStart, onDragEnd }: CardProps) {
+export default function Card({ children, className, title, action, onClick, draggable, onDragStart, onDragEnd, style }: CardProps) {
   return (
     <div
       onClick={onClick}
       draggable={draggable}
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
+      style={style}
       className={cn('rounded-2xl border border-slate-200/80 bg-white shadow-xs', className)}
     >
       {(title || action) && (

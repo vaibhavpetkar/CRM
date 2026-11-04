@@ -280,6 +280,28 @@ body {
   }
 }
 
+/* ─── Lead status colours ────────────────────────────────────────────────────
+   Whole-row tints on the Leads list, one per status, matching StatusBadge.
+   Opaque on purpose: frozen (sticky) cells reuse the same colour. */
+:root {
+  --lead-row-new: #eaf2ff;
+  --lead-row-contacted: #fff6e0;
+  --lead-row-working: #eef0ff;
+  --lead-row-qualified: #e4f6e2;
+  --lead-row-unqualified: #f1f3f6;
+  --lead-row-converted: #dcf1f7;
+  --lead-row-lost: #fdecec;
+}
+.dark {
+  --lead-row-new: color-mix(in srgb, #3b82f6 16%, #111a2b);
+  --lead-row-contacted: color-mix(in srgb, #f59e0b 14%, #111a2b);
+  --lead-row-working: color-mix(in srgb, #6366f1 16%, #111a2b);
+  --lead-row-qualified: color-mix(in srgb, #10b981 14%, #111a2b);
+  --lead-row-unqualified: color-mix(in srgb, #94a3b8 10%, #111a2b);
+  --lead-row-converted: color-mix(in srgb, #14b8a6 14%, #111a2b);
+  --lead-row-lost: color-mix(in srgb, #ef4444 15%, #111a2b);
+}
+
 /* Task 3.1: Print Format — elements marked .no-print (sidebar, topbar, action
    buttons) are hidden when printing/exporting to PDF via the browser dialog. */
 @media print {

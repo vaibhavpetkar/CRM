@@ -6,16 +6,20 @@ export const getMyNotifications = async (req: Request & { user?: any }, res: Res
     const { unreadOnly } = req.query;
     const whereClause: any = { userId: req.user?.id };
     if (unreadOnly === 'true') whereClause.isRead = false;
+    // Paged for the full Notifications page; the bell asks for the newest few.
+    const limit = Math.min(Math.max(parseInt(String(req.query.limit), 10) || 100, 1), 100);
+    const page = Math.max(parseInt(String(req.query.page), 10) || 1, 1);
 
-    const notifications = await Notification.findAll({
+    const { rows: notifications, count: total } = await Notification.findAndCountAll({
       where: whereClause,
-      order: [['createdAt', 'DESC']],
-      limit: 100,
+      order: [['createdAt', 'DESC'], ['id', 'DESC']],
+      limit,
+      offset: (page - 1) * limit,
     });
 
     const unreadCount = await Notification.count({ where: { userId: req.user?.id, isRead: false } });
 
-    return res.json({ notifications, unreadCount, total: notifications.length });
+    return res.json({ notifications, unreadCount, total, page, totalPages: Math.ceil(total / limit) });
   } catch (error) {
     console.error('Get notifications error:', error);
     return res.status(500).json({ message: 'Server error while fetching notifications' });

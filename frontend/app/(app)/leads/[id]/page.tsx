@@ -6,17 +6,18 @@ import { useParams, useRouter } from 'next/navigation';
 import { leadsApi, usersApi, itemsApi, aiApi, getStoredUser } from '@/lib/api';
 import { isModuleEnabled } from '@/lib/modules';
 import { hasPermission } from '@/lib/permissions';
-import { DESIGNATION_OPTIONS, LEAD_SOURCE_OPTIONS, CONFIGURATION_OPTIONS, PROPERTY_TYPE_OPTIONS, leadSourceLabel, budgetRange } from '@/lib/lead-options';
+import { LEAD_SOURCE_OPTIONS, CONFIGURATION_OPTIONS, PROPERTY_TYPE_OPTIONS, leadSourceLabel, budgetRange } from '@/lib/lead-options';
 import Button from '@/components/ui/button';
 import Card from '@/components/ui/card';
 import DataTable from '@/components/ui/data-table';
 import AISummaryPanel from '@/components/ui/ai-summary-panel';
 import SearchableSelect from '@/components/ui/searchable-select';
-import { ArrowLeftIcon, ChevronRightIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, ChevronRightIcon, PhoneIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { useToast } from '@/components/ui/toast';
 import { useKeyboardShortcuts } from '@/lib/hooks/useKeyboardShortcuts';
 import CallButton from '@/components/calls/call-button';
 import CallHistory from '@/components/calls/call-history';
+import LogCallModal from '@/components/calls/log-call-modal';
 import SiteVisitsCard from '@/components/sales/site-visits-card';
 import FollowUpHistoryDrawer from '@/components/leads/follow-up-history-drawer';
 
@@ -37,6 +38,9 @@ export default function LeadDetailsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Manual call log, opened from the button next to Save.
+  const [logCallOpen, setLogCallOpen] = useState(false);
+  const [callsVersion, setCallsVersion] = useState(0);
 
   const [formData, setFormData] = useState<any>({});
   const [activeTab, setActiveTab] = useState('lead-form');
@@ -254,6 +258,9 @@ export default function LeadDetailsPage() {
         <h1 className="text-2xl font-bold text-slate-900 flex-1">
           {lead.firstName} {lead.lastName}
         </h1>
+        <Button type="button" size="sm" variant="secondary" onClick={() => setLogCallOpen(true)}>
+          <PhoneIcon className="h-4 w-4" /> Log Call
+        </Button>
         <Button
           type="button"
           size="sm"
@@ -394,19 +401,6 @@ export default function LeadDetailsPage() {
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
                   />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700">Designation</label>
-                  <select
-                    value={formData.jobTitle || ''}
-                    onChange={(e) => setFormData({ ...formData, jobTitle: e.target.value })}
-                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
-                  >
-                    <option value="">— Select —</option>
-                    {DESIGNATION_OPTIONS.map((opt) => (
-                      <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                  </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700">Telephone</label>
@@ -617,7 +611,10 @@ export default function LeadDetailsPage() {
               </div>
             </div>
 
-            <div className="flex justify-end pt-4">
+            <div className="flex justify-end gap-2 pt-4">
+              <Button type="button" variant="secondary" onClick={() => setLogCallOpen(true)}>
+                <PhoneIcon className="h-4 w-4" /> Log Call
+              </Button>
               <Button type="submit" disabled={saving}>
                 {saving ? 'Saving...' : 'Save Changes'}
               </Button>
@@ -754,7 +751,7 @@ export default function LeadDetailsPage() {
 
       {activeTab === 'calls' && (
         <Card title="Calls">
-          <CallHistory leadId={leadId} />
+          <CallHistory key={callsVersion} leadId={leadId} />
         </Card>
       )}
 
@@ -765,6 +762,17 @@ export default function LeadDetailsPage() {
       )}
 
       <FollowUpHistoryDrawer leadId={leadId} leadName={leadName} open={remarksOpen} onClose={() => setRemarksOpen(false)} />
+      {logCallOpen && (
+        <LogCallModal
+          lead={{ id: lead.id, name: leadName || lead.name || `Lead #${lead.id}`, mobile: lead.mobile || lead.phone }}
+          onClose={() => setLogCallOpen(false)}
+          onSaved={() => {
+            setLogCallOpen(false);
+            setCallsVersion((v) => v + 1);
+            fetchLead();
+          }}
+        />
+      )}
     </div>
   );
 }
