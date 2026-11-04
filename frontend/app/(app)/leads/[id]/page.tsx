@@ -6,7 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { leadsApi, usersApi, itemsApi, aiApi, getStoredUser } from '@/lib/api';
 import { isModuleEnabled } from '@/lib/modules';
 import { hasPermission } from '@/lib/permissions';
-import { LEAD_SOURCE_OPTIONS, CONFIGURATION_OPTIONS, PROPERTY_TYPE_OPTIONS, leadSourceLabel, budgetRange } from '@/lib/lead-options';
+import { VISIT_LEAD_STATUSES, leadStatusLabel, LEAD_SOURCE_OPTIONS, CONFIGURATION_OPTIONS, PROPERTY_TYPE_OPTIONS, leadSourceLabel, budgetRange } from '@/lib/lead-options';
 import Button from '@/components/ui/button';
 import Card from '@/components/ui/card';
 import DataTable from '@/components/ui/data-table';
@@ -20,6 +20,7 @@ import CallHistory from '@/components/calls/call-history';
 import LogCallModal from '@/components/calls/log-call-modal';
 import { LeadStatusSelect } from '@/components/leads/lead-status';
 import SiteVisitsCard from '@/components/sales/site-visits-card';
+import SiteVisitModal from '@/components/sales/site-visit-modal';
 import FollowUpHistoryDrawer from '@/components/leads/follow-up-history-drawer';
 
 // Today as YYYY-MM-DD in the browser's time zone, for the follow-up date picker's minimum.
@@ -42,6 +43,8 @@ export default function LeadDetailsPage() {
   // Manual call log, opened from the button next to Save.
   const [logCallOpen, setLogCallOpen] = useState(false);
   const [callsVersion, setCallsVersion] = useState(0);
+  // Saving the lead as "Site Visit Done" / "Revisit Done" first asks for the visit.
+  const [visitPrompt, setVisitPrompt] = useState(false);
 
   const [formData, setFormData] = useState<any>({});
   const [activeTab, setActiveTab] = useState('lead-form');
@@ -156,7 +159,7 @@ export default function LeadDetailsPage() {
     }
   };
 
-  const handleSave = async (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent, opts: { visitLogged?: boolean } = {}) => {
     e.preventDefault();
 
     // Task 2.7: Mobile Number is mandatory. The bottom form-submit button also
@@ -200,6 +203,13 @@ export default function LeadDetailsPage() {
     const savedFollowUp = lead?.nextFollowUp ? String(lead.nextFollowUp).slice(0, 10) : '';
     if (newFollowUp && newFollowUp !== savedFollowUp && newFollowUp < todayStr()) {
       toast.warning("Next Follow-up date can't be before today.");
+      return;
+    }
+
+    // Moving the lead to a site-visit status: log the visit first (the popup
+    // calls handleSave again once it is saved). Cancelling it leaves the lead unsaved.
+    if (VISIT_LEAD_STATUSES[formData.status] && formData.status !== lead?.status && !opts.visitLogged) {
+      setVisitPrompt(true);
       return;
     }
 
@@ -755,6 +765,24 @@ export default function LeadDetailsPage() {
       )}
 
       <FollowUpHistoryDrawer leadId={leadId} leadName={leadName} open={remarksOpen} onClose={() => setRemarksOpen(false)} />
+      {visitPrompt && (
+        <SiteVisitModal
+          lead={{ id: Number(leadId), name: leadName || `Lead #${leadId}`, projectName: formData.projectName ?? lead.projectName, preferredLocation: formData.preferredLocation ?? lead.preferredLocation }}
+          agents={assignableUsers}
+          canPickAgent={hasPermission(getStoredUser(), 'users:read')}
+          currentUserId={getStoredUser()?.id}
+          initialStatus={VISIT_LEAD_STATUSES[formData.status]}
+          intro={`Log the site visit to save this lead as "${leadStatusLabel(formData.status)}". If you cancel, the lead is not saved.`}
+          onClose={() => {
+            setVisitPrompt(false);
+            toast.warning('Lead not saved. Log the site visit to save it with this status.');
+          }}
+          onSaved={() => {
+            setVisitPrompt(false);
+            handleSave({ preventDefault: () => {} } as FormEvent, { visitLogged: true });
+          }}
+        />
+      )}
       {logCallOpen && (
         <LogCallModal
           lead={{ id: lead.id, name: leadName || lead.name || `Lead #${lead.id}`, mobile: lead.mobile || lead.phone }}

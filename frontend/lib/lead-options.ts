@@ -174,6 +174,7 @@ export const LEAD_STATUS_OPTIONS: { value: string; label: string; tone: LeadStat
   { value: 'wrong-number', label: 'Wrong Number', tone: 'slate' },
   { value: 'whatsapp-done', label: 'WhatsApp Done', tone: 'lime' },
   { value: 'details-shared', label: 'Details Shared', tone: 'cyan' },
+  { value: 'site-visit-done', label: 'Site Visit Done', tone: 'teal' },
   { value: 'revisit-done', label: 'Revisit Done', tone: 'purple' },
   { value: 'ready-possession', label: 'Looking for Ready Possession', tone: 'sky' },
   { value: 'budget-issue', label: 'Budget Issue', tone: 'rose' },
@@ -186,6 +187,14 @@ export const LEAD_STATUS_OPTIONS: { value: string; label: string; tone: LeadStat
 ];
 
 export const LEAD_STATUS_VALUES = LEAD_STATUS_OPTIONS.map((o) => o.value);
+
+// Lead statuses that mean a site visit just happened: saving a lead into one
+// first asks for the visit (it is logged on the Site Visits page), and
+// cancelling that leaves the lead unsaved. Maps to the visit's own status.
+export const VISIT_LEAD_STATUSES: Record<string, 'completed' | 'revisit-done'> = {
+  'site-visit-done': 'completed',
+  'revisit-done': 'revisit-done',
+};
 
 // Earlier statuses, no longer offered in any picker. Leads that still carry
 // one keep showing its name and colour until someone changes it.

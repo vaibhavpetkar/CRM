@@ -5,6 +5,7 @@ import PageHeader from '@/components/ui/page-header';
 import SearchInput from '@/components/ui/search-input';
 import { LeadStatusBadge, LeadStatusSelect } from '@/components/leads/lead-status';
 import { LeadStatusColorsButton, useLeadStatusColors } from '@/components/leads/lead-status-colors';
+import SiteVisitModal from '@/components/sales/site-visit-modal';
 import Button from '@/components/ui/button';
 import Card from '@/components/ui/card';
 import DataTable, { DataTableColumn } from '@/components/ui/data-table';
@@ -12,7 +13,7 @@ import ImportExportButtons from '@/components/ui/import-export-buttons';
 import { LEAD_FIELDS } from '@/lib/import-export/field-configs';
 import { formatCurrency } from '@/lib/utils';
 import { leadsApi, usersApi, salesApi, getStoredUser, PresenceState } from '@/lib/api';
-import { LEAD_SOURCE_OPTIONS, LEAD_STATUS_VALUES, leadStatusRowColor, CONFIGURATION_OPTIONS, PROPERTY_TYPE_OPTIONS, BUDGET_OPTIONS, leadSourceLabel, budgetRange } from '@/lib/lead-options';
+import { VISIT_LEAD_STATUSES, leadStatusLabel, LEAD_SOURCE_OPTIONS, LEAD_STATUS_VALUES, leadStatusRowColor, CONFIGURATION_OPTIONS, PROPERTY_TYPE_OPTIONS, BUDGET_OPTIONS, leadSourceLabel, budgetRange } from '@/lib/lead-options';
 import { AgentStatusDot } from '@/components/sales/agent-status';
 import { hasPermission } from '@/lib/permissions';
 import { useKeyboardShortcuts } from '@/lib/hooks/useKeyboardShortcuts';
@@ -66,6 +67,8 @@ export default function LeadsPage() {
   const [selectedLeadIds, setSelectedLeadIds] = useState<(string | number)[]>([]);
   // Users available to assign leads to (name typeahead datalist)
   const [assignableUsers, setAssignableUsers] = useState<{ id: number; name: string }[]>([]);
+  // Dragging a lead to "Site Visit Done" / "Revisit Done" first asks for the visit.
+  const [visitMove, setVisitMove] = useState<{ lead: any; status: string } | null>(null);
 
   useEffect(() => {
     usersApi
@@ -419,6 +422,22 @@ export default function LeadsPage() {
     },
   ];
 
+  const moveLead = async (leadId: string | number, newStatus: string, visitLogged = false) => {
+    const lead = leads.find((l) => l.id === leadId);
+    if (!lead || lead.status === newStatus) return;
+    if (VISIT_LEAD_STATUSES[newStatus] && !visitLogged) {
+      setVisitMove({ lead, status: newStatus });
+      return;
+    }
+    setLeads((prev) => prev.map((l) => (l.id === leadId ? { ...l, status: newStatus } : l)));
+    try {
+      await leadsApi.updateLead(leadId, { status: newStatus });
+    } catch (err: any) {
+      setLeads((prev) => prev.map((l) => (l.id === leadId ? { ...l, status: lead.status } : l)));
+      toast.error(err.message || 'Failed to move lead. Please try again.');
+    }
+  };
+
   return (
     <>
       <PageHeader
@@ -579,17 +598,7 @@ export default function LeadsPage() {
           setDraggedLeadId={setDraggedLeadId}
           dragOverStatus={dragOverStatus}
           setDragOverStatus={setDragOverStatus}
-          onMove={async (leadId, newStatus) => {
-            const lead = leads.find((l) => l.id === leadId);
-            if (!lead || lead.status === newStatus) return;
-            setLeads((prev) => prev.map((l) => (l.id === leadId ? { ...l, status: newStatus } : l)));
-            try {
-              await leadsApi.updateLead(leadId, { status: newStatus });
-            } catch (err: any) {
-              setLeads((prev) => prev.map((l) => (l.id === leadId ? { ...l, status: lead.status } : l)));
-              toast.error(err.message || 'Failed to move lead. Please try again.');
-            }
-          }}
+          onMove={moveLead}
         />
       ) : (
       <Card>
@@ -639,6 +648,22 @@ export default function LeadsPage() {
           </span>
         </div>
       )}
+      {visitMove && (
+        <SiteVisitModal
+          lead={{ id: visitMove.lead.id, name: visitMove.lead.name || `${visitMove.lead.firstName || ''} ${visitMove.lead.lastName || ''}`.trim() || `Lead #${visitMove.lead.id}`, projectName: visitMove.lead.projectName, preferredLocation: visitMove.lead.preferredLocation }}
+          agents={assignableUsers}
+          canPickAgent={hasPermission(getStoredUser(), 'users:read')}
+          currentUserId={getStoredUser()?.id}
+          initialStatus={VISIT_LEAD_STATUSES[visitMove.status]}
+          intro={`Log the site visit to move this lead to "${leadStatusLabel(visitMove.status)}". If you cancel, the lead stays where it was.`}
+          onClose={() => setVisitMove(null)}
+          onSaved={() => {
+            const { lead, status } = visitMove;
+            setVisitMove(null);
+            moveLead(lead.id, status, true);
+          }}
+        />
+      )}
     </>
   );
 }
@@ -660,7 +685,7 @@ function LeadsKanban({
   setDraggedLeadId: (id: string | number | null) => void;
   dragOverStatus: string | null;
   setDragOverStatus: (status: string | null) => void;
-  onMove: (leadId: string | number, newStatus: string) => void;
+  onMove: (leadId: string | number, newStatus: string, visitLogged?: boolean) => void;
 }) {
   const router = useRouter();
   useLeadStatusColors();
