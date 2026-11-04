@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { SparklesIcon } from '@heroicons/react/24/outline';
 import Button from './button';
+import { aiApi } from '@/lib/api';
 
 type AISummaryPanelProps = {
   onGenerate: () => Promise<{ summary: string; nextAction: string | null }>;
@@ -18,6 +19,19 @@ export default function AISummaryPanel({ onGenerate }: AISummaryPanelProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ summary: string; nextAction: string | null } | null>(null);
+  // Hidden until the server says an AI provider is set up.
+  const [configured, setConfigured] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    aiApi
+      .getStatus()
+      .then((s) => alive && setConfigured(!!s.configured))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const handleGenerate = async () => {
     setLoading(true);
@@ -31,6 +45,8 @@ export default function AISummaryPanel({ onGenerate }: AISummaryPanelProps) {
       setLoading(false);
     }
   };
+
+  if (!configured) return null;
 
   return (
     <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
