@@ -209,3 +209,57 @@ export const runSchemaPatches = async (sequelize: Sequelize): Promise<void> => {
     }
   }
 };
+
+/**
+ * One-time data changes, recorded in "data_migrations" so each runs once per
+ * database. Used to hand new permissions to the roles that already did the
+ * same thing under an older permission (see PERMISSION_GRANTS). Runs after
+ * sync and role seeding, across every company.
+ */
+export const runPermissionGrants = async (
+  sequelize: Sequelize,
+  grants: { name: string; ifHas: string; grant: string[] }[]
+): Promise<void> => {
+  try {
+    await sequelize.query(
+      `CREATE TABLE IF NOT EXISTS "data_migrations" ("name" VARCHAR(100) PRIMARY KEY, "ranAt" TIMESTAMPTZ NOT NULL DEFAULT NOW());`,
+      { type: QueryTypes.RAW }
+    );
+    const done = new Set(
+      (await sequelize.query<{ name: string }>(`SELECT "name" FROM "data_migrations";`, { type: QueryTypes.SELECT })).map((r) => r.name)
+    );
+    for (const g of grants) {
+      if (done.has(g.name)) continue;
+      await sequelize.transaction(async (transaction) => {
+        const roles = await sequelize.query<{ id: number; permissions: string }>(`SELECT "id", "permissions" FROM "roles";`, {
+          type: QueryTypes.SELECT,
+          transaction,
+        });
+        let changed = 0;
+        for (const role of roles) {
+          let perms: string[] = [];
+          try {
+            perms = JSON.parse(role.permissions || '[]');
+          } catch {
+            continue;
+          }
+          if (!Array.isArray(perms) || perms.includes('*') || !perms.includes(g.ifHas)) continue;
+          const next = [...perms, ...g.grant.filter((p) => !perms.includes(p))];
+          if (next.length === perms.length) continue;
+          await sequelize.query(`UPDATE "roles" SET "permissions" = :perms WHERE "id" = :id;`, {
+            replacements: { perms: JSON.stringify(next), id: role.id },
+            transaction,
+          });
+          changed += 1;
+        }
+        await sequelize.query(`INSERT INTO "data_migrations" ("name") VALUES (:name) ON CONFLICT DO NOTHING;`, {
+          replacements: { name: g.name },
+          transaction,
+        });
+        console.log(`[data-migration] ${g.name}: updated ${changed} role(s).`);
+      });
+    }
+  } catch (err) {
+    console.error('[data-migration] Permission grants failed:', err);
+  }
+};

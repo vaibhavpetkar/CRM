@@ -150,6 +150,7 @@ const loadTarget = async (user: any, target: Target, action: 'read' | 'update') 
 // ─── Placing a call ─────────────────────────────────────────────────────────
 
 export const startCall = async (user: any, input: Target & { number?: string }) => {
+  if (!userCan(user, 'calls:make')) throw new ForbiddenError('You are not allowed to make calls.');
   const provider = await requireProvider();
   const target = await loadTarget(user, input, 'read');
 
@@ -222,6 +223,7 @@ export const logManualCall = async (
   user: any,
   input: Target & { number?: string; direction?: string; status?: string; durationMinutes?: unknown; calledAt?: string; notes?: string }
 ) => {
+  if (!userCan(user, 'calls:make')) throw new ForbiddenError('You are not allowed to log calls.');
   const target = input.leadId || input.contactId ? await loadTarget(user, input, 'read') : null;
 
   const typed = input.number ? normalizeIndianNumber(input.number) : null;
@@ -436,7 +438,7 @@ const userName = async (id: number) => {
  */
 export const cancelCall = async (user: any, id: number) => {
   const call = await loadCall(user, id, 'read');
-  if (call.userId !== user.id && !userCan(user, 'users:read')) throw new ForbiddenError('Only the person who placed the call or a manager can cancel it.');
+  if (call.userId !== user.id && !userCan(user, 'sales:team')) throw new ForbiddenError('Only the person who placed the call or a manager can cancel it.');
   if (!isTerminal(call.status)) {
     const who = call.userId === user.id ? 'the caller' : (await userName(user.id)) || 'a manager';
     await endByCrm(call, 'canceled', `${CANCELLED_BY} ${who}.`);
@@ -446,7 +448,7 @@ export const cancelCall = async (user: any, id: number) => {
 
 /** Calls ringing or connected right now: the user's own, or the whole team's for managers. */
 export const listLiveCalls = async (user: any) => {
-  const team = userCan(user, 'users:read');
+  const team = userCan(user, 'sales:team');
   const calls = await Call.findAll({
     where: { status: { [Op.notIn]: TERMINAL_CALL_STATUSES }, ...(team ? {} : { userId: user.id }) },
     order: [['createdAt', 'ASC']],
@@ -511,7 +513,7 @@ const loadCall = async (user: any, id: number, action: 'read' | 'update') => {
   if (!call) throw new NotFoundError('Call', id);
   // An incoming call from someone who isn't a lead: theirs, or a manager's.
   if (!call.leadId && !call.contactId) {
-    if (call.userId !== user.id && !userCan(user, 'users:read')) throw new ForbiddenError();
+    if (call.userId !== user.id && !userCan(user, 'sales:team')) throw new ForbiddenError();
     return call;
   }
   await loadTarget(user, { leadId: call.leadId, contactId: call.contactId }, action === 'update' && call.userId === user.id ? 'read' : action);
@@ -567,6 +569,7 @@ export const listCalls = async (user: any, target: Target) => {
 
 /** The saved recording file, fetching it from the provider first if needed. */
 export const getRecording = async (user: any, id: number) => {
+  if (!userCan(user, 'calls:recordings')) throw new ForbiddenError('You are not allowed to listen to call recordings.');
   const call = await loadCall(user, id, 'read');
   if (!call.recordingFile && call.recordingUrl) {
     const provider = getVoiceProvider(call.provider);

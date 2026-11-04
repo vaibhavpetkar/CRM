@@ -446,6 +446,8 @@ export default function LeadsPage() {
         actions={
           <>
             <ImportExportButtons
+              canImport={hasPermission(getStoredUser(), 'leads:import')}
+              canExport={hasPermission(getStoredUser(), 'leads:export')}
               config={{
                 entityName: 'Lead',
                 entityNamePlural: 'leads',
@@ -652,7 +654,7 @@ export default function LeadsPage() {
         <SiteVisitModal
           lead={{ id: visitMove.lead.id, name: visitMove.lead.name || `${visitMove.lead.firstName || ''} ${visitMove.lead.lastName || ''}`.trim() || `Lead #${visitMove.lead.id}`, projectName: visitMove.lead.projectName, preferredLocation: visitMove.lead.preferredLocation }}
           agents={assignableUsers}
-          canPickAgent={hasPermission(getStoredUser(), 'users:read')}
+          canPickAgent={hasPermission(getStoredUser(), 'sales:team')}
           currentUserId={getStoredUser()?.id}
           initialStatus={VISIT_LEAD_STATUSES[visitMove.status]}
           intro={`Log the site visit to move this lead to "${leadStatusLabel(visitMove.status)}". If you cancel, the lead stays where it was.`}

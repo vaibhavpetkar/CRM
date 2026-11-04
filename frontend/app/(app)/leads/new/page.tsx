@@ -387,7 +387,7 @@ export default function NewLeadPage() {
       <SiteVisitModal
         lead={{ id: 0, name: `${visitFor.firstName || ''} ${visitFor.lastName || ''}`.trim() || 'New lead', projectName: visitFor.projectName, preferredLocation: visitFor.preferredLocation }}
         agents={agents}
-        canPickAgent={hasPermission(getStoredUser(), 'users:read')}
+        canPickAgent={hasPermission(getStoredUser(), 'sales:team')}
         currentUserId={getStoredUser()?.id}
         initialStatus={VISIT_LEAD_STATUSES[visitFor.status]}
         intro={`Log the site visit to save this lead as "${leadStatusLabel(visitFor.status)}". If you cancel, the lead is not saved.`}

@@ -32,6 +32,8 @@ type Props = {
   onClose: () => void;
   config: ImportExportConfig;
   initialTab?: Tab;
+  /** Tabs to offer; both by default. */
+  tabs?: readonly Tab[];
 };
 
 const PREVIEW_ROW_LIMIT = 200;
@@ -43,7 +45,7 @@ const FORMATS: { id: ExportFormat; label: string; icon: typeof TableCellsIcon; h
   { id: 'word', label: 'Word', icon: DocumentTextIcon, hint: '.docx' },
 ];
 
-export default function ImportExportModal({ open, onClose, config, initialTab = 'export' }: Props) {
+export default function ImportExportModal({ open, onClose, config, initialTab = 'export', tabs = ['export', 'import'] }: Props) {
   const toast = useToast();
   const [tab, setTab] = useState<Tab>(initialTab);
 
@@ -323,7 +325,7 @@ export default function ImportExportModal({ open, onClose, config, initialTab = 
 
         {/* Tabs */}
         <div className="flex gap-1 border-b border-slate-100 px-6 pt-3">
-          {(['export', 'import'] as Tab[]).map((t) => (
+          {tabs.map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}

@@ -3,7 +3,8 @@ import dotenv from 'dotenv';
 import cors from 'cors';
 import bcrypt from 'bcryptjs';
 import sequelize from './config/database';
-import { runSchemaPatches } from './utils/ensureSchema';
+import { runPermissionGrants, runSchemaPatches } from './utils/ensureSchema';
+import { PERMISSION_GRANTS } from './config/permissions';
 import User from './models/User';
 import logger from './utils/logger';
 import { errorHandler } from './utils/errorHandler';
@@ -354,6 +355,9 @@ const startServer = async () => {
     for (const company of await listTenantCompanies()) await seedRolesForCompany(company.id);
     const roles = await seedRolesForCompany(defaultCompanyId);
     await createSuperAdmin(roles['Administrator']?.id);
+    // Roles made before a permission existed get it once, if they already
+    // did the same thing (e.g. Site Visits used to follow the Leads permissions).
+    await runPermissionGrants(sequelize, PERMISSION_GRANTS);
 
     await initRealtime(httpServer);
 

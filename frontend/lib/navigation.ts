@@ -54,7 +54,7 @@ export const navigation: NavSection[] = [
       { name: 'Leads', href: '/leads', icon: ClipboardDocumentListIcon, permission: 'leads:read' },
       { name: 'Sales Activity', href: '/sales-activity', icon: SignalIcon },
       { name: 'Call Tracking', href: '/call-tracking', icon: PhoneIcon },
-      { name: 'Site Visits', href: '/site-visits', icon: MapPinIcon, permission: 'leads:read' },
+      { name: 'Site Visits', href: '/site-visits', icon: MapPinIcon, permission: 'site_visits:read' },
       { name: 'Tasks', href: '/tasks', icon: CheckCircleIcon, permission: 'tasks:view' },
       { name: 'Meetings', href: '/meetings', icon: CalendarDaysIcon, permission: 'meetings:view' },
     ],
@@ -93,7 +93,7 @@ export const navigation: NavSection[] = [
       { name: 'Company', href: '/settings/company', icon: BuildingOffice2Icon, permission: 'company:manage' },
       { name: 'Subscription', href: '/settings/subscription', icon: CreditCardIcon, permission: 'company:manage' },
       { name: 'Integrations', href: '/settings/integrations', icon: PuzzlePieceIcon, permission: 'integrations:manage' },
-      { name: 'Roles', href: '/settings/roles', icon: ShieldCheckIcon, permission: 'roles:view' },
+      { name: 'Roles', href: '/settings/roles', icon: ShieldCheckIcon, permission: ['roles:read', 'roles:view'] },
       { name: 'Activity Logs', href: '/activity-logs', icon: ClockIcon }, // Administrator only (handled in page)
       { name: 'Recycle Bin', href: '/recycle-bin', icon: TrashIcon }, // Administrator only
       { name: 'Settings', href: '/settings', icon: Cog6ToothIcon },

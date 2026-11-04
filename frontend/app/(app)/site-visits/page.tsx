@@ -6,6 +6,7 @@ import { MapPinIcon, PlusIcon } from '@heroicons/react/24/outline';
 import PageHeader from '@/components/ui/page-header';
 import Card from '@/components/ui/card';
 import Button from '@/components/ui/button';
+import ExportMenu from '@/components/ui/export-menu';
 import LoadingSpinner from '@/components/ui/loading-spinner';
 import { useToast } from '@/components/ui/toast';
 import DateRangePicker, { DateRange, presetRange } from '@/components/sales/date-range';
@@ -19,13 +20,33 @@ import { leadStatusColor, leadStatusRowColor } from '@/lib/lead-options';
 
 // Site visits across the team: what's scheduled, what happened, feedback.
 
+const EXPORT_COLUMNS = [
+  { key: 'date', label: 'Date' },
+  { key: 'time', label: 'Time' },
+  { key: 'leadNumber', label: 'Lead No.' },
+  { key: 'leadName', label: 'Lead name' },
+  { key: 'leadMobile', label: 'Mobile' },
+  { key: 'projectName', label: 'Project' },
+  { key: 'location', label: 'Location' },
+  { key: 'agentName', label: 'Sales person' },
+  { key: 'status', label: 'Status' },
+  { key: 'notes', label: 'Feedback' },
+  { key: 'completedAt', label: 'Marked done at' },
+  { key: 'createdAt', label: 'Logged at' },
+];
+
+const stamp = (v: string | null) => (v ? new Date(v).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : '');
+
 export default function SiteVisitsPage() {
   const toast = useToast();
   // Re-render when the visit status colours load or change.
   useLeadStatusColors();
   const user = getStoredUser();
-  const canEdit = hasPermission(user, 'leads:update');
-  const canPickAgent = hasPermission(user, 'users:read');
+  const canCreate = hasPermission(user, 'site_visits:create');
+  const canEdit = hasPermission(user, 'site_visits:update');
+  const canDelete = hasPermission(user, 'site_visits:delete');
+  const canExport = hasPermission(user, 'site_visits:export');
+  const canPickAgent = hasPermission(user, 'sales:team');
   const [range, setRange] = useState<DateRange>(() => presetRange('7d'));
   const [userId, setUserId] = useState('all');
   const [status, setStatus] = useState<'all' | SiteVisitStatus>('all');
@@ -93,7 +114,30 @@ export default function SiteVisitsPage() {
         actions={
           <>
             <Link href="/sales-activity"><Button size="sm" variant="secondary">Sales activity</Button></Link>
-            {canEdit && <Button size="sm" onClick={() => setEditing('new')}><PlusIcon className="h-4 w-4" /> Log site visit</Button>}
+            {canExport && <ExportMenu
+              fileName={`site-visits-${range.from}-to-${range.to}`}
+              columns={EXPORT_COLUMNS}
+              disabled={!visits || visits.length === 0}
+              getRows={async () => {
+                // Same filters as the table, without the 500-row page cap.
+                const { visits: all } = await salesApi.listVisits({ ...range, userId, status, limit: 10000 });
+                return all.map((v) => ({
+                  date: new Date(v.scheduledAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+                  time: new Date(v.scheduledAt).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' }),
+                  leadNumber: v.leadNumber || '',
+                  leadName: v.leadName || '',
+                  leadMobile: v.leadMobile || '',
+                  projectName: v.projectName || '',
+                  location: v.location || '',
+                  agentName: v.agentName || '',
+                  status: VISIT_STATUS_LABEL[v.status] || v.status,
+                  notes: v.notes || '',
+                  completedAt: stamp(v.completedAt),
+                  createdAt: stamp(v.createdAt),
+                }));
+              }}
+            />}
+            {canCreate && <Button size="sm" onClick={() => setEditing('new')}><PlusIcon className="h-4 w-4" /> Log site visit</Button>}
           </>
         }
       />
@@ -180,17 +224,17 @@ export default function SiteVisitsPage() {
                     </td>
                     <td className="max-w-xs px-3 py-3 text-slate-600"><p className="line-clamp-2">{v.notes || '—'}</p></td>
                     <td className="whitespace-nowrap px-6 py-3 text-right">
-                      {canEdit && (
+                      {(canEdit || canDelete) && (
                         <div className="flex justify-end gap-1">
-                          {v.status === 'scheduled' && (
+                          {canEdit && v.status === 'scheduled' && (
                             <>
                               <Button size="sm" variant="secondary" onClick={() => update(v, 'completed')}>Visit done</Button>
                               <Button size="sm" variant="secondary" onClick={() => update(v, 'revisit-done')}>Revisit done</Button>
                               <Button size="sm" variant="ghost" onClick={() => update(v, 'no-show')}>No show</Button>
                             </>
                           )}
-                          <Button size="sm" variant="ghost" onClick={() => setEditing(v)}>Edit</Button>
-                          <Button size="sm" variant="ghost" className="text-red-600" onClick={() => remove(v)}>Delete</Button>
+                          {canEdit && <Button size="sm" variant="ghost" onClick={() => setEditing(v)}>Edit</Button>}
+                          {canDelete && <Button size="sm" variant="ghost" className="text-red-600" onClick={() => remove(v)}>Delete</Button>}
                         </div>
                       )}
                     </td>

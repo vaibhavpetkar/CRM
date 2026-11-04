@@ -269,9 +269,11 @@ export default function LeadDetailsPage() {
         <h1 className="text-2xl font-bold text-slate-900 flex-1">
           {lead.firstName} {lead.lastName}
         </h1>
-        <Button type="button" size="sm" variant="secondary" onClick={() => setLogCallOpen(true)}>
-          <PhoneIcon className="h-4 w-4" /> Log Call
-        </Button>
+        {hasPermission(getStoredUser(), 'calls:make') && (
+          <Button type="button" size="sm" variant="secondary" onClick={() => setLogCallOpen(true)}>
+            <PhoneIcon className="h-4 w-4" /> Log Call
+          </Button>
+        )}
         <Button
           type="button"
           size="sm"
@@ -307,14 +309,14 @@ export default function LeadDetailsPage() {
         >
           Activity
         </button>
-        <button
+        {hasPermission(getStoredUser(), 'site_visits:read') && <button
           onClick={() => setActiveTab('visits')}
           className={`px-4 py-2 text-sm font-medium border-b-2 ${
             activeTab === 'visits' ? 'border-[var(--primary)] text-[var(--primary)]' : 'border-transparent text-slate-500 hover:text-slate-700'
           }`}
         >
           Site Visits
-        </button>
+        </button>}
         <button
           onClick={() => setActiveTab('calls')}
           className={`px-4 py-2 text-sm font-medium border-b-2 ${
@@ -615,9 +617,11 @@ export default function LeadDetailsPage() {
             </div>
 
             <div className="flex justify-end gap-2 pt-4">
-              <Button type="button" variant="secondary" onClick={() => setLogCallOpen(true)}>
-                <PhoneIcon className="h-4 w-4" /> Log Call
-              </Button>
+              {hasPermission(getStoredUser(), 'calls:make') && (
+                <Button type="button" variant="secondary" onClick={() => setLogCallOpen(true)}>
+                  <PhoneIcon className="h-4 w-4" /> Log Call
+                </Button>
+              )}
               <Button type="submit" disabled={saving}>
                 {saving ? 'Saving...' : 'Save Changes'}
               </Button>
@@ -758,7 +762,7 @@ export default function LeadDetailsPage() {
         </Card>
       )}
 
-      {activeTab === 'visits' && (
+      {activeTab === 'visits' && hasPermission(getStoredUser(), 'site_visits:read') && (
         <SiteVisitsCard
           lead={{ id: Number(leadId), name: leadName, projectName: lead.projectName, preferredLocation: lead.preferredLocation }}
         />
@@ -769,7 +773,7 @@ export default function LeadDetailsPage() {
         <SiteVisitModal
           lead={{ id: Number(leadId), name: leadName || `Lead #${leadId}`, projectName: formData.projectName ?? lead.projectName, preferredLocation: formData.preferredLocation ?? lead.preferredLocation }}
           agents={assignableUsers}
-          canPickAgent={hasPermission(getStoredUser(), 'users:read')}
+          canPickAgent={hasPermission(getStoredUser(), 'sales:team')}
           currentUserId={getStoredUser()?.id}
           initialStatus={VISIT_LEAD_STATUSES[formData.status]}
           intro={`Log the site visit to save this lead as "${leadStatusLabel(formData.status)}". If you cancel, the lead is not saved.`}

@@ -1,13 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { callsApi } from '@/lib/api';
+import { callsApi, getStoredUser } from '@/lib/api';
+import { hasPermission } from '@/lib/permissions';
 
 /** Plays a call recording. The file needs the login token, so it's loaded as a blob. */
 export default function RecordingPlayer({ callId, autoLoad = true }: { callId: number; autoLoad?: boolean }) {
   const [src, setSrc] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [requested, setRequested] = useState(autoLoad);
+  const allowed = hasPermission(getStoredUser(), 'calls:recordings');
+  const [requested, setRequested] = useState(autoLoad && allowed);
 
   useEffect(() => {
     if (!requested) return;
@@ -27,6 +29,7 @@ export default function RecordingPlayer({ callId, autoLoad = true }: { callId: n
     };
   }, [callId, requested]);
 
+  if (!allowed) return null;
   if (!requested) {
     return (
       <button type="button" onClick={() => setRequested(true)} className="text-xs font-medium text-[var(--primary)] hover:underline">

@@ -8,6 +8,9 @@ import type { ImportExportConfig } from '@/lib/import-export/types';
 
 type Props = {
   config: ImportExportConfig;
+  /** Hide a button the user has no permission for. Both show by default. */
+  canImport?: boolean;
+  canExport?: boolean;
 };
 
 /**
@@ -24,13 +27,13 @@ type Props = {
  *     }}
  *   />
  */
-export default function ImportExportButtons({ config }: Props) {
+export default function ImportExportButtons({ config, canImport = true, canExport = true }: Props) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<'export' | 'import'>('import');
 
   return (
     <>
-      <Button
+      {canImport && <Button
         variant="secondary"
         size="sm"
         onClick={() => {
@@ -39,8 +42,8 @@ export default function ImportExportButtons({ config }: Props) {
         }}
       >
         <ArrowUpTrayIcon className="h-4 w-4" /> Import
-      </Button>
-      <Button
+      </Button>}
+      {canExport && <Button
         variant="secondary"
         size="sm"
         onClick={() => {
@@ -49,8 +52,16 @@ export default function ImportExportButtons({ config }: Props) {
         }}
       >
         <ArrowDownTrayIcon className="h-4 w-4" /> Export
-      </Button>
-      {open && <ImportExportModal open={open} onClose={() => setOpen(false)} config={config} initialTab={tab} />}
+      </Button>}
+      {open && (
+        <ImportExportModal
+          open={open}
+          onClose={() => setOpen(false)}
+          config={config}
+          initialTab={tab}
+          tabs={[...(canExport ? (['export'] as const) : []), ...(canImport ? (['import'] as const) : [])]}
+        />
+      )}
     </>
   );
 }
