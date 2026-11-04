@@ -7,6 +7,7 @@ import { useToast } from '@/components/ui/toast';
 import { preferencesApi, LeadStatusColorLevels, PreferenceScope } from '@/lib/api';
 import {
   LEAD_STATUS_OPTIONS,
+  VISIT_STATUS_COLOR_OPTIONS,
   defaultLeadStatusColor,
   leadStatusColor,
   leadStatusColorVersion,
@@ -56,8 +57,13 @@ const LEVEL_LABEL: Record<PreferenceScope, string> = {
   global: 'Default for all companies',
 };
 
-/** "Colours" button for the Leads toolbar; opens the colour editor. */
-export function LeadStatusColorsButton() {
+type ColorOption = { value: string; label: string };
+
+/**
+ * "Colours" button; opens the colour editor for lead statuses, or with
+ * `kind="visit"` for site visit statuses (stored as "visit:<status>").
+ */
+export function LeadStatusColorsButton({ kind = 'lead' }: { kind?: 'lead' | 'visit' }) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -69,17 +75,23 @@ export function LeadStatusColorsButton() {
       >
         <SwatchIcon className="h-4 w-4" /> Colours
       </button>
-      {open && <LeadStatusColorsModal onClose={() => setOpen(false)} />}
+      {open && (
+        <LeadStatusColorsModal
+          options={kind === 'visit' ? VISIT_STATUS_COLOR_OPTIONS : LEAD_STATUS_OPTIONS}
+          title={kind === 'visit' ? 'Site visit status colours' : 'Status colours'}
+          onClose={() => setOpen(false)}
+        />
+      )}
     </>
   );
 }
 
-function LeadStatusColorsModal({ onClose }: { onClose: () => void }) {
+function LeadStatusColorsModal({ options, title, onClose }: { options: ColorOption[]; title: string; onClose: () => void }) {
   const toast = useToast();
   useLeadStatusColors();
   const [scope, setScope] = useState<PreferenceScope>('user');
   const [draft, setDraft] = useState<Record<string, string>>(() =>
-    Object.fromEntries(LEAD_STATUS_OPTIONS.map((o) => [o.value, leadStatusColor(o.value)]))
+    Object.fromEntries(options.map((o) => [o.value, leadStatusColor(o.value)]))
   );
   const [saving, setSaving] = useState(false);
   const [canSetCompany, setCanSetCompany] = useState(!!levels?.canSetCompany);
@@ -101,10 +113,16 @@ function LeadStatusColorsModal({ onClose }: { onClose: () => void }) {
     return defaultLeadStatusColor(status);
   };
 
+  // Colours saved at a level for statuses not in this editor's list.
+  const othersAt = (s: PreferenceScope) => {
+    const keys = new Set(options.map((o) => o.value));
+    return Object.fromEntries(Object.entries((levels?.[s] || {}) as Record<string, string>).filter(([k]) => !keys.has(k)));
+  };
+
   const pickScope = (s: PreferenceScope) => {
     setScope(s);
     const saved = (levels?.[s] || {}) as Record<string, string>;
-    setDraft(Object.fromEntries(LEAD_STATUS_OPTIONS.map((o) => [o.value, saved[o.value] || inheritedFor(s, o.value)])));
+    setDraft(Object.fromEntries(options.map((o) => [o.value, saved[o.value] || inheritedFor(s, o.value)])));
   };
 
   const save = async () => {
@@ -112,8 +130,10 @@ function LeadStatusColorsModal({ onClose }: { onClose: () => void }) {
     try {
       // Only keep colours that differ from what this level would inherit, so
       // later changes to a lower default still show through.
-      const colors = Object.fromEntries(Object.entries(draft).filter(([status, c]) => c.toLowerCase() !== inheritedFor(scope, status).toLowerCase()));
-      await preferencesApi.setLeadStatusColors(scope, colors);
+      // later changes to a lower default still show through. Colours saved
+      // for the other list (lead vs visit statuses) at this level are kept.
+      const changed = Object.fromEntries(Object.entries(draft).filter(([status, c]) => c.toLowerCase() !== inheritedFor(scope, status).toLowerCase()));
+      await preferencesApi.setLeadStatusColors(scope, { ...othersAt(scope), ...changed });
       await loadLevels(true);
       toast.success(scope === 'user' ? 'Your colours are saved.' : 'Default colours saved.');
       onClose();
@@ -127,7 +147,9 @@ function LeadStatusColorsModal({ onClose }: { onClose: () => void }) {
   const reset = async () => {
     setSaving(true);
     try {
-      await preferencesApi.resetLeadStatusColors(scope);
+      const others = othersAt(scope);
+      if (Object.keys(others).length) await preferencesApi.setLeadStatusColors(scope, others);
+      else await preferencesApi.resetLeadStatusColors(scope);
       await loadLevels(true);
       pickScope(scope);
       toast.success('Colours reset.');
@@ -144,7 +166,7 @@ function LeadStatusColorsModal({ onClose }: { onClose: () => void }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div className="flex max-h-[90vh] w-full max-w-lg flex-col rounded-2xl bg-white shadow-xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
-          <h3 className="text-lg font-bold text-slate-900">Status colours</h3>
+          <h3 className="text-lg font-bold text-slate-900">{title}</h3>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600" aria-label="Close">
             <XMarkIcon className="h-5 w-5" />
           </button>
@@ -171,7 +193,7 @@ function LeadStatusColorsModal({ onClose }: { onClose: () => void }) {
         )}
 
         <ul className="flex-1 divide-y divide-slate-100 overflow-y-auto px-6">
-          {LEAD_STATUS_OPTIONS.map((o) => (
+          {options.map((o) => (
             <li key={o.value} className="flex items-center gap-3 py-2">
               <input
                 type="color"

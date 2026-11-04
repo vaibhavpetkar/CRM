@@ -226,9 +226,20 @@ export const subscribeLeadStatusColors = (fn: () => void) => {
 };
 export const leadStatusColorVersion = () => colorVersion;
 
+// Site visit statuses share the colour settings, keyed "visit:<status>".
+export const VISIT_STATUS_COLOR_OPTIONS: { value: string; label: string; tone: LeadStatusTone }[] = [
+  { value: 'visit:scheduled', label: 'Scheduled', tone: 'blue' },
+  { value: 'visit:completed', label: 'Site Visit Done', tone: 'green' },
+  { value: 'visit:revisit-done', label: 'Revisit Done', tone: 'purple' },
+  { value: 'visit:cancelled', label: 'Cancelled', tone: 'slate' },
+  { value: 'visit:no-show', label: 'No show', tone: 'orange' },
+];
+const VISIT_BY_KEY = Object.fromEntries(VISIT_STATUS_COLOR_OPTIONS.map((o) => [o.value, o]));
+
 /** Built-in colour (hex) of a status, ignoring anyone's choices. */
 export const defaultLeadStatusColor = (status?: string | null) => {
-  const tone = STATUS_BY_VALUE[String(status || '').toLowerCase()]?.tone;
+  const key = String(status || '').toLowerCase();
+  const tone = (STATUS_BY_VALUE[key] || VISIT_BY_KEY[key])?.tone;
   return tone ? LEAD_STATUS_TONES[tone] : '#94a3b8';
 };
 
@@ -239,6 +250,6 @@ export const leadStatusColor = (status?: string | null) =>
 /** Background for a lead's row or card, by its status: a pale tint of its colour. */
 export const leadStatusRowColor = (status?: string | null) => {
   const key = String(status || '').toLowerCase();
-  if (!STATUS_BY_VALUE[key] && !colorOverrides[key]) return undefined;
+  if (!STATUS_BY_VALUE[key] && !VISIT_BY_KEY[key] && !colorOverrides[key]) return undefined;
   return `color-mix(in srgb, ${leadStatusColor(key)} var(--lead-row-mix), var(--lead-row-base))`;
 };

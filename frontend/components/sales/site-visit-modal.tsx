@@ -19,14 +19,6 @@ export const VISIT_STATUS_LABEL: Record<SiteVisitStatus, string> = {
   'no-show': 'No show',
 };
 
-export const VISIT_STATUS_CLASS: Record<SiteVisitStatus, string> = {
-  scheduled: 'bg-blue-50 text-blue-700',
-  completed: 'bg-emerald-50 text-emerald-700',
-  'revisit-done': 'bg-purple-50 text-purple-700',
-  cancelled: 'bg-slate-100 text-slate-500',
-  'no-show': 'bg-orange-50 text-orange-700',
-};
-
 const toLocalInput = (iso?: string | null) => {
   const d = iso ? new Date(iso) : new Date(Date.now() + 24 * 3600 * 1000);
   if (!iso) d.setHours(11, 0, 0, 0);

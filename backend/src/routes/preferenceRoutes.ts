@@ -2,14 +2,17 @@ import { Router, Response } from 'express';
 import { protect, AuthRequest } from '../middleware/authMiddleware';
 import { clearPreference, getPreferenceLevels, PreferenceScope, setPreference } from '../services/preferenceService';
 import { LEAD_STATUSES } from '../validations/leadValidation';
+import { SITE_VISIT_STATUSES } from '../models/SiteVisit';
 import { asyncHandler } from '../utils/errorHandler';
 
-// Lead status colours: every user can pick their own, a company admin sets the
+// Lead and site visit status colours: every user can pick their own, a company admin sets the
 // company default, and the super admin sets the default for all companies.
 
 const router = Router();
 const KEY = 'lead_status_colors';
 const HEX = /^#[0-9a-fA-F]{6}$/;
+// Lead statuses by name; site visit statuses as "visit:<status>".
+const COLOR_KEYS = [...LEAD_STATUSES, ...SITE_VISIT_STATUSES.map((s) => `visit:${s}`)];
 
 const canSet = (req: AuthRequest, scope: PreferenceScope) => {
   const user = req.user as any;
@@ -42,7 +45,7 @@ router.put('/lead-status-colors', protect, asyncHandler(async (req: AuthRequest,
   if (!input || typeof input !== 'object') return res.status(400).json({ message: 'colors is required.' });
   const colors: Record<string, string> = {};
   for (const [status, color] of Object.entries(input)) {
-    if (LEAD_STATUSES.includes(status) && typeof color === 'string' && HEX.test(color)) colors[status] = color.toLowerCase();
+    if (COLOR_KEYS.includes(status) && typeof color === 'string' && HEX.test(color)) colors[status] = color.toLowerCase();
   }
   await setPreference(scope, KEY, colors, req.user as any);
   res.json({ message: 'Saved.', colors });

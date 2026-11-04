@@ -7,12 +7,14 @@ import Card from '@/components/ui/card';
 import { useToast } from '@/components/ui/toast';
 import { getStoredUser, salesApi, SiteVisitRow, usersApi } from '@/lib/api';
 import { hasPermission } from '@/lib/permissions';
-import { cn } from '@/lib/utils';
-import SiteVisitModal, { VISIT_STATUS_CLASS, VISIT_STATUS_LABEL } from './site-visit-modal';
+import SiteVisitModal, { VISIT_STATUS_LABEL } from './site-visit-modal';
+import { useLeadStatusColors } from '@/components/leads/lead-status-colors';
+import { leadStatusColor } from '@/lib/lead-options';
 
 // Site visits for one lead (lead page, "Site Visits" tab).
 export default function SiteVisitsCard({ lead }: { lead: { id: number; name: string; projectName?: string | null; preferredLocation?: string | null } }) {
   const toast = useToast();
+  useLeadStatusColors();
   const user = getStoredUser();
   const canEdit = hasPermission(user, 'leads:update');
   const canPickAgent = hasPermission(user, 'users:read');
@@ -71,7 +73,12 @@ export default function SiteVisitsCard({ lead }: { lead: { id: number; name: str
                   <span className="text-sm font-semibold text-slate-900">
                     {new Date(v.scheduledAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
                   </span>
-                  <span className={cn('whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold', VISIT_STATUS_CLASS[v.status])}>{VISIT_STATUS_LABEL[v.status]}</span>
+                  <span
+                    className="lead-status-badge whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                    style={{ '--tone': leadStatusColor(`visit:${v.status}`) } as React.CSSProperties}
+                  >
+                    {VISIT_STATUS_LABEL[v.status]}
+                  </span>
                 </div>
                 <p className="mt-0.5 flex items-center gap-1 text-xs text-slate-500">
                   <MapPinIcon className="h-3.5 w-3.5" />
