@@ -122,9 +122,12 @@ export const assertPublicUrl = async (raw: string, opts: UrlGuardOptions = {}): 
 export const safeFetch = async (raw: string, init: RequestInit = {}, opts: UrlGuardOptions = {}): Promise<Response> => {
   let url = raw;
   let { headers } = init;
+  // A slow or silent host must not hold a request (or a background timer) open
+  // for minutes. Callers can pass their own signal for a longer limit.
+  const signal = init.signal || AbortSignal.timeout(30000);
   for (let hop = 0; hop <= 5; hop++) {
     const current = await assertPublicUrl(url, opts);
-    const res = await fetch(current.toString(), { ...init, headers, redirect: 'manual' });
+    const res = await fetch(current.toString(), { ...init, headers, signal, redirect: 'manual' });
     const location = res.headers.get('location');
     if (res.status < 300 || res.status >= 400 || !location) return res;
     const next = new URL(location, current);

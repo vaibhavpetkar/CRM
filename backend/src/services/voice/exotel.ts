@@ -82,6 +82,8 @@ export class ExotelProvider implements VoiceProvider {
       res = await fetch(`${this.baseUrl()}${path}`, {
         ...init,
         headers: { Authorization: this.authHeader(), Accept: 'application/json', ...(init.headers || {}) },
+        // Never let a slow Exotel hold the request (or a timer) open for minutes.
+        signal: init.signal || AbortSignal.timeout(20000),
       });
     } catch (err) {
       throw new VoiceProviderError(`Could not reach Exotel: ${(err as Error).message}`);

@@ -144,6 +144,7 @@ export const syncTaskToGoogle = async (
   try {
     const response = await fetch(`${TASKS_API_BASE}/lists/@default/tasks`, {
       method: 'POST',
+      signal: AbortSignal.timeout(20000),
       headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         title,

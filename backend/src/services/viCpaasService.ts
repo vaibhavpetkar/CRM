@@ -187,7 +187,12 @@ let pullTimer: NodeJS.Timeout | null = null;
 /** Every few minutes, pull call reports for each company that switched Vi CPaaS on with a Pull API URL. */
 export const startViPuller = () => {
   if (pullTimer) return;
+  // Skip a run while the last one is still going, so slow providers never
+  // stack up overlapping runs that pile load on the server.
+  let running = false;
   const run = async () => {
+    if (running) return;
+    running = true;
     try {
       const rows = await runUnscoped(() => Integration.findAll({ where: { provider: VI_PROVIDER_ROW, isEnabled: true, config: { [Op.like]: '%"pullPassword":"v1:%' } } }));
       for (const row of rows) {
@@ -197,6 +202,8 @@ export const startViPuller = () => {
       }
     } catch (err) {
       logger.warn(`[vi] Puller run failed: ${err}`);
+    } finally {
+      running = false;
     }
   };
   pullTimer = setInterval(run, PULL_MINUTES() * 60000);

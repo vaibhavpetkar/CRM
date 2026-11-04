@@ -1,8 +1,18 @@
+# Cap Docker's own container logs. Without this, json-file logs grow forever
+# (the backend logs every request), fill the disk, and then Postgres and the
+# app start failing and slowing down.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 services:
   postgres:
     image: postgres:15-alpine
     container_name: crm_postgres
     restart: always
+    logging: *default-logging
     environment:
       POSTGRES_DB: ${DB_NAME:-crm_db}
       POSTGRES_USER: ${DB_USERNAME:-postgres}
@@ -21,6 +31,7 @@ services:
     image: redis:7-alpine
     container_name: crm_redis
     restart: always
+    logging: *default-logging
     command: redis-server --appendonly yes
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -53,6 +64,7 @@ services:
     image: ollama/ollama:latest
     container_name: crm_ollama
     restart: always
+    logging: *default-logging
     environment:
       # Requests Ollama will actually run at once. Match your real thread
       # count (`nproc`) — e.g. 2 for a 2 vCPU box — and keep this roughly in
@@ -81,6 +93,7 @@ services:
       dockerfile: Dockerfile
     container_name: crm_backend
     restart: always
+    logging: *default-logging
     depends_on:
       postgres:
         condition: service_healthy
@@ -207,6 +220,7 @@ services:
         NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-}
     container_name: crm_frontend
     restart: always
+    logging: *default-logging
     depends_on:
       - backend
     environment:

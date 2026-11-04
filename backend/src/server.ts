@@ -372,6 +372,18 @@ const startServer = async () => {
   }
 };
 
+// A stray rejected promise or thrown error used to kill Node silently, so the
+// container restarted mid-request (users see errors and slow reloads) with
+// nothing in the logs. Log them. A rejection is survivable; a thrown error
+// leaves the process in an unknown state, so exit and let Docker restart it.
+process.on('unhandledRejection', (reason) => {
+  logger.error(`Unhandled promise rejection: ${reason instanceof Error ? reason.stack || reason.message : String(reason)}`);
+});
+process.on('uncaughtException', (err) => {
+  logger.error(`Uncaught exception, restarting: ${err.stack || err.message}`);
+  setTimeout(() => process.exit(1), 500).unref();
+});
+
 startServer();
 
 export default app;

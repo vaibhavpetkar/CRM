@@ -66,7 +66,7 @@ export default function LiveStatusPanel() {
 
   useEffect(() => {
     const first = setTimeout(load, 0);
-    const poll = setInterval(load, POLL_MS);
+    const poll = setInterval(() => { if (!document.hidden) load(); }, POLL_MS);
     const tick = setInterval(() => setNow(Date.now()), 1000);
     const socket = getSocket();
     const onChanged = () => load();

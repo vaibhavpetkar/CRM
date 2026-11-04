@@ -95,7 +95,7 @@ export default function CallTrackingPage() {
       loadCalls();
     };
     socket?.on('presence:changed', onChanged);
-    const poll = setInterval(onChanged, 30000);
+    const poll = setInterval(() => { if (!document.hidden) onChanged(); }, 30000);
     return () => {
       socket?.off('presence:changed', onChanged);
       clearInterval(poll);
