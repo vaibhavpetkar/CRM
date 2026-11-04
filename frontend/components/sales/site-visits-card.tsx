@@ -38,9 +38,9 @@ export default function SiteVisitsCard({ lead }: { lead: { id: number; name: str
     usersApi.getAssignableUsers().then((r) => setAgents(r.users.map((u) => ({ id: u.id, name: u.name })))).catch(() => {});
   }, [load]);
 
-  const markDone = async (v: SiteVisitRow) => {
+  const markDone = async (v: SiteVisitRow, status: 'completed' | 'revisit-done' = 'completed') => {
     try {
-      await salesApi.updateVisit(v.id, { status: 'completed' });
+      await salesApi.updateVisit(v.id, { status });
       load();
     } catch (err: any) {
       toast.error(err.message || 'Could not update the visit.');
@@ -71,7 +71,7 @@ export default function SiteVisitsCard({ lead }: { lead: { id: number; name: str
                   <span className="text-sm font-semibold text-slate-900">
                     {new Date(v.scheduledAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
                   </span>
-                  <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-semibold', VISIT_STATUS_CLASS[v.status])}>{VISIT_STATUS_LABEL[v.status]}</span>
+                  <span className={cn('whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold', VISIT_STATUS_CLASS[v.status])}>{VISIT_STATUS_LABEL[v.status]}</span>
                 </div>
                 <p className="mt-0.5 flex items-center gap-1 text-xs text-slate-500">
                   <MapPinIcon className="h-3.5 w-3.5" />
@@ -82,7 +82,10 @@ export default function SiteVisitsCard({ lead }: { lead: { id: number; name: str
               {canEdit && (
                 <div className="flex shrink-0 gap-2">
                   {v.status === 'scheduled' && (
-                    <Button size="sm" variant="secondary" onClick={() => markDone(v)}>Mark done</Button>
+                    <>
+                      <Button size="sm" variant="secondary" onClick={() => markDone(v)}>Visit done</Button>
+                      <Button size="sm" variant="secondary" onClick={() => markDone(v, 'revisit-done')}>Revisit done</Button>
+                    </>
                   )}
                   <Button size="sm" variant="ghost" onClick={() => setEditing(v)}>Edit</Button>
                 </div>

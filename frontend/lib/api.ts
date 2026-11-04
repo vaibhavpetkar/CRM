@@ -1401,7 +1401,7 @@ export interface CallLogRow {
   error: string | null;
 }
 
-export type SiteVisitStatus = 'scheduled' | 'completed' | 'cancelled' | 'no-show';
+export type SiteVisitStatus = 'scheduled' | 'completed' | 'revisit-done' | 'cancelled' | 'no-show';
 
 export interface SiteVisitRow {
   id: number;

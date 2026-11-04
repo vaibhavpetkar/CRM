@@ -1,6 +1,6 @@
 import { Op, fn, col } from 'sequelize';
 import Call, { TERMINAL_CALL_STATUSES } from '../models/Call';
-import SiteVisit, { SITE_VISIT_STATUSES, SiteVisitStatus } from '../models/SiteVisit';
+import SiteVisit, { DONE_VISIT_STATUSES, SITE_VISIT_STATUSES, SiteVisitStatus } from '../models/SiteVisit';
 import Lead from '../models/Lead';
 import Contact from '../models/Contact';
 import User from '../models/User';
@@ -111,11 +111,11 @@ export const getActivity = async (user: any, query: Record<string, unknown>, onl
   }
   for (const v of visits) {
     const s = statFor(Number(v.userId));
-    if (v.status === 'completed') s.visitsCompleted += 1;
+    if (DONE_VISIT_STATUSES.includes(v.status as SiteVisitStatus)) s.visitsCompleted += 1;
     else if (v.status === 'cancelled' || v.status === 'no-show') s.visitsCancelled += 1;
     else s.visitsScheduled += 1;
     const d = daily.get(localDay(new Date(v.scheduledAt as any)));
-    if (d && (v.status === 'completed' || v.status === 'scheduled')) d.visits += 1;
+    if (d && (DONE_VISIT_STATUSES.includes(v.status as SiteVisitStatus) || v.status === 'scheduled')) d.visits += 1;
   }
 
   const agents = users.map((u) => {
@@ -341,7 +341,7 @@ export const listVisits = async (user: any, query: Record<string, unknown>) => {
 
 const validStatus = (value: unknown): SiteVisitStatus | undefined => {
   if (value === undefined) return undefined;
-  if (!(SITE_VISIT_STATUSES as string[]).includes(String(value))) throw new ValidationError('Status must be scheduled, completed, cancelled or no-show.');
+  if (!(SITE_VISIT_STATUSES as string[]).includes(String(value))) throw new ValidationError(`Status must be one of: ${SITE_VISIT_STATUSES.join(', ')}.`);
   return value as SiteVisitStatus;
 };
 
@@ -384,7 +384,7 @@ export const createVisit = async (user: any, body: Record<string, any>) => {
     projectName: text(body.projectName, 255) ?? lead.projectName ?? null,
     location: text(body.location, 255) ?? lead.preferredLocation ?? null,
     notes: text(body.notes, 5000) ?? null,
-    completedAt: status === 'completed' ? new Date() : null,
+    completedAt: DONE_VISIT_STATUSES.includes(status as SiteVisitStatus) ? new Date() : null,
     createdById: user.id,
   });
   await logActivity({
@@ -392,7 +392,7 @@ export const createVisit = async (user: any, body: Record<string, any>) => {
     entityType: 'Lead',
     entityId: leadId,
     performedById: user.id,
-    details: `Site visit${visitLabel(visit)} ${status === 'completed' ? 'done' : 'scheduled'} for ${new Date(visit.scheduledAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' })}.`,
+    details: `Site visit${visitLabel(visit)} ${status === 'revisit-done' ? 'revisit done' : status === 'completed' ? 'done' : 'scheduled'} for ${new Date(visit.scheduledAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' })}.`,
   }).catch(() => {});
   return serializeVisit(visit, await lookups([visit]));
 };
@@ -407,7 +407,7 @@ export const updateVisit = async (user: any, id: number, body: Record<string, an
   const status = validStatus(body.status);
   if (status) {
     changes.status = status;
-    changes.completedAt = status === 'completed' ? visit.completedAt || new Date() : null;
+    changes.completedAt = DONE_VISIT_STATUSES.includes(status as SiteVisitStatus) ? visit.completedAt || new Date() : null;
   }
   if (body.scheduledAt !== undefined) changes.scheduledAt = validDate(body.scheduledAt);
   if (body.userId !== undefined) changes.userId = await resolveAgent(user, body.userId);

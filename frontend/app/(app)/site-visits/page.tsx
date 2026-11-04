@@ -54,7 +54,7 @@ export default function SiteVisitsPage() {
   }, [canPickAgent]);
 
   const counts = useMemo(() => {
-    const c = { scheduled: 0, completed: 0, cancelled: 0, 'no-show': 0 } as Record<SiteVisitStatus, number>;
+    const c = { scheduled: 0, completed: 0, 'revisit-done': 0, cancelled: 0, 'no-show': 0 } as Record<SiteVisitStatus, number>;
     for (const v of visits || []) c[v.status] += 1;
     return c;
   }, [visits]);
@@ -106,7 +106,7 @@ export default function SiteVisitsPage() {
             </select>
           )}
           <div className="flex flex-wrap gap-1">
-            {(['all', 'scheduled', 'completed', 'cancelled', 'no-show'] as const).map((s) => (
+            {(['all', 'scheduled', 'completed', 'revisit-done', 'cancelled', 'no-show'] as const).map((s) => (
               <button
                 key={s}
                 onClick={() => setStatus(s)}
@@ -165,7 +165,7 @@ export default function SiteVisitsPage() {
                       </span>
                     </td>
                     <td className="px-3 py-3">
-                      <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-semibold', VISIT_STATUS_CLASS[v.status])}>{VISIT_STATUS_LABEL[v.status]}</span>
+                      <span className={cn('whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold', VISIT_STATUS_CLASS[v.status])}>{VISIT_STATUS_LABEL[v.status]}</span>
                     </td>
                     <td className="max-w-xs px-3 py-3 text-slate-600"><p className="line-clamp-2">{v.notes || '—'}</p></td>
                     <td className="whitespace-nowrap px-6 py-3 text-right">
@@ -173,7 +173,8 @@ export default function SiteVisitsPage() {
                         <div className="flex justify-end gap-1">
                           {v.status === 'scheduled' && (
                             <>
-                              <Button size="sm" variant="secondary" onClick={() => update(v, 'completed')}>Done</Button>
+                              <Button size="sm" variant="secondary" onClick={() => update(v, 'completed')}>Visit done</Button>
+                              <Button size="sm" variant="secondary" onClick={() => update(v, 'revisit-done')}>Revisit done</Button>
                               <Button size="sm" variant="ghost" onClick={() => update(v, 'no-show')}>No show</Button>
                             </>
                           )}

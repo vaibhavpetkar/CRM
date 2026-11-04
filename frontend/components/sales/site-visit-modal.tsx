@@ -13,7 +13,8 @@ type LeadRef = { id: number; name: string; projectName?: string | null; preferre
 
 export const VISIT_STATUS_LABEL: Record<SiteVisitStatus, string> = {
   scheduled: 'Scheduled',
-  completed: 'Visit done',
+  completed: 'Site Visit Done',
+  'revisit-done': 'Revisit Done',
   cancelled: 'Cancelled',
   'no-show': 'No show',
 };
@@ -21,6 +22,7 @@ export const VISIT_STATUS_LABEL: Record<SiteVisitStatus, string> = {
 export const VISIT_STATUS_CLASS: Record<SiteVisitStatus, string> = {
   scheduled: 'bg-blue-50 text-blue-700',
   completed: 'bg-emerald-50 text-emerald-700',
+  'revisit-done': 'bg-purple-50 text-purple-700',
   cancelled: 'bg-slate-100 text-slate-500',
   'no-show': 'bg-orange-50 text-orange-700',
 };
@@ -91,7 +93,7 @@ export default function SiteVisitModal({
         ...(canPickAgent && userId ? { userId: Number(userId) } : {}),
       };
       const saved = visit ? await salesApi.updateVisit(visit.id, payload) : await salesApi.createVisit({ ...payload, leadId: leadRef.id });
-      toast.success(visit ? 'Site visit updated.' : status === 'completed' ? 'Site visit logged.' : 'Site visit scheduled.');
+      toast.success(visit ? 'Site visit updated.' : status === 'completed' || status === 'revisit-done' ? 'Site visit logged.' : 'Site visit scheduled.');
       onSaved(saved);
     } catch (err: any) {
       toast.error(err.message || 'Could not save the site visit.');
@@ -195,7 +197,7 @@ export default function SiteVisitModal({
 
         <div className="mt-6 flex justify-end gap-2 border-t border-slate-100 pt-4">
           <Button variant="secondary" size="sm" onClick={onClose}>Cancel</Button>
-          <Button size="sm" onClick={save} disabled={saving}>{saving ? 'Saving...' : visit ? 'Save' : status === 'completed' ? 'Log visit' : 'Schedule visit'}</Button>
+          <Button size="sm" onClick={save} disabled={saving}>{saving ? 'Saving...' : visit ? 'Save' : status === 'completed' || status === 'revisit-done' ? 'Log visit' : 'Schedule visit'}</Button>
         </div>
       </div>
     </div>
