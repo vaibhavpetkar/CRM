@@ -43,50 +43,6 @@ services:
     networks:
       - crm_network
 
-  # Free, local AI provider for the AI Assistant (item: lead/deal summaries,
-  # quote follow-ups, chat widget). No API key, no per-request cost. Runs
-  # llama3.2:1b by default — the smallest/fastest Llama model, chosen for
-  # small (2 vCPU, no GPU) VPS boxes where per-request speed matters more
-  # than model size. Bump OLLAMA_MODEL to llama3.2:3b or llama3.1 for better
-  # accuracy if your server has more CPU to spare.
-  #
-  # Concurrency: this is CPU inference sharing the box with everything else,
-  # it does NOT get faster just by raising OLLAMA_NUM_PARALLEL — that only
-  # controls how many of the queued requests are *allowed* to run at once,
-  # not how much CPU is available to run them. Set both this and the
-  # backend's AI_MAX_CONCURRENT to your actual vCPU/thread count (check with
-  # `nproc`), not higher — a bigger number just adds context-switching
-  # overhead without adding real throughput. For genuinely fast responses
-  # under real concurrency (10+ simultaneous users) on small hardware, set
-  # ANTHROPIC_API_KEY below so requests Ollama can't get to immediately
-  # overflow to Anthropic's infrastructure instead of queuing on this CPU.
-  ollama:
-    image: ollama/ollama:latest
-    container_name: crm_ollama
-    restart: always
-    logging: *default-logging
-    environment:
-      # Requests Ollama will actually run at once. Match your real thread
-      # count (`nproc`) — e.g. 2 for a 2 vCPU box — and keep this roughly in
-      # step with the backend's AI_MAX_CONCURRENT below.
-      - OLLAMA_NUM_PARALLEL=${OLLAMA_NUM_PARALLEL:-2}
-      # How many requests can sit in Ollama's queue before it starts
-      # rejecting new ones outright.
-      - OLLAMA_MAX_QUEUE=${OLLAMA_MAX_QUEUE:-512}
-      # Only one model in use here, so just keep it resident.
-      - OLLAMA_MAX_LOADED_MODELS=1
-      # Keep the model loaded in RAM between requests — without this, Ollama
-      # unloads it after a few minutes idle and the next request pays a slow
-      # reload on top of generation time. Matches the backend's keep_alive.
-      - OLLAMA_KEEP_ALIVE=30m
-    volumes:
-      - ollama_data:/root/.ollama
-    ports:
-      - "127.0.0.1:11434:11434"
-    networks:
-      - crm_network
-    entrypoint: ["/bin/sh", "-c", "ollama serve & sleep 5 && ollama pull ${OLLAMA_MODEL:-llama3.2:1b}; wait"]
-
   backend:
     build:
       context: ./backend
@@ -99,8 +55,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      ollama:
-        condition: service_started
     environment:
       - NODE_ENV=production
       - PORT=5000
@@ -166,13 +120,12 @@ services:
       - INDIAMART_API_URL=${INDIAMART_API_URL:-}
       - SUPER_ADMIN_EMAIL=${SUPER_ADMIN_EMAIL:-admin@crmpro.com}
       - SUPER_ADMIN_PASSWORD=${SUPER_ADMIN_PASSWORD:?Set SUPER_ADMIN_PASSWORD in .env}
-      # AI Assistant — free, local Ollama provider (see the `ollama` service
-      # above). Set ANTHROPIC_API_KEY instead (and leave OLLAMA_BASE_URL
-      # unset) if you'd rather use the paid Anthropic API. If both are set,
-      # Ollama handles what it can and busy overflow spills to Anthropic —
-      # see AI_MAX_CONCURRENT below.
-      - AI_PROVIDER=${AI_PROVIDER:-ollama}
-      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://ollama:11434}
+      # AI Assistant is off by default: the bundled Ollama model was removed
+      # because it used RAM/CPU on small servers. Turn it on by setting
+      # ANTHROPIC_API_KEY (paid), or OLLAMA_BASE_URL pointing at an Ollama
+      # server you run yourself. With neither set, the AI buttons are hidden.
+      - AI_PROVIDER=${AI_PROVIDER:-}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-}
       - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2:1b}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-claude-sonnet-5}
@@ -241,4 +194,3 @@ volumes:
   redis_data:
   backend_uploads:
   backups_data:
-  ollama_data:

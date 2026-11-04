@@ -51,6 +51,10 @@ export default function AIChatWidget() {
     }
   };
 
+  // No AI provider on the server (Ollama removed, no Anthropic key): hide the
+  // button instead of offering a chat that can only answer "not configured".
+  if (!status?.configured) return null;
+
   return (
     <div className="relative">
       <button
