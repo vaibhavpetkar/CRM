@@ -54,7 +54,14 @@ export const META_SCOPES = [
 const LEAD_FIELDS = 'id,created_time,field_data,form_id,ad_name,adset_name,campaign_name,platform,is_organic';
 const SYNC_DAYS = 7;
 const STALE_PROCESSING_MS = 10 * 60 * 1000;
-const POLL_MINUTES = () => Math.max(1, Number(process.env.META_POLL_MINUTES) || 2);
+// Each run costs one Graph call per active form, and Meta caps leadgen calls
+// per Page, so the auto-fetch stays a slow safety net behind the webhook.
+const POLL_MINUTES = () => Math.max(5, Number(process.env.META_POLL_MINUTES) || 10);
+const FORMS_CACHE_MS = 60 * 60 * 1000;
+const BACKOFF_FIRST_MS = 60 * 60 * 1000;
+const BACKOFF_MAX_MS = 12 * 60 * 60 * 1000;
+// Graph API throttling codes: app, user, page, custom and leadgen (80005) limits.
+const RATE_LIMIT_CODES = new Set([4, 17, 32, 613, 80001, 80005]);
 
 export const isMetaConfigured = (): boolean => !!process.env.META_APP_ID && !!process.env.META_APP_SECRET;
 
@@ -63,10 +70,13 @@ const getRedirectUri = () => `${clientUrl()}/api/integrations/meta/callback`;
 export const getWebhookUrl = () => `${clientUrl()}/api/webhooks/meta`;
 
 export class MetaApiError extends Error {
-  constructor(message: string, public status = 502) {
+  constructor(message: string, public status = 502, public code?: number) {
     super(message);
   }
 }
+
+export const isRateLimited = (err: unknown): boolean =>
+  err instanceof MetaApiError && err.code != null && RATE_LIMIT_CODES.has(err.code);
 
 const graph = async (
   path: string,
@@ -90,7 +100,8 @@ const graph = async (
   const body: any = await response.json().catch(() => ({}));
   if (!response.ok || body?.error) {
     const message = body?.error?.message || `Facebook returned ${response.status}.`;
-    throw new MetaApiError(message.slice(0, 480), response.status >= 400 && response.status < 500 ? 400 : 502);
+    const code = Number(body?.error?.code) || undefined;
+    throw new MetaApiError(message.slice(0, 480), response.status >= 400 && response.status < 500 ? 400 : 502, code);
   }
   return body;
 };
@@ -498,6 +509,24 @@ const importLead = async (page: MetaPage, leadgenId: string, prefetched?: any): 
  * any the webhook missed (or that failed before). Already-imported leads are
  * skipped by their leadgen id, so this is safe to run any time.
  */
+// Active forms per Page for the auto-fetch, refreshed hourly: listing every
+// form (old ones included) on each run used up the Page's leadgen limit.
+const activeForms = new Map<string, { at: number; forms: any[] }>();
+
+const listForms = async (page: MetaPage, activeOnly: boolean) => {
+  const cached = activeForms.get(page.pageId);
+  if (activeOnly && cached && Date.now() - cached.at < FORMS_CACHE_MS) return cached.forms;
+  const forms = await graphAll(`${page.pageId}/leadgen_forms`, {
+    fields: 'id,name,status',
+    limit: '100',
+    access_token: page.pageAccessToken!,
+  });
+  for (const form of forms) if (form?.id && form?.name) formNames.set(String(form.id), String(form.name));
+  const active = forms.filter((f) => !f?.status || f.status === 'ACTIVE');
+  activeForms.set(page.pageId, { at: Date.now(), forms: active });
+  return activeOnly ? active : forms;
+};
+
 export const syncPage = async (id: number, opts: { sinceLastSync?: boolean } = {}) => {
   const page = await findPage(id);
   const weekAgo = Date.now() - SYNC_DAYS * 24 * 60 * 60 * 1000;
@@ -507,9 +536,9 @@ export const syncPage = async (id: number, opts: { sinceLastSync?: boolean } = {
   const counts = { created: 0, duplicate: 0, skipped: 0, failed: 0 };
 
   try {
-    const forms = await graphAll(`${page.pageId}/leadgen_forms`, { fields: 'id,name', limit: '100', access_token: page.pageAccessToken! });
+    // The manual fetch reads every form; the auto-fetch only active ones.
+    const forms = await listForms(page, !!opts.sinceLastSync);
     for (const form of forms) {
-      if (form?.id && form?.name) formNames.set(String(form.id), String(form.name));
       const leads = await graphAll(`${form.id}/leads`, {
         fields: LEAD_FIELDS,
         limit: '100',
@@ -522,11 +551,14 @@ export const syncPage = async (id: number, opts: { sinceLastSync?: boolean } = {
       }
     }
   } catch (err: any) {
-    await page.update({ lastError: err.message });
+    const message = isRateLimited(err)
+      ? 'Facebook is limiting how often this Page can be read. Leads still come in by webhook; the CRM fetches again automatically later.'
+      : err.message;
+    await page.update({ lastError: message });
     throw err;
   }
 
-  await page.update({ lastSyncAt: new Date() });
+  await page.update({ lastSyncAt: new Date(), lastError: null });
   return counts;
 };
 
@@ -542,6 +574,8 @@ export const startMetaPoller = () => {
   // Skip a run while the last one is still going, so slow providers never
   // stack up overlapping runs that pile load on the server.
   let running = false;
+  // Pages Facebook is throttling: skip them until `until`, doubling the wait each time.
+  const backoff = new Map<string, { until: number; ms: number }>();
   const run = async () => {
     if (running) return;
     running = true;
@@ -550,9 +584,20 @@ export const startMetaPoller = () => {
       for (const page of pages) {
         const companyId = page.get('companyId') as number | null;
         if (!companyId || !page.pageAccessToken) continue;
-        await runWithTenant(companyId, () => syncPage(page.id, { sinceLastSync: true })).catch((err) =>
-          logger.warn(`[meta] Auto-fetch for page ${page.pageId}: ${err.message}`)
-        );
+        const wait = backoff.get(page.pageId);
+        if (wait && Date.now() < wait.until) continue;
+        try {
+          await runWithTenant(companyId, () => syncPage(page.id, { sinceLastSync: true }));
+          backoff.delete(page.pageId);
+        } catch (err: any) {
+          if (isRateLimited(err)) {
+            const ms = wait ? Math.min(wait.ms * 2, BACKOFF_MAX_MS) : BACKOFF_FIRST_MS;
+            backoff.set(page.pageId, { until: Date.now() + ms, ms });
+            logger.warn(`[meta] Facebook is rate limiting page ${page.pageId}; pausing its auto-fetch for ${ms / 60000} min.`);
+          } else {
+            logger.warn(`[meta] Auto-fetch for page ${page.pageId}: ${err.message}`);
+          }
+        }
       }
     } catch (err) {
       logger.warn(`[meta] Auto-fetch run failed: ${err}`);
