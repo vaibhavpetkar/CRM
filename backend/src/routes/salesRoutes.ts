@@ -8,6 +8,8 @@ import * as salesController from '../controllers/salesController';
 const router = Router();
 
 router.get('/activity', protect, salesController.getActivity);
+// The app pings this once a minute while someone is using it (time active in the CRM).
+router.post('/heartbeat', protect, salesController.heartbeat);
 router.get('/lead-sources', protect, authorize('leads:read'), salesController.getLeadSources);
 router.get('/calls', protect, salesController.getCallLog);
 
