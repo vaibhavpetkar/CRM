@@ -74,7 +74,8 @@ const graph = async (
   method: 'GET' | 'POST' | 'DELETE' = 'GET'
 ): Promise<any> => {
   const url = new URL(path.startsWith('http') ? path : `${graphBase()}/${path.replace(/^\//, '')}`);
-  const init: RequestInit = { method };
+  // A slow Graph API must not hang the request or the auto-fetch timer.
+  const init: RequestInit = { method, signal: AbortSignal.timeout(30000) };
   if (method === 'GET') {
     for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
   } else {
@@ -538,7 +539,12 @@ let pollTimer: NodeJS.Timeout | null = null;
  */
 export const startMetaPoller = () => {
   if (pollTimer || !isMetaConfigured()) return;
+  // Skip a run while the last one is still going, so slow providers never
+  // stack up overlapping runs that pile load on the server.
+  let running = false;
   const run = async () => {
+    if (running) return;
+    running = true;
     try {
       const pages = await runUnscoped(() => MetaPage.findAll({ where: { isSubscribed: true } }));
       for (const page of pages) {
@@ -550,6 +556,8 @@ export const startMetaPoller = () => {
       }
     } catch (err) {
       logger.warn(`[meta] Auto-fetch run failed: ${err}`);
+    } finally {
+      running = false;
     }
   };
   pollTimer = setInterval(run, POLL_MINUTES() * 60000);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import PageHeader from '@/components/ui/page-header';
 import SearchInput from '@/components/ui/search-input';
 import StatusBadge from '@/components/ui/status-badge';
@@ -19,6 +19,9 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { PlusIcon, FunnelIcon, PencilSquareIcon, TrashIcon, EyeIcon, Squares2X2Icon, ListBulletIcon } from '@heroicons/react/24/outline';
 import { useToast } from '@/components/ui/toast';
+
+// Rows per request. The backend caps a page at 200.
+const LEADS_PAGE_SIZE = 200;
 
 export default function LeadsPage() {
   const toast = useToast();
@@ -41,6 +44,12 @@ export default function LeadsPage() {
   // Live green/red status of each sales person, for the Assigned To column.
   const [agentStates, setAgentStates] = useState<Map<number, PresenceState>>(new Map());
   const [leads, setLeads] = useState<any[]>([]);
+  // The server holds every matching lead; the page loads them a page at a
+  // time (newest first) instead of downloading the whole book on every visit.
+  const [totalLeads, setTotalLeads] = useState(0);
+  const [loadedPages, setLoadedPages] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
@@ -144,33 +153,71 @@ export default function LeadsPage() {
     [assignableUsers]
   );
 
+  // Search and filters run on the server, so they still find any lead.
+  const listParams = useMemo(() => {
+    const budget = BUDGET_OPTIONS[Number(budgetFilter)];
+    return {
+      search: debouncedSearch,
+      status: filter,
+      territory: territoryFilter,
+      leadSource: sourceFilter,
+      assignedToId: assigneeFilter,
+      configuration: configFilter.join(','),
+      propertyType: propertyTypeFilter,
+      location: debouncedLocation,
+      budgetFrom: budgetFilter !== '' ? budget?.from : undefined,
+      budgetTo: budgetFilter !== '' ? budget?.to : undefined,
+      dateFrom,
+      dateTo,
+    };
+  }, [debouncedSearch, filter, territoryFilter, sourceFilter, assigneeFilter, configFilter, propertyTypeFilter, debouncedLocation, budgetFilter, dateFrom, dateTo]);
+
+  // Ignores answers to an older filter once the filters have changed.
+  const requestSeq = useRef(0);
+
   const fetchLeads = useCallback(async () => {
+    const seq = ++requestSeq.current;
     setLoading(true);
     setError(null);
     try {
-      const budget = BUDGET_OPTIONS[Number(budgetFilter)];
-      const rows = await leadsApi.getAllLeads({
-        search: debouncedSearch,
-        status: filter,
-        territory: territoryFilter,
-        leadSource: sourceFilter,
-        assignedToId: assigneeFilter,
-        configuration: configFilter.join(','),
-        propertyType: propertyTypeFilter,
-        location: debouncedLocation,
-        budgetFrom: budgetFilter !== '' ? budget?.from : undefined,
-        budgetTo: budgetFilter !== '' ? budget?.to : undefined,
-        dateFrom,
-        dateTo,
-      });
-      setLeads(rows);
+      const res = await leadsApi.getLeads({ ...listParams, page: 1, limit: LEADS_PAGE_SIZE });
+      if (seq !== requestSeq.current) return;
+      setLeads(res.leads || []);
+      setTotalLeads(Number(res.total) || 0);
+      setTotalPages(Math.max(1, Number(res.pages) || 1));
+      setLoadedPages(1);
     } catch (err: any) {
+      if (seq !== requestSeq.current) return;
       setError(err.message || 'Failed to load leads. Is the backend running?');
       setLeads([]);
+      setTotalLeads(0);
+      setTotalPages(0);
+      setLoadedPages(0);
     } finally {
-      setLoading(false);
+      if (seq === requestSeq.current) setLoading(false);
     }
-  }, [debouncedSearch, filter, territoryFilter, sourceFilter, assigneeFilter, configFilter, propertyTypeFilter, debouncedLocation, budgetFilter, dateFrom, dateTo]);
+  }, [listParams]);
+
+  const loadMoreLeads = async () => {
+    if (loadingMore || loadedPages >= totalPages) return;
+    const seq = requestSeq.current;
+    setLoadingMore(true);
+    try {
+      const res = await leadsApi.getLeads({ ...listParams, page: loadedPages + 1, limit: LEADS_PAGE_SIZE });
+      if (seq !== requestSeq.current) return;
+      setLeads((prev) => {
+        const seen = new Set(prev.map((l) => l.id));
+        return [...prev, ...(res.leads || []).filter((l: any) => !seen.has(l.id))];
+      });
+      setTotalLeads(Number(res.total) || 0);
+      setTotalPages(Math.max(1, Number(res.pages) || 1));
+      setLoadedPages((p) => p + 1);
+    } catch (err: any) {
+      toast.error(err.message || 'Could not load more leads.');
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   const activeFilterCount = [
     sourceFilter !== 'all',
@@ -389,7 +436,8 @@ export default function LeadsPage() {
                 entityName: 'Lead',
                 entityNamePlural: 'leads',
                 fields: LEAD_FIELDS,
-                getExportData: () => leads,
+                // Export still includes every lead that matches the filters.
+                getExportData: () => leadsApi.getAllLeads(listParams),
                 onImportRow: handleImportRow,
                 onImportBatch: handleImportBatch,
                 importBatchSize: 500,
@@ -442,7 +490,7 @@ export default function LeadsPage() {
         >
           <FunnelIcon className="h-4 w-4" /> More filters{activeFilterCount ? ` (${activeFilterCount})` : ''}
         </button>
-        <span className="whitespace-nowrap text-sm text-slate-500">{leads.length} lead{leads.length === 1 ? '' : 's'}</span>
+        <span className="whitespace-nowrap text-sm text-slate-500">{totalLeads.toLocaleString('en-IN')} lead{totalLeads === 1 ? '' : 's'}</span>
         <div className="ml-auto flex items-center gap-1 rounded-lg border border-slate-200 bg-white p-1">
           <button
             onClick={() => setView('list')}
@@ -583,7 +631,7 @@ export default function LeadsPage() {
           showToolbar
           canEdit={canEditLeads}
           onSelectionChange={setSelectedLeadIds}
-          totalEntries={leads.length}
+          totalEntries={totalLeads}
           emptyMessage='No leads found. Click "Add Lead" to create one.'
           onRowClick={(lead) => router.push(`/leads/${lead.id}`)}
           actions={(lead) => (
@@ -603,6 +651,16 @@ export default function LeadsPage() {
       </Card>
       )}
 
+      {!loading && loadedPages < totalPages && (
+        <div className="mt-4 flex flex-col items-center gap-1">
+          <Button variant="secondary" onClick={loadMoreLeads} disabled={loadingMore}>
+            {loadingMore ? 'Loading…' : `Load ${Math.min(LEADS_PAGE_SIZE, totalLeads - leads.length).toLocaleString('en-IN')} more leads`}
+          </Button>
+          <span className="text-xs text-slate-500">
+            {leads.length.toLocaleString('en-IN')} of {totalLeads.toLocaleString('en-IN')} loaded. Search or filter to find any lead.
+          </span>
+        </div>
+      )}
     </>
   );
 }

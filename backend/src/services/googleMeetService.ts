@@ -144,6 +144,7 @@ export const createMeetLink = async (params: {
     const requestId = `crm-meet-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const response = await fetch(`${CALENDAR_EVENTS_URL}?conferenceDataVersion=1`, {
       method: 'POST',
+      signal: AbortSignal.timeout(20000),
       headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         summary: params.summary,

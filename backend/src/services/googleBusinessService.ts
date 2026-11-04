@@ -132,7 +132,7 @@ export const getAccounts = async (): Promise<{ accounts: any[] } | { error: stri
   if (!accessToken) return { error: connection.lastError || 'Could not get a valid access token.', status: 401 };
 
   try {
-    const response = await fetch(ACCOUNTS_URL, { headers: { Authorization: `Bearer ${accessToken}` } });
+    const response = await fetch(ACCOUNTS_URL, { headers: { Authorization: `Bearer ${accessToken}` }, signal: AbortSignal.timeout(20000) });
     const body: any = await response.json().catch(() => ({}));
 
     if (!response.ok) {

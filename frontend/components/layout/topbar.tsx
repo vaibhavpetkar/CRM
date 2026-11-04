@@ -134,7 +134,7 @@ export default function Topbar({ onMobileMenuClick }: { onMobileMenuClick?: () =
     loadNotifications();
     // Poll for new notifications every 30s as a fallback in case the socket
     // connection drops — the socket below is what makes the bell feel instant.
-    const interval = setInterval(loadNotifications, 30000);
+    const interval = setInterval(() => { if (!document.hidden) loadNotifications(); }, 30000);
     return () => clearInterval(interval);
   }, [loadNotifications]);
 

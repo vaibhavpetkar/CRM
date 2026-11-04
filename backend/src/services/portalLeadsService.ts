@@ -353,7 +353,7 @@ export const parse99acresXml = (xml: string) => {
 const pull99acres = async (creds: Record<string, string>, from: Date, to: Date) => {
   const url = process.env.ACRES99_API_URL || 'https://www.99acres.com/99api/v1/getmy99Response/OeAuXClO43hwseaXEQ/uid/';
   const xml = `<?xml version='1.0'?><query><user_name>${creds.username}</user_name><pswd>${creds.password}</pswd><start_date>${ymdhms(from)}</start_date><end_date>${ymdhms(to)}</end_date></query>`;
-  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ xml }).toString() });
+  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ xml }).toString(), signal: AbortSignal.timeout(30000) });
   const text = await res.text();
   if (!res.ok) throw new Error(`99acres answered HTTP ${res.status}.`);
   return parse99acresXml(text);
@@ -372,7 +372,7 @@ const pullHousing = async (creds: Record<string, string>, from: Date, to: Date) 
     hash: housingSignature(now, creds.encryptionKey),
     id: creds.profileId,
   });
-  const res = await fetch(`${base}?${qs.toString()}`, { headers: { Accept: 'application/json' } });
+  const res = await fetch(`${base}?${qs.toString()}`, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(30000) });
   const text = await res.text();
   let body: any = null;
   try {
@@ -396,7 +396,7 @@ export const indiamartTime = (d: Date) => {
 const pullIndiamart = async (creds: Record<string, string>, from: Date, to: Date) => {
   const base = process.env.INDIAMART_API_URL || 'https://mapi.indiamart.com/wservce/crm/crmListing/v2/';
   const qs = new URLSearchParams({ glusr_crm_key: creds.crmKey, start_time: indiamartTime(from), end_time: indiamartTime(to) });
-  const res = await fetch(`${base}?${qs.toString()}`, { headers: { Accept: 'application/json' } });
+  const res = await fetch(`${base}?${qs.toString()}`, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(30000) });
   const text = await res.text();
   let body: any = null;
   try {
@@ -443,7 +443,12 @@ let pollTimer: NodeJS.Timeout | null = null;
 /** Every few minutes, pull new leads for every company that saved a portal login. */
 export const startPortalPoller = () => {
   if (pollTimer) return;
+  // Skip a run while the last one is still going, so slow providers never
+  // stack up overlapping runs that pile load on the server.
+  let running = false;
   const run = async () => {
+    if (running) return;
+    running = true;
     try {
       const conns = await runUnscoped(() => PortalConnection.findAll({ where: { isEnabled: true, credentials: { [Op.ne]: null } } }));
       for (const conn of conns) {
@@ -453,6 +458,8 @@ export const startPortalPoller = () => {
       }
     } catch (err) {
       logger.warn(`[portals] Poller run failed: ${err}`);
+    } finally {
+      running = false;
     }
   };
   pollTimer = setInterval(run, POLL_MINUTES() * 60000);

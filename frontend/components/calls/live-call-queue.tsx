@@ -40,7 +40,7 @@ export default function LiveCallQueue({ className }: { className?: string }) {
 
   useEffect(() => {
     const first = setTimeout(load, 0);
-    const poll = setInterval(load, POLL_MS);
+    const poll = setInterval(() => { if (!document.hidden) load(); }, POLL_MS);
     const tick = setInterval(() => setNow(Date.now()), 1000);
     const socket = getSocket();
     socket?.on('presence:changed', load);

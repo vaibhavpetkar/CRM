@@ -411,7 +411,16 @@ export const endStaleCalls = async () => {
 let staleTimer: NodeJS.Timeout | null = null;
 export const startStaleCallSweeper = () => {
   if (staleTimer) return;
-  staleTimer = setInterval(() => endStaleCalls().catch((err) => logger.warn(`[voice] Stuck-call sweep failed: ${err}`)), 60000);
+  let running = false;
+  staleTimer = setInterval(() => {
+    if (running) return;
+    running = true;
+    endStaleCalls()
+      .catch((err) => logger.warn(`[voice] Stuck-call sweep failed: ${err}`))
+      .finally(() => {
+        running = false;
+      });
+  }, 60000);
   staleTimer.unref?.();
 };
 

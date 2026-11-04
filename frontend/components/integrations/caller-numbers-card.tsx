@@ -46,7 +46,7 @@ export default function CallerNumbersCard({ bare = false }: { bare?: boolean } =
       .getUsers()
       .then((res) => setUsers(res.users || []))
       .catch(() => setUsers([]));
-    const t = setInterval(load, LIVE_REFRESH_MS);
+    const t = setInterval(() => { if (!document.hidden) load(); }, LIVE_REFRESH_MS);
     return () => clearInterval(t);
   }, [load]);
 

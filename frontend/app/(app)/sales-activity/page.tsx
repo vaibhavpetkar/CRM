@@ -57,7 +57,7 @@ export default function SalesActivityPage() {
 
   useEffect(() => {
     const first = setTimeout(load, 0);
-    const poll = setInterval(load, POLL_MS);
+    const poll = setInterval(() => { if (!document.hidden) load(); }, POLL_MS);
     // Managers get a nudge whenever someone's call or online status changes.
     const socket = getSocket();
     socket?.on('presence:changed', load);
