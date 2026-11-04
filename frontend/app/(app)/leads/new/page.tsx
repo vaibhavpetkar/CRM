@@ -25,6 +25,7 @@ import { useToast } from '@/components/ui/toast';
 import { useKeyboardShortcuts } from '@/lib/hooks/useKeyboardShortcuts';
 import { leadsApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { LeadStatusSelect } from '@/components/leads/lead-status';
 import { CONFIGURATION_OPTIONS, LEAD_SOURCE_OPTIONS, PROPERTY_TYPE_OPTIONS } from '@/lib/lead-options';
 
 // Today as YYYY-MM-DD in the browser's time zone.
@@ -47,6 +48,7 @@ const leadSchema = z.object({
   phone: z.string().optional(),
   jobTitle: z.string().optional(),
   leadSource: z.string().optional(),
+  status: z.string().optional(),
   nextFollowUp: z.string().optional().refine((v) => !v || v >= todayStr(), "Follow-up date can't be before today"),
   followUpRemark: z.string().optional(),
   assignedToId: z.union([z.string(), z.number()]).optional(),
@@ -140,13 +142,13 @@ export default function NewLeadPage() {
     formState: { errors, isSubmitting },
   } = useForm<LeadFormValues>({
     resolver: zodResolver(leadSchema),
-    defaultValues: { leadSource: 'website', assignedToId: '' },
+    defaultValues: { leadSource: 'website', status: 'new', assignedToId: '' },
   });
 
   const toPayload = (data: LeadFormValues) => {
     const payload: Record<string, any> = {
       ...data,
-      status: 'new',
+      status: data.status || 'new',
       leadSource: (data.leadSource || 'website').toLowerCase().replace(/\s+/g, '-'),
       assignedToId: data.assignedToId ? Number(data.assignedToId) : null,
       budgetMin: data.budgetMin ? Number(data.budgetMin) : null,
@@ -246,6 +248,9 @@ export default function NewLeadPage() {
               <option key={o.value} value={o.value}>{o.label}</option>
             ))}
           </IconSelect>
+        </Field>
+        <Field label="Status">
+          <LeadStatusSelect value={watch('status') || 'new'} onChange={(v) => setValue('status', v)} />
         </Field>
         <Field label="Assigned To (Lead Owner)">
           <UserAutocomplete

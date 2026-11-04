@@ -139,14 +139,81 @@ export const budgetRange = (min?: number | string | null, max?: number | string 
   return '';
 };
 
-// ─── Lead status colours ──────────────────────────────────────────────────────
+// ─── Lead statuses ────────────────────────────────────────────────────────────
 
-// Statuses that get their own row colour on the Leads list (see the
-// --lead-row-* variables in app/globals.css).
-export const LEAD_STATUS_COLOR_KEYS = ['new', 'contacted', 'working', 'qualified', 'unqualified', 'converted', 'lost'];
+// Lead statuses a user can pick, in the order the pickers list them. `value`
+// is what is stored on the lead (keep in sync with ACTIVE_LEAD_STATUSES in
+// backend/src/validations/leadValidation.ts), `tone` picks its colour.
+// 'new' is the starting status every lead gets.
+export const LEAD_STATUS_TONES = {
+  blue: '#3b82f6',
+  amber: '#f59e0b',
+  indigo: '#6366f1',
+  green: '#22c55e',
+  slate: '#94a3b8',
+  teal: '#14b8a6',
+  red: '#ef4444',
+  orange: '#f97316',
+  yellow: '#eab308',
+  rose: '#f43f5e',
+  lime: '#84cc16',
+  cyan: '#06b6d4',
+  purple: '#a855f7',
+  sky: '#0ea5e9',
+} as const;
+
+export type LeadStatusTone = keyof typeof LEAD_STATUS_TONES;
+
+export const LEAD_STATUS_OPTIONS: { value: string; label: string; tone: LeadStatusTone }[] = [
+  { value: 'new', label: 'New', tone: 'blue' },
+  { value: 'cnr', label: 'CNR (Call Not Received)', tone: 'orange' },
+  { value: 'call-busy', label: 'Call Busy', tone: 'orange' },
+  { value: 'call-later', label: 'Call Later', tone: 'yellow' },
+  { value: 'not-interested', label: 'Not Interested', tone: 'rose' },
+  { value: 'invalid-number', label: 'Invalid Number', tone: 'slate' },
+  { value: 'wrong-number', label: 'Wrong Number', tone: 'slate' },
+  { value: 'whatsapp-done', label: 'WhatsApp Done', tone: 'lime' },
+  { value: 'details-shared', label: 'Details Shared', tone: 'cyan' },
+  { value: 'revisit-done', label: 'Revisit Done', tone: 'purple' },
+  { value: 'ready-possession', label: 'Looking for Ready Possession', tone: 'sky' },
+  { value: 'budget-issue', label: 'Budget Issue', tone: 'rose' },
+  { value: 'loan-problem', label: 'Loan Problem', tone: 'rose' },
+  { value: 'final-rate-given', label: 'Final Rate Given', tone: 'green' },
+  { value: 'plan-dropped', label: 'Plan Dropped', tone: 'red' },
+  { value: 'plan-on-hold', label: 'Plan is on Hold', tone: 'yellow' },
+  { value: 'postponed', label: 'Postponed', tone: 'yellow' },
+  { value: 'nearing-possession', label: 'Looking for Nearing Possession', tone: 'sky' },
+];
+
+export const LEAD_STATUS_VALUES = LEAD_STATUS_OPTIONS.map((o) => o.value);
+
+// Earlier statuses, no longer offered in any picker. Leads that still carry
+// one keep showing its name and colour until someone changes it.
+export const LEGACY_LEAD_STATUS_OPTIONS: { value: string; label: string; tone: LeadStatusTone }[] = [
+  { value: 'contacted', label: 'Contacted', tone: 'amber' },
+  { value: 'working', label: 'Working / In Progress', tone: 'indigo' },
+  { value: 'qualified', label: 'Qualified', tone: 'green' },
+  { value: 'unqualified', label: 'Unqualified / Disqualified', tone: 'slate' },
+  { value: 'converted', label: 'Converted', tone: 'teal' },
+  { value: 'lost', label: 'Lost', tone: 'red' },
+];
+
+const STATUS_BY_VALUE = Object.fromEntries([...LEAD_STATUS_OPTIONS, ...LEGACY_LEAD_STATUS_OPTIONS].map((o) => [o.value, o]));
+
+/** "cnr" -> "CNR (Call Not Received)"; unknown -> Title Case. */
+export const leadStatusLabel = (status?: string | null) => {
+  const key = String(status || '').toLowerCase();
+  return STATUS_BY_VALUE[key]?.label || key.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) || '—';
+};
+
+/** Base colour (hex) of a status, for dots and charts. */
+export const leadStatusColor = (status?: string | null) => {
+  const tone = STATUS_BY_VALUE[String(status || '').toLowerCase()]?.tone;
+  return tone ? LEAD_STATUS_TONES[tone] : '#94a3b8';
+};
 
 /** Background for a lead's row or card, by its status. Unknown statuses stay plain. */
 export const leadStatusRowColor = (status?: string | null) => {
-  const key = String(status || '').toLowerCase();
-  return LEAD_STATUS_COLOR_KEYS.includes(key) ? `var(--lead-row-${key})` : undefined;
+  const tone = STATUS_BY_VALUE[String(status || '').toLowerCase()]?.tone;
+  return tone ? `var(--lead-tone-${tone})` : undefined;
 };

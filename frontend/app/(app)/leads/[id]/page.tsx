@@ -18,6 +18,7 @@ import { useKeyboardShortcuts } from '@/lib/hooks/useKeyboardShortcuts';
 import CallButton from '@/components/calls/call-button';
 import CallHistory from '@/components/calls/call-history';
 import LogCallModal from '@/components/calls/log-call-modal';
+import { LeadStatusSelect } from '@/components/leads/lead-status';
 import SiteVisitsCard from '@/components/sales/site-visits-card';
 import FollowUpHistoryDrawer from '@/components/leads/follow-up-history-drawer';
 
@@ -339,19 +340,11 @@ export default function LeadDetailsPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700">Status</label>
-                <select
+                <LeadStatusSelect
                   value={formData.status || ''}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                  className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
-                >
-                  <option value="new">New</option>
-                  <option value="contacted">Contacted</option>
-                  <option value="working">Working / In Progress</option>
-                  <option value="qualified">Qualified</option>
-                  <option value="unqualified">Unqualified / Disqualified</option>
-                  <option value="converted">Converted</option>
-                  <option value="lost">Lost</option>
-                </select>
+                  onChange={(v) => setFormData({ ...formData, status: v })}
+                  className="mt-1"
+                />
               </div>
             </div>
 

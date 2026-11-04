@@ -10,6 +10,7 @@ import { userCan } from './callService';
 import { getTeamPresence, PresenceState } from './presenceService';
 import { formatIndianNumber, normalizeIndianNumber } from '../utils/indianPhone';
 import { localDay, startOfLocalDay } from '../utils/reportTime';
+import { DEAD_LEAD_STATUSES, ENGAGED_LEAD_STATUSES } from '../validations/leadValidation';
 
 // Sales-team reporting for the real-estate CRM: calls and site visits per
 // sales person, where leads come from, and the full call log (call
@@ -164,7 +165,7 @@ export const getActivity = async (user: any, query: Record<string, unknown>, onl
 // ─── Lead sources ───────────────────────────────────────────────────────────
 
 const WON = ['converted'];
-const QUALIFIED = ['qualified', 'converted'];
+const QUALIFIED = ENGAGED_LEAD_STATUSES;
 
 export const getLeadSources = async (query: Record<string, unknown>) => {
   const { fromDay, toDay, start, end } = parseRange(query.from, query.to);
@@ -185,7 +186,7 @@ export const getLeadSources = async (query: Record<string, unknown>) => {
     s.total += 1;
     if (QUALIFIED.includes(r.status) || r.isConverted) s.qualified += 1;
     if (WON.includes(r.status) || r.isConverted) s.converted += 1;
-    if (r.status === 'lost') s.lost += 1;
+    if (DEAD_LEAD_STATUSES.includes(r.status)) s.lost += 1;
     if (!r.assignedToId) s.unassigned += 1;
     const day = localDay(new Date(r.createdAt));
     s.daily[day] = (s.daily[day] || 0) + 1;

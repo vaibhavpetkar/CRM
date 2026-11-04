@@ -20,7 +20,7 @@ interface LeadAttributes {
   website?: string | null;
   jobTitle?: string | null; // a.k.a "Designation"
   leadSource: string; // e.g., 'website', 'social-media', 'referral', 'event', 'linkedin'
-  status: string;     // 'new' | 'contacted' | 'working' | 'qualified' | 'unqualified' | 'converted' | 'lost'
+  status: string;     // see LEAD_STATUSES in validations/leadValidation.ts
   industry?: string | null;
   noOfEmployees?: number | null;
   annualRevenue?: string | null; // a.k.a "Annual Turnover" — fixed range label, e.g. "₹1–5 Crores" (Task 2.2)

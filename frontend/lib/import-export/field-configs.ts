@@ -1,3 +1,4 @@
+import { LEAD_STATUS_VALUES } from '@/lib/lead-options';
 import type { ImportExportChildTable, ImportExportField } from './types';
 import { LEAD_SOURCE_OPTIONS } from '../lead-options';
 
@@ -16,7 +17,7 @@ export const LEAD_FIELDS: ImportExportField[] = [
   { key: 'jobTitle', label: 'Job Title', type: 'text' },
   { key: 'leadSource', label: 'Lead Source', type: 'select', options: LEAD_SOURCE_OPTIONS.map((o) => o.value) },
   { key: 'subSource', label: 'Sub Source', type: 'text' },
-  { key: 'status', label: 'Status', type: 'select', options: ['new', 'contacted', 'working', 'qualified', 'unqualified', 'converted', 'lost'] },
+  { key: 'status', label: 'Status', type: 'select', options: LEAD_STATUS_VALUES },
   { key: 'industry', label: 'Industry', type: 'text' },
   { key: 'noOfEmployees', label: 'No. of Employees', type: 'number', defaultExport: false },
   { key: 'annualRevenue', label: 'Annual Revenue', type: 'number', defaultExport: false },

@@ -10,6 +10,7 @@ import { currentCompanyId, runWithTenant, runUnscoped } from '../tenancy/context
 import { getOnlineUserIds } from '../realtime/presence';
 import { normalizeIndianNumber } from '../utils/indianPhone';
 import logger from '../utils/logger';
+import { DEAD_LEAD_STATUSES } from '../validations/leadValidation';
 
 /**
  * Rotational calling: new leads (and incoming calls, through the provider's
@@ -163,7 +164,7 @@ export const distributeUnassigned = async (limit = 500) => {
   const settings = await getRotationSettings();
   if (!settings.userIds.length) throw new ValidationError('Add sales people to the rotation first.');
   const leads = await Lead.findAll({
-    where: { assignedToId: null, isConverted: false, status: { [Op.notIn]: ['converted', 'lost', 'unqualified'] } },
+    where: { assignedToId: null, isConverted: false, status: { [Op.notIn]: ['converted', ...DEAD_LEAD_STATUSES] } },
     order: [['createdAt', 'ASC']],
     limit,
     attributes: ['id'],

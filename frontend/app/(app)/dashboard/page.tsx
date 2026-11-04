@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { LeadStatusBadge } from '@/components/leads/lead-status';
+import { leadStatusColor, leadStatusLabel } from '@/lib/lead-options';
 import Link from 'next/link';
-import StatusBadge from '@/components/ui/status-badge';
 import LoadingSpinner from '@/components/ui/loading-spinner';
 import { KpiCard, Panel, PanelLink, PeriodSelect, SelectPill, OwnerChip } from '@/components/ui/analytics';
 import { DAY_MS as DAY, dayEnds, dailyCounts, dealMeasures, dealTrend, parseDeals, percentChange } from '@/lib/analytics';
@@ -51,25 +52,16 @@ const METRICS = [
   { value: 'count', label: 'Deal Count' },
 ];
 
-// Lead stages as chevrons, deep navy to pale blue like the reference design.
+// Lead stages as chevrons, deep navy to pale blue like the reference design:
+// the main steps a real-estate lead moves through.
 const PIPELINE_STAGES = [
   { key: 'new', label: 'New', bg: '#0b2a6f', text: '#ffffff' },
-  { key: 'contacted', label: 'Contacted', bg: '#0a6cf5', text: '#ffffff' },
-  { key: 'qualified', label: 'Qualified', bg: '#a8cdfb', text: '#0b2a6f' },
-  { key: 'working', label: 'Working', bg: '#c4ddfc', text: '#0b2a6f' },
-  { key: 'converted', label: 'Converted', bg: '#d9e9fd', text: '#0b2a6f' },
-  { key: 'lost', label: 'Lost', bg: '#e8f1fe', text: '#0b2a6f' },
+  { key: 'cnr', label: 'CNR', bg: '#0a6cf5', text: '#ffffff' },
+  { key: 'details-shared', label: 'Details Shared', bg: '#a8cdfb', text: '#0b2a6f' },
+  { key: 'revisit-done', label: 'Revisit Done', bg: '#c4ddfc', text: '#0b2a6f' },
+  { key: 'final-rate-given', label: 'Final Rate Given', bg: '#d9e9fd', text: '#0b2a6f' },
+  { key: 'not-interested', label: 'Not Interested', bg: '#e8f1fe', text: '#0b2a6f' },
 ];
-
-const STATUS_COLORS: Record<string, string> = {
-  contacted: '#ef4444',
-  converted: '#f97316',
-  lost: '#e11d48',
-  new: '#0a6cf5',
-  qualified: '#16a34a',
-  working: '#8b5cf6',
-  unqualified: '#94a3b8',
-};
 
 const SOURCE_COLORS: Record<string, string> = {
   other: '#0a6cf5',
@@ -89,7 +81,6 @@ const ACTIVITY_BADGE = {
   task: { label: 'Task', cls: 'bg-orange-50 text-orange-700', icon: ClipboardDocumentCheckIcon, tile: 'bg-orange-50 text-orange-500' },
 } as const;
 
-const formatLabel = (value: string) => (value || 'Unknown').replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
 const greeting = () => {
   const h = new Date().getHours();
@@ -359,7 +350,7 @@ export default function DashboardPage() {
   const statusSlices: Slice[] = Object.entries(statusCounts)
     .filter(([, n]) => n > 0)
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([status, n]) => ({ name: formatLabel(status), value: n, color: STATUS_COLORS[status] || '#64748b' }));
+    .map(([status, n]) => ({ name: leadStatusLabel(status), value: n, color: leadStatusColor(status) }));
 
   const chartValue = (v: number) => (metric === 'count' ? v.toLocaleString() : formatCurrency(v));
   const tickEvery = Math.max(1, Math.round(days / 6));
@@ -619,7 +610,7 @@ export default function DashboardPage() {
                         <p className="text-[11px] text-slate-500">{lead.email || 'No email'}</p>
                       </td>
                       <td className="px-4 py-2.5 text-slate-500">{lead.company || '—'}</td>
-                      <td className="px-4 py-2.5"><StatusBadge status={lead.status || 'new'} /></td>
+                      <td className="px-4 py-2.5"><LeadStatusBadge status={lead.status || 'new'} /></td>
                       <td className="px-4 py-2.5">{lead.score || 0}</td>
                       <td className="px-4 py-2.5">{formatCurrency(Number(lead.value) || 0)}</td>
                       <td className="px-4 py-2.5"><OwnerChip name={lead.assignedTo} /></td>
