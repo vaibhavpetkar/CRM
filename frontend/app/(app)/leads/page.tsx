@@ -13,7 +13,8 @@ import ImportExportButtons from '@/components/ui/import-export-buttons';
 import { LEAD_FIELDS } from '@/lib/import-export/field-configs';
 import { formatCurrency } from '@/lib/utils';
 import { leadsApi, usersApi, salesApi, getStoredUser, PresenceState } from '@/lib/api';
-import { VISIT_LEAD_STATUSES, leadStatusLabel, LEAD_SOURCE_OPTIONS, LEAD_STATUS_VALUES, leadStatusRowColor, CONFIGURATION_OPTIONS, PROPERTY_TYPE_OPTIONS, BUDGET_OPTIONS, leadSourceLabel, budgetRange } from '@/lib/lead-options';
+import { lastNoteLine } from '@/components/leads/lead-notes';
+import { VISIT_LEAD_STATUSES, leadStatusLabel, LEAD_STATUS_OPTIONS, LEAD_SOURCE_OPTIONS, LEAD_STATUS_VALUES, leadStatusRowColor, CONFIGURATION_OPTIONS, PROPERTY_TYPE_OPTIONS, BUDGET_OPTIONS, leadSourceLabel, budgetRange } from '@/lib/lead-options';
 import { AgentStatusDot } from '@/components/sales/agent-status';
 import { hasPermission } from '@/lib/permissions';
 import { useKeyboardShortcuts } from '@/lib/hooks/useKeyboardShortcuts';
@@ -41,6 +42,15 @@ export default function LeadsPage() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [showFilters, setShowFilters] = useState(false);
+  // Call note filters: on each lead's latest note, or on any one note.
+  const [noteScope, setNoteScope] = useState<'last' | 'any'>('last');
+  const [noteFrom, setNoteFrom] = useState('');
+  const [noteTo, setNoteTo] = useState('');
+  const [noteSearch, setNoteSearch] = useState('');
+  const [debouncedNoteSearch, setDebouncedNoteSearch] = useState('');
+  const [noteStatus, setNoteStatus] = useState('all');
+  const [noteBy, setNoteBy] = useState('all');
+  const [noteNames, setNoteNames] = useState<string[]>([]);
   // Typed text waits a moment before searching, so each key press doesn't reload every lead.
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [debouncedLocation, setDebouncedLocation] = useState('');
@@ -75,6 +85,10 @@ export default function LeadsPage() {
       .getAssignableUsers()
       .then((res) => setAssignableUsers(res.users.map((u) => ({ id: u.id, name: u.name }))))
       .catch(() => setAssignableUsers([]));
+    leadsApi
+      .getNoteNames()
+      .then((res) => setNoteNames(res.names || []))
+      .catch(() => setNoteNames([]));
     salesApi
       .getActivity()
       .then((res) => setAgentStates(new Map(res.agents.map((a) => [a.userId, a.state]))))
@@ -97,6 +111,12 @@ export default function LeadsPage() {
     take('dateFrom', setDateFrom);
     take('dateTo', setDateTo);
     take('location', setLocationFilter);
+    take('noteFrom', setNoteFrom);
+    take('noteTo', setNoteTo);
+    take('noteStatus', setNoteStatus);
+    take('noteBy', setNoteBy);
+    take('noteSearch', setNoteSearch);
+    if (q.get('noteScope') === 'any') setNoteScope('any');
     if (any) setShowFilters(true);
     // Dashboard pipeline stages link here with ?status=..., a top-level filter.
     const status = q.get('status');
@@ -112,6 +132,13 @@ export default function LeadsPage() {
     const t = setTimeout(() => setDebouncedLocation(locationFilter), 300);
     return () => clearTimeout(t);
   }, [locationFilter]);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedNoteSearch(noteSearch), 300);
+    return () => clearTimeout(t);
+  }, [noteSearch]);
+
+  const noteFiltersOn = !!(noteFrom || noteTo || noteSearch.trim() || noteStatus !== 'all' || noteBy !== 'all');
 
   // The topbar's Quick Create menu links here with ?quickCreate=1; Add Lead is a full page now.
   useEffect(() => {
@@ -173,8 +200,14 @@ export default function LeadsPage() {
       budgetTo: budgetFilter !== '' ? budget?.to : undefined,
       dateFrom,
       dateTo,
+      noteScope: noteFiltersOn ? noteScope : undefined,
+      noteFrom,
+      noteTo,
+      noteSearch: debouncedNoteSearch,
+      noteStatus,
+      noteBy,
     };
-  }, [debouncedSearch, filter, sourceFilter, assigneeFilter, configFilter, propertyTypeFilter, debouncedLocation, budgetFilter, dateFrom, dateTo]);
+  }, [debouncedSearch, filter, sourceFilter, assigneeFilter, configFilter, propertyTypeFilter, debouncedLocation, budgetFilter, dateFrom, dateTo, noteFiltersOn, noteScope, noteFrom, noteTo, debouncedNoteSearch, noteStatus, noteBy]);
 
   // Ignores answers to an older filter once the filters have changed.
   const requestSeq = useRef(0);
@@ -231,6 +264,10 @@ export default function LeadsPage() {
     !!locationFilter.trim(),
     budgetFilter !== '',
     !!dateFrom || !!dateTo,
+    !!noteFrom || !!noteTo,
+    !!noteSearch.trim(),
+    noteStatus !== 'all',
+    noteBy !== 'all',
   ].filter(Boolean).length;
 
   const clearFilters = () => {
@@ -242,6 +279,12 @@ export default function LeadsPage() {
     setBudgetFilter('');
     setDateFrom('');
     setDateTo('');
+    setNoteFrom('');
+    setNoteTo('');
+    setNoteSearch('');
+    setNoteStatus('all');
+    setNoteBy('all');
+    setNoteScope('last');
   };
 
   const toggleConfig = (c: string) => setConfigFilter((prev) => (prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]));
@@ -256,6 +299,11 @@ export default function LeadsPage() {
 
   const importPayload = (row: Record<string, any>) => {
     const payload: Record<string, any> = { ...row };
+    // A Notes column written as dated call notes ("31/10/26- CNR (SS) ...") is the call history.
+    if (!payload.callNotes && /\d{1,2}\s*[/.-]\s*\d{1,2}\s*[/.-]\s*\d{2,4}/.test(String(payload.notes || ''))) {
+      payload.callNotes = payload.notes;
+      delete payload.notes;
+    }
     if (payload.leadSource) payload.leadSource = String(payload.leadSource).toLowerCase().trim().replace(/\s+/g, '-');
     if (payload.status) payload.status = String(payload.status).toLowerCase().trim();
     ['score', 'value', 'noOfEmployees', 'latitude', 'longitude', 'budgetMin', 'budgetMax'].forEach((key) => {
@@ -328,6 +376,21 @@ export default function LeadsPage() {
       },
     },
     { header: 'Status', accessor: (lead) => <LeadStatusBadge status={lead.status} /> },
+    {
+      header: 'Last Note',
+      id: 'lastNote',
+      sortKey: (lead) => String(lead.lastNoteDate || ''),
+      accessor: (lead) => {
+        const line = lastNoteLine(lead);
+        if (!line) return <span className="text-slate-400">—</span>;
+        return (
+          <Link href={`/leads/${lead.id}`} className="block max-w-[260px] text-slate-600 hover:text-[var(--primary)]" title={line}>
+            <span className="block truncate">{line}</span>
+            {lead.notesCount > 1 && <span className="block text-[11px] text-slate-400">{lead.notesCount} notes</span>}
+          </Link>
+        );
+      },
+    },
     {
       header: 'Requirement',
       id: 'requirement',
@@ -568,6 +631,63 @@ export default function LeadsPage() {
               <button type="button" onClick={clearFilters} disabled={!activeFilterCount} className="text-sm font-medium text-[var(--primary)] hover:underline disabled:text-slate-300 disabled:no-underline">
                 Clear filters
               </button>
+            </div>
+          </div>
+          <div className="mt-4 border-t border-slate-100 pt-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Call notes</span>
+              <div className="flex items-center gap-1 rounded-lg border border-slate-200 p-0.5 text-xs font-medium">
+                {(['last', 'any'] as const).map((k) => (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => setNoteScope(k)}
+                    className={`rounded-md px-2 py-1 ${noteScope === k ? 'bg-[var(--primary)] text-white' : 'text-slate-500 hover:text-slate-700'}`}
+                    title={k === 'last' ? "Match each lead's latest note" : 'Match any one note on the lead'}
+                  >
+                    {k === 'last' ? 'Latest note' : 'Any note'}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              <div>
+                <label className="block text-xs font-medium text-slate-500">Note date from</label>
+                <input type="date" value={noteFrom} max={noteTo || undefined} onChange={(e) => setNoteFrom(e.target.value)} className={filterField} />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-500">Note date to</label>
+                <input type="date" value={noteTo} min={noteFrom || undefined} onChange={(e) => setNoteTo(e.target.value)} className={filterField} />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-500">Note says</label>
+                <input value={noteSearch} onChange={(e) => setNoteSearch(e.target.value)} placeholder="e.g. CNR, switch off" className={filterField} />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-500">Note status</label>
+                <select value={noteStatus} onChange={(e) => setNoteStatus(e.target.value)} className={filterField}>
+                  <option value="all">Any status</option>
+                  {LEAD_STATUS_OPTIONS.filter((o) => o.value !== 'new').map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-500">Note by</label>
+                <select value={noteBy} onChange={(e) => setNoteBy(e.target.value)} className={filterField}>
+                  <option value="all">Anyone</option>
+                  {assignableUsers.map((u) => (
+                    <option key={u.id} value={u.id}>{u.name}</option>
+                  ))}
+                  {noteNames.length > 0 && (
+                    <optgroup label="Names from imported notes">
+                      {noteNames.map((n) => (
+                        <option key={n} value={`name:${n}`}>{n}</option>
+                      ))}
+                    </optgroup>
+                  )}
+                </select>
+              </div>
             </div>
           </div>
           <div className="mt-3">

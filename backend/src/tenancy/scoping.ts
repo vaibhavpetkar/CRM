@@ -9,6 +9,7 @@ import Lead from '../models/Lead';
 import LeadProduct from '../models/LeadProduct';
 import LeadTax from '../models/LeadTax';
 import LeadFollowUp from '../models/LeadFollowUp';
+import LeadNote from '../models/LeadNote';
 import Deal from '../models/Deal';
 import Contact from '../models/Contact';
 import Quote from '../models/Quote';
@@ -68,6 +69,7 @@ export const TENANT_MODELS: ModelStatic<Model>[] = [
   LeadProduct,
   LeadTax,
   LeadFollowUp,
+  LeadNote,
   Deal,
   Contact,
   Quote,

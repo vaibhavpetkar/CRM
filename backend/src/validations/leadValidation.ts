@@ -4,7 +4,7 @@ import { body } from 'express-validator';
 // frontend/lib/lead-options.ts). 'new' is the starting status of every lead.
 export const ACTIVE_LEAD_STATUSES = [
   'new',
-  'cnr', 'call-busy', 'call-later', 'not-interested', 'invalid-number', 'wrong-number',
+  'cnr', 'call-busy', 'switch-off', 'call-later', 'not-interested', 'invalid-number', 'wrong-number',
   'whatsapp-done', 'details-shared', 'site-visit-done', 'revisit-done', 'ready-possession', 'budget-issue',
   'loan-problem', 'final-rate-given', 'plan-dropped', 'plan-on-hold', 'postponed', 'nearing-possession',
 ];

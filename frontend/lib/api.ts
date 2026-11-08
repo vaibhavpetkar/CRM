@@ -350,6 +350,13 @@ export interface LeadListParams {
   budgetTo?: number | string;
   dateFrom?: string; // YYYY-MM-DD
   dateTo?: string;
+  // Call notes: the latest note on each lead, or any one note with noteScope=any.
+  noteScope?: 'last' | 'any';
+  noteFrom?: string; // YYYY-MM-DD
+  noteTo?: string;
+  noteSearch?: string;
+  noteStatus?: string; // comma separated
+  noteBy?: string; // a user id, or "name:SS" for a name that isn't a user
 }
 
 export const leadsApi = {
@@ -380,7 +387,7 @@ export const leadsApi = {
 
   /** Bulk import: one request per batch, one result per row (see POST /leads/import). */
   importLeads: async (rows: Record<string, any>[]) =>
-    request<{ created: number; failed: number; results: { ok: boolean; id?: number; error?: string; duplicate?: boolean }[] }>('/leads/import', {
+    request<{ created: number; failed: number; results: { ok: boolean; id?: number; error?: string; duplicate?: boolean; updated?: boolean; notesAdded?: number }[] }>('/leads/import', {
       method: 'POST',
       body: JSON.stringify({ rows }),
     }),
@@ -423,6 +430,24 @@ export const leadsApi = {
   getLeadTimeline: async (id: string | number) => request<{ timeline: any[] }>(`/leads/${id}/timeline`),
   getLeadFollowUps: async (id: string | number) =>
     request<{ followUps: LeadFollowUpEntry[] }>(`/leads/${id}/follow-ups`),
+
+  getLeadNotes: async (id: string | number) => request<{ notes: LeadNoteEntry[] }>(`/leads/${id}/notes`),
+
+  addLeadNote: async (id: string | number, payload: { text: string; noteDate?: string }) =>
+    request<{ note: LeadNoteEntry; statusChanged: boolean; status: string }>(`/leads/${id}/notes`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  deleteLeadNote: async (id: string | number, noteId: number) =>
+    request<{ ok: boolean }>(`/leads/${id}/notes/${noteId}`, { method: 'DELETE' }),
+
+  /** The lead status a note's text means ("cnr", "switch-off"), or null. */
+  detectNoteStatus: async (text: string) =>
+    request<{ status: string | null }>(`/leads/notes/detect?text=${encodeURIComponent(text)}`),
+
+  /** Names written in note brackets that aren't users, e.g. "SS". */
+  getNoteNames: async () => request<{ names: string[] }>('/leads/notes/names'),
 
   revertLeadChange: async (id: string | number, logId: string | number) =>
     request<{ message: string; lead: any }>(`/leads/${id}/timeline/${logId}/revert`, { method: 'POST' }),
@@ -1346,10 +1371,12 @@ export interface SalesAgentActivity {
   longestCallSeconds: number;
   connectRate: number;
   followUpsDone: number;
+  notesWritten: number;
   statusChanges: number;
   conversions: number;
   leadsWorked: number;
   leadsCalled: number;
+  leadsNoted: number;
   activeDays: number;
   avgCallsPerDay: number;
   firstActivityAt: string | null;
@@ -1378,6 +1405,7 @@ export interface SalesActivity {
     leadsAssigned: number;
     leadsWorked: number;
     followUpsDone: number;
+    notesWritten: number;
     followUpsOverdue: number;
     statusChanges: number;
     conversions: number;
@@ -1474,7 +1502,42 @@ const qs = (params: Record<string, unknown>) => {
   return s ? `?${s}` : '';
 };
 
+export interface NotesPersonRow {
+  key: string; // "u:<userId>" or "n:<NAME>"
+  userId: number | null;
+  name: string;
+  notes: number;
+  leads: number;
+  days: number;
+  lastNoteDate: string | null;
+  statuses: Record<string, number>;
+}
+
+export interface NotesActivityRow {
+  id: number;
+  leadId: number;
+  leadNumber: string | null;
+  leadName: string;
+  mobile: string | null;
+  leadStatus: string | null;
+  noteDate: string;
+  text: string;
+  status: string | null;
+  salesPersonName: string | null;
+}
+
+export interface NotesActivity {
+  from: string;
+  to: string;
+  canSeeTeam: boolean;
+  totals: { notes: number; leads: number; people: number };
+  people: NotesPersonRow[];
+  notes?: NotesActivityRow[];
+}
+
 export const salesApi = {
+  getNotesActivity: async (params: { from?: string; to?: string; userId?: number | string; person?: string } = {}) =>
+    request<NotesActivity>(`/sales/notes${qs(params)}`),
   getActivity: async (params: { from?: string; to?: string; userId?: number | string } = {}) =>
     request<SalesActivity>(`/sales/activity${qs(params)}`),
   getLeadSources: async (params: { from?: string; to?: string } = {}) =>
@@ -1689,6 +1752,20 @@ export async function openPrintWindow(html: Promise<string>): Promise<void> {
     win.close();
     throw err;
   }
+}
+
+export interface LeadNoteEntry {
+  id: number;
+  leadId: number;
+  noteDate: string; // YYYY-MM-DD
+  text: string;
+  status: string | null;
+  salesPersonName: string | null;
+  userId: number | null;
+  createdById: number | null;
+  source: 'manual' | 'import';
+  createdAt: string;
+  line: string; // "13/09/26 CNR (SAKSHI)"
 }
 
 export interface LeadFollowUpEntry {

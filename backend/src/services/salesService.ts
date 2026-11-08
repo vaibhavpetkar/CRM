@@ -3,6 +3,8 @@ import Call, { TERMINAL_CALL_STATUSES } from '../models/Call';
 import SiteVisit, { DONE_VISIT_STATUSES, SITE_VISIT_STATUSES, SiteVisitStatus } from '../models/SiteVisit';
 import Lead from '../models/Lead';
 import LeadFollowUp from '../models/LeadFollowUp';
+import LeadNote from '../models/LeadNote';
+import { notesActivity } from './leadNoteService';
 import ActivityLog from '../models/ActivityLog';
 import Contact from '../models/Contact';
 import User from '../models/User';
@@ -165,6 +167,7 @@ export const getActivity = async (user: any, query: Record<string, unknown>, onl
     visitsCompleted: 0,
     visitsCancelled: 0,
     followUpsDone: 0,
+    notesWritten: 0,
     statusChanges: 0,
     conversions: 0,
   });
@@ -232,6 +235,20 @@ export const getActivity = async (user: any, query: Record<string, unknown>, onl
     statFor(Number(f.createdById)).followUpsDone += 1;
     touch(Number(f.createdById), f.leadId, f.createdAt);
   }
+  // Call notes, counted on the day written on them (imported ones too).
+  const notes = (await LeadNote.findAll({
+    where: { noteDate: { [Op.gte]: fromDay, [Op.lte]: toDay }, userId: onlyUserId || { [Op.ne]: null } } as any,
+    attributes: ['userId', 'leadId', 'noteDate', 'source', 'createdAt'],
+    raw: true,
+  })) as unknown as { userId: number; leadId: number; noteDate: string; source: string; createdAt: Date }[];
+  const notedLeads = new Map<number, Set<number>>();
+  for (const n of notes) {
+    statFor(Number(n.userId)).notesWritten += 1;
+    if (!notedLeads.has(n.userId)) notedLeads.set(n.userId, new Set());
+    notedLeads.get(n.userId)!.add(n.leadId);
+    // A note typed in the CRM is work done at that moment; an imported one isn't.
+    if (n.source === 'manual') touch(Number(n.userId), n.leadId, n.createdAt);
+  }
   for (const l of logs) {
     const s = statFor(Number(l.performedById));
     if (l.action === 'status_changed') s.statusChanges += 1;
@@ -264,6 +281,7 @@ export const getActivity = async (user: any, query: Record<string, unknown>, onl
       leadsAssigned: leadsByUser.get(u.id) || 0,
       leadsWorked: w?.leads.size || 0,
       leadsCalled: w?.called.size || 0,
+      leadsNoted: notedLeads.get(u.id)?.size || 0,
       activeDays,
       avgCallsPerDay: Math.round((s.calls / Math.max(1, activeDays || rangeDays)) * 10) / 10,
       firstActivityAt: w && Number.isFinite(w.first) ? new Date(w.first) : null,
@@ -290,6 +308,7 @@ export const getActivity = async (user: any, query: Record<string, unknown>, onl
       t.visitsCompleted += a.visitsCompleted;
       t.leadsAssigned += a.leadsAssigned;
       t.followUpsDone += a.followUpsDone;
+      t.notesWritten += a.notesWritten;
       t.followUpsOverdue += a.followUpsOverdue;
       t.statusChanges += a.statusChanges;
       t.conversions += a.conversions;
@@ -306,6 +325,7 @@ export const getActivity = async (user: any, query: Record<string, unknown>, onl
       visitsCompleted: 0,
       leadsAssigned: 0,
       followUpsDone: 0,
+      notesWritten: 0,
       followUpsOverdue: 0,
       statusChanges: 0,
       conversions: 0,
@@ -329,6 +349,20 @@ export const getActivity = async (user: any, query: Record<string, unknown>, onl
     agents,
     daily: [...daily.values()],
   };
+};
+
+/**
+ * GET /api/sales/notes: call notes per sales person in the range, and with
+ * ?person=u:<userId> or n:<NAME> that person's notes on each lead. People
+ * without sales:team only see their own.
+ */
+export const getNotesActivity = async (user: any, query: Record<string, unknown>) => {
+  const range = parseRange(query.from, query.to);
+  const onlyUserId = scopedUserId(user, query.userId);
+  let person = typeof query.person === 'string' && /^(u:\d+|n:.{1,100})$/.test(query.person) ? query.person : null;
+  if (person && !canSeeTeam(user) && person !== `u:${user.id}`) throw new ForbiddenError('You can only see your own notes.');
+  if (!person && !canSeeTeam(user)) person = `u:${user.id}`;
+  return { canSeeTeam: canSeeTeam(user), ...(await notesActivity(range, onlyUserId, { listFor: person, limit: 1000 })) };
 };
 
 // ─── Lead sources ───────────────────────────────────────────────────────────

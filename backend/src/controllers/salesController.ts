@@ -106,6 +106,10 @@ const portalBody = (req: Request): unknown => {
   }
 };
 
+export const getNotesActivity = asyncHandler(async (req: AuthRequest, res: Response) => {
+  return res.json(await salesService.getNotesActivity(req.user, req.query as Record<string, unknown>));
+});
+
 export const importLeadRows = asyncHandler(async (req: AuthRequest, res: Response) => {
   return res.json(await portalLeads.importRows(req.body || {}));
 });

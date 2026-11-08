@@ -22,6 +22,7 @@ import { LeadStatusSelect } from '@/components/leads/lead-status';
 import SiteVisitsCard from '@/components/sales/site-visits-card';
 import SiteVisitModal from '@/components/sales/site-visit-modal';
 import FollowUpHistoryDrawer from '@/components/leads/follow-up-history-drawer';
+import { LeadNotesBox, lastNoteLine } from '@/components/leads/lead-notes';
 
 // Today as YYYY-MM-DD in the browser's time zone, for the follow-up date picker's minimum.
 const todayStr = () => {
@@ -52,6 +53,8 @@ export default function LeadDetailsPage() {
   const [timelineLoading, setTimelineLoading] = useState(false);
   const [revertingId, setRevertingId] = useState<number | string | null>(null);
   const [remarksOpen, setRemarksOpen] = useState(false);
+  // A call note that moves the lead to Site Visit Done asks for the visit first.
+  const [noteVisit, setNoteVisit] = useState<{ status: string; resolve: (ok: boolean) => void } | null>(null);
 
   // Assign To — name typeahead datalist, resolved back to a user ID on save.
   const [assignableUsers, setAssignableUsers] = useState<{ id: number; name: string }[]>([]);
@@ -518,6 +521,30 @@ export default function LeadDetailsPage() {
               </div>
             </div>
 
+            {/* Call notes: "13/09/26 CNR (SAKSHI)", date-wise behind the arrow */}
+            <LeadNotesBox
+              leadId={leadId}
+              leadName={leadName}
+              currentStatus={lead.status}
+              lastNote={lastNoteLine(lead)}
+              beforeStatus={(status) =>
+                VISIT_LEAD_STATUSES[status]
+                  ? new Promise<boolean>((resolve) => setNoteVisit({ status, resolve }))
+                  : Promise.resolve(true)
+              }
+              onSaved={(res) => {
+                const patch = {
+                  status: res.status,
+                  lastNoteDate: res.note.noteDate >= String(lead.lastNoteDate || '') ? res.note.noteDate : lead.lastNoteDate,
+                  lastNoteText: res.note.noteDate >= String(lead.lastNoteDate || '') ? res.note.text : lead.lastNoteText,
+                  lastNoteBy: res.note.noteDate >= String(lead.lastNoteDate || '') ? res.note.salesPersonName : lead.lastNoteBy,
+                };
+                setLead((l: any) => ({ ...l, ...patch }));
+                // Keep the form in step, so Save doesn't put the old status back.
+                setFormData((f: any) => ({ ...f, status: res.status }));
+              }}
+            />
+
             {/* Property Requirement (real estate) */}
             <div>
               <h4 className="mb-3 flex items-center justify-between border-b border-slate-100 pb-2 text-sm font-semibold text-slate-900">
@@ -784,6 +811,24 @@ export default function LeadDetailsPage() {
           onSaved={() => {
             setVisitPrompt(false);
             handleSave({ preventDefault: () => {} } as FormEvent, { visitLogged: true });
+          }}
+        />
+      )}
+      {noteVisit && (
+        <SiteVisitModal
+          lead={{ id: Number(leadId), name: leadName || `Lead #${leadId}`, projectName: lead.projectName, preferredLocation: lead.preferredLocation }}
+          agents={assignableUsers}
+          canPickAgent={hasPermission(getStoredUser(), 'sales:team')}
+          currentUserId={getStoredUser()?.id}
+          initialStatus={VISIT_LEAD_STATUSES[noteVisit.status]}
+          intro={`This note moves the lead to "${leadStatusLabel(noteVisit.status)}". Log the site visit to save it.`}
+          onClose={() => {
+            noteVisit.resolve(false);
+            setNoteVisit(null);
+          }}
+          onSaved={() => {
+            noteVisit.resolve(true);
+            setNoteVisit(null);
           }}
         />
       )}

@@ -13,6 +13,7 @@ import LoadingSpinner from '@/components/ui/loading-spinner';
 import DateRangePicker, { DateRange, presetRange } from '@/components/sales/date-range';
 import { AgentStatusBadge, AgentStatusDot } from '@/components/sales/agent-status';
 import SiteVisitModal from '@/components/sales/site-visit-modal';
+import NotesActivityCard from '@/components/sales/notes-activity';
 import { getStoredUser, salesApi, SalesActivity, SalesAgentActivity, usersApi } from '@/lib/api';
 import { getSocket } from '@/lib/socket';
 import { hasPermission } from '@/lib/permissions';
@@ -52,6 +53,8 @@ const COLUMNS: { key: SortKey; label: string; title?: string; render?: (a: Sales
   { key: 'leadsWorked', label: 'Leads worked', title: 'Different leads called, updated, followed up or visited', render: (a) => <b className="text-slate-900">{a.leadsWorked}</b> },
   { key: 'leadsCalled', label: 'Leads called', title: 'Different leads called' },
   { key: 'followUpsDone', label: 'Follow-ups', title: 'Follow-ups and remarks written' },
+  { key: 'notesWritten', label: 'Notes', title: 'Call notes written (by the date on the note)', render: (a) => <b className="text-slate-900">{a.notesWritten}</b> },
+  { key: 'leadsNoted', label: 'Leads noted', title: 'Different leads with a call note' },
   { key: 'followUpsOverdue', label: 'Overdue', title: 'Open assigned leads whose follow-up date has passed', render: (a) => <span className={a.followUpsOverdue ? 'font-semibold text-rose-600' : ''}>{a.followUpsOverdue}</span> },
   { key: 'statusChanges', label: 'Status changes' },
   { key: 'visitsCompleted', label: 'Visits done', render: (a) => <b className="text-slate-900">{a.visitsCompleted}</b> },
@@ -81,6 +84,8 @@ const EXPORT_COLUMNS = [
   { key: 'leadsWorked', label: 'Leads worked' },
   { key: 'leadsCalled', label: 'Leads called' },
   { key: 'followUpsDone', label: 'Follow-ups done' },
+  { key: 'notesWritten', label: 'Call notes' },
+  { key: 'leadsNoted', label: 'Leads noted' },
   { key: 'followUpsOverdue', label: 'Follow-ups overdue' },
   { key: 'followUpsDueToday', label: 'Follow-ups due today' },
   { key: 'statusChanges', label: 'Status changes' },
@@ -228,7 +233,7 @@ export default function SalesActivityPage() {
             <StatCard label="Calls today" value={t.callsToday} change={isToday ? `${connectRate}% connected` : `${t.calls} in this range`} icon={<PhoneIcon className="h-5 w-5" />} />
             <StatCard label="Connected calls" value={t.connected} change={`${connectRate}% of ${t.calls} · ${t.missed} missed`} icon={<PhoneArrowUpRightIcon className="h-5 w-5" />} tone="emerald" />
             <StatCard label="Avg call time" value={talkTime(t.avgTalkSeconds)} change={`${talkTime(t.talkSeconds)} total talk time`} icon={<ClockIcon className="h-5 w-5" />} tone="indigo" />
-            <StatCard label="Leads worked" value={t.leadsWorked} change={`${t.statusChanges} status changes`} icon={<UsersIcon className="h-5 w-5" />} tone="sky" />
+            <StatCard label="Leads worked" value={t.leadsWorked} change={`${t.notesWritten || 0} call notes · ${t.statusChanges} status changes`} icon={<UsersIcon className="h-5 w-5" />} tone="sky" />
             <StatCard label="Follow-ups done" value={t.followUpsDone} change={t.followUpsOverdue ? `${t.followUpsOverdue} overdue now` : 'None overdue'} changeType={t.followUpsOverdue ? 'negative' : 'positive'} icon={<CalendarDaysIcon className="h-5 w-5" />} tone="violet" />
             <StatCard label="Visits done" value={t.visitsCompleted} change={`${t.visitsScheduled} booked`} icon={<MapPinIcon className="h-5 w-5" />} tone="amber" />
             <StatCard label="Converted" value={t.conversions} icon={<ArrowPathIcon className="h-5 w-5" />} tone="emerald" />
@@ -280,6 +285,8 @@ export default function SalesActivityPage() {
               </table>
             </div>
           </Card>
+
+          <NotesActivityCard from={data.from} to={data.to} userId={userId} />
 
           {chart.length > 1 && (
             <Card title="Calls, leads worked and visits per day">

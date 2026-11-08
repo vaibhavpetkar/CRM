@@ -168,6 +168,7 @@ export const LEAD_STATUS_OPTIONS: { value: string; label: string; tone: LeadStat
   { value: 'new', label: 'New', tone: 'blue' },
   { value: 'cnr', label: 'CNR (Call Not Received)', tone: 'orange' },
   { value: 'call-busy', label: 'Call Busy', tone: 'orange' },
+  { value: 'switch-off', label: 'Switch Off / Not Reachable', tone: 'slate' },
   { value: 'call-later', label: 'Call Later', tone: 'yellow' },
   { value: 'not-interested', label: 'Not Interested', tone: 'rose' },
   { value: 'invalid-number', label: 'Invalid Number', tone: 'slate' },

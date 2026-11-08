@@ -30,6 +30,14 @@ export const LEAD_FIELDS: ImportExportField[] = [
   { key: 'score', label: 'Score', type: 'number' },
   { key: 'value', label: 'Value', type: 'number' },
   { key: 'notes', label: 'Notes', type: 'text', defaultExport: false },
+  // "31/10/26- CNR (SS) 01/11/26- BUSY (SS) ..." -> one dated note each; the last sets status and sales person.
+  {
+    key: 'callNotes',
+    label: 'Call Notes',
+    type: 'text',
+    defaultExport: false,
+    aliases: ['Remark', 'Remarks', 'Call Remark', 'Call Remarks', 'Call Status', 'Calling Status', 'Feedback', 'Follow Up', 'Follow Ups', 'Call History', 'Note History', 'Comments'],
+  },
 ];
 
 export const CONTACT_FIELDS: ImportExportField[] = [
