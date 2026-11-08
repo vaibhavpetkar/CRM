@@ -75,6 +75,8 @@ export default function LeadsPage() {
   const [draggedLeadId, setDraggedLeadId] = useState<string | number | null>(null);
   const [dragOverStatus, setDragOverStatus] = useState<string | null>(null);
   const [selectedLeadIds, setSelectedLeadIds] = useState<(string | number)[]>([]);
+  // Header sorting runs on the server so it covers every lead, not just the loaded ones.
+  const [sort, setSort] = useState<{ field: string; direction: 'asc' | 'desc' } | null>(null);
   // Users available to assign leads to (name typeahead datalist)
   const [assignableUsers, setAssignableUsers] = useState<{ id: number; name: string }[]>([]);
   // Dragging a lead to "Site Visit Done" / "Revisit Done" first asks for the visit.
@@ -206,8 +208,10 @@ export default function LeadsPage() {
       noteSearch: debouncedNoteSearch,
       noteStatus,
       noteBy,
+      sortBy: sort?.field,
+      order: sort ? sort.direction.toUpperCase() : undefined,
     };
-  }, [debouncedSearch, filter, sourceFilter, assigneeFilter, configFilter, propertyTypeFilter, debouncedLocation, budgetFilter, dateFrom, dateTo, noteFiltersOn, noteScope, noteFrom, noteTo, debouncedNoteSearch, noteStatus, noteBy]);
+  }, [sort, debouncedSearch, filter, sourceFilter, assigneeFilter, configFilter, propertyTypeFilter, debouncedLocation, budgetFilter, dateFrom, dateTo, noteFiltersOn, noteScope, noteFrom, noteTo, debouncedNoteSearch, noteStatus, noteBy]);
 
   // Ignores answers to an older filter once the filters have changed.
   const requestSeq = useRef(0);
@@ -344,6 +348,7 @@ export default function LeadsPage() {
   const columns: DataTableColumn<any>[] = [
     {
       header: 'Series ID',
+      sortField: 'leadNumber',
       accessor: (lead) => (
         <Link
           href={`/leads/${lead.id}`}
@@ -355,12 +360,14 @@ export default function LeadsPage() {
     },
     {
       header: 'Company Name',
+      sortField: 'company',
       accessor: (lead) => <span className="font-medium text-slate-900">{lead.company || '—'}</span>,
       editValue: (lead) => lead.company || '',
       onEdit: (lead, val) => patchLead(lead, 'company', val),
     },
     {
       header: 'Contact Person',
+      sortField: 'name',
       accessor: (lead) => {
         const leadName = lead.name || `${lead.firstName || ''} ${lead.lastName || ''}`.trim() || 'Unnamed';
         return (
@@ -370,10 +377,11 @@ export default function LeadsPage() {
         );
       },
     },
-    { header: 'Status', accessor: (lead) => <LeadStatusBadge status={lead.status} /> },
+    { header: 'Status', sortField: 'status', accessor: (lead) => <LeadStatusBadge status={lead.status} /> },
     {
       header: 'Last Note',
       id: 'lastNote',
+      sortField: 'lastNoteDate',
       sortKey: (lead) => String(lead.lastNoteDate || ''),
       accessor: (lead) => {
         // "Any note" filter: show the note that matched rather than the latest one.
@@ -397,6 +405,7 @@ export default function LeadsPage() {
     {
       header: 'Requirement',
       id: 'requirement',
+      sortField: 'configuration',
       accessor: (lead) => {
         const parts = [lead.configuration, lead.propertyType].filter(Boolean).join(' ');
         const budget = budgetRange(lead.budgetMin, lead.budgetMax);
@@ -412,11 +421,13 @@ export default function LeadsPage() {
     {
       header: 'Area',
       id: 'preferredLocation',
+      sortField: 'preferredLocation',
       accessor: (lead) => <span className="text-slate-600">{lead.preferredLocation || lead.city || '—'}</span>,
     },
     {
       header: 'Project',
       id: 'projectName',
+      sortField: 'projectName',
       optional: true,
       accessor: (lead) => <span className="text-slate-600">{lead.projectName || '—'}</span>,
     },
@@ -425,42 +436,49 @@ export default function LeadsPage() {
     {
       header: 'Phone',
       id: 'phone',
+      sortField: 'phone',
       optional: true,
       accessor: (lead) => <span className="text-slate-600">{lead.phone || '—'}</span>,
     },
     {
       header: 'Mobile',
       id: 'mobile',
+      sortField: 'mobile',
       optional: true,
       accessor: (lead) => <span className="text-slate-600">{lead.mobile || '—'}</span>,
     },
     {
       header: 'Email',
       id: 'email',
+      sortField: 'email',
       optional: true,
       accessor: (lead) => <span className="text-slate-600">{lead.email || '—'}</span>,
     },
     {
       header: 'Source',
       id: 'leadSource',
+      sortField: 'leadSource',
       optional: true,
       accessor: (lead) => <span className="text-slate-600">{lead.source || lead.leadSource ? leadSourceLabel(lead.source || lead.leadSource) : '—'}</span>,
     },
     {
       header: 'Sub Source',
       id: 'subSource',
+      sortField: 'subSource',
       optional: true,
       accessor: (lead) => <span className="text-slate-600">{lead.subSource || '—'}</span>,
     },
     {
       header: 'Industry',
       id: 'industry',
+      sortField: 'industry',
       optional: true,
       accessor: (lead) => <span className="text-slate-600">{lead.industry || '—'}</span>,
     },
     {
       header: 'Score',
       id: 'score',
+      sortField: 'score',
       optional: true,
       sortKey: (lead) => lead.score ?? 0,
       accessor: (lead) => <span className="text-slate-600">{lead.score ?? '—'}</span>,
@@ -468,13 +486,15 @@ export default function LeadsPage() {
     {
       header: 'Value',
       id: 'value',
+      sortField: 'value',
       optional: true,
       sortKey: (lead) => lead.value ?? 0,
       accessor: (lead) => <span className="text-slate-600">{lead.value ? formatCurrency(lead.value) : '—'}</span>,
     },
     {
-      header: 'Assigned To',
+      header: 'Sales Person',
       id: 'assignedTo',
+      sortField: 'assignedTo',
       optional: true,
       accessor: (lead) =>
         lead.assignedTo ? (
@@ -486,6 +506,24 @@ export default function LeadsPage() {
           <span className="text-slate-400">—</span>
         ),
     },
+    // More lead fields, off by default: add them from Columns.
+    { header: 'Alternate Mobile', id: 'alternateMobile', sortField: 'alternateMobile', optional: true, accessor: (lead) => <span className="text-slate-600">{lead.alternateMobile || '—'}</span> },
+    { header: 'Configuration', id: 'configuration', sortField: 'configuration', optional: true, accessor: (lead) => <span className="text-slate-600">{lead.configuration || '—'}</span> },
+    { header: 'Property Type', id: 'propertyType', sortField: 'propertyType', optional: true, accessor: (lead) => <span className="text-slate-600">{lead.propertyType || '—'}</span> },
+    {
+      header: 'Budget',
+      id: 'budget',
+      sortField: 'budget',
+      optional: true,
+      accessor: (lead) => <span className="text-slate-600">{budgetRange(lead.budgetMin, lead.budgetMax) || '—'}</span>,
+    },
+    { header: 'City', id: 'city', sortField: 'city', optional: true, accessor: (lead) => <span className="text-slate-600">{lead.city || '—'}</span> },
+    { header: 'Lead Date', id: 'createdAt', sortField: 'createdAt', optional: true, accessor: (lead) => <span className="text-slate-600">{shortDate(lead.createdAt)}</span> },
+    { header: 'Next Follow Up', id: 'nextFollowUp', sortField: 'nextFollowUp', optional: true, accessor: (lead) => <span className="text-slate-600">{shortDate(lead.nextFollowUp)}</span> },
+    { header: 'Last Contacted', id: 'lastContacted', sortField: 'lastContacted', optional: true, accessor: (lead) => <span className="text-slate-600">{shortDate(lead.lastContacted)}</span> },
+    { header: 'Last Note Date', id: 'lastNoteDate', sortField: 'lastNoteDate', optional: true, accessor: (lead) => <span className="text-slate-600">{shortDate(lead.lastNoteDate)}</span> },
+    { header: 'Last Note By', id: 'lastNoteBy', sortField: 'lastNoteBy', optional: true, accessor: (lead) => <span className="text-slate-600">{lead.lastNoteBy || '—'}</span> },
+    { header: 'Notes', id: 'notesCount', sortField: 'notesCount', optional: true, accessor: (lead) => <span className="text-slate-600">{lead.notesCount || 0}</span> },
   ];
 
   const moveLead = async (leadId: string | number, newStatus: string, visitLogged = false) => {
@@ -744,6 +782,7 @@ export default function LeadsPage() {
           showToolbar
           canEdit={canEditLeads}
           onSelectionChange={setSelectedLeadIds}
+          onSortChange={setSort}
           totalEntries={totalLeads}
           emptyMessage='No leads found. Click "Add Lead" to create one.'
           onRowClick={(lead) => router.push(`/leads/${lead.id}`)}
@@ -794,6 +833,13 @@ export default function LeadsPage() {
     </>
   );
 }
+
+/** "2026-11-08..." -> "08 Nov 2026"; "—" when empty. */
+const shortDate = (value?: string | null) => {
+  if (!value) return '—';
+  const d = new Date(String(value).length === 10 ? `${value}T00:00:00` : String(value));
+  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+};
 
 const ALL_STATUSES_OPTION = [{ value: 'all', label: 'All Statuses' }];
 const ALL_SOURCES = [{ value: 'all', label: 'All sources' }];

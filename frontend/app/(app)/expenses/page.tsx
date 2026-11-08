@@ -132,7 +132,7 @@ export default function ExpensesPage() {
   };
 
   const columns: DataTableColumn<Expense>[] = [
-    { header: 'Date', accessor: (e) => <span className="text-slate-600">{formatDate(e.expenseDate)}</span> },
+    { header: 'Date', sortKey: (e) => (e.expenseDate ? new Date(e.expenseDate).getTime() : null), accessor: (e) => <span className="text-slate-600">{formatDate(e.expenseDate)}</span> },
     { header: 'Category', accessor: (e) => <span className="font-medium text-slate-900">{e.category}</span> },
     { header: 'Description', accessor: (e) => <span className="text-slate-600">{e.description}</span> },
     { header: 'Vendor', accessor: (e) => <span className="text-slate-600">{e.vendor || '—'}</span> },
@@ -144,6 +144,7 @@ export default function ExpensesPage() {
     },
     {
       header: 'Amount',
+      sortKey: (e) => Number(e.amount) || 0,
       accessor: (e) => <span className="font-medium text-slate-900">{formatCurrency(Number(e.amount))}</span>,
     },
     { header: 'Recorded By', accessor: (e) => <span className="text-slate-500">{e.recordedBy || '—'}</span> },

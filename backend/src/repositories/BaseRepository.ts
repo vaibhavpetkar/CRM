@@ -68,7 +68,8 @@ export class BaseRepository<TModel extends Model> {
       where,
       limit,
       offset: (page - 1) * limit,
-      order: [[sortBy, order]],
+      // A repository can pass its own order (e.g. a whitelisted sort); id breaks ties so pages don't overlap.
+      order: options.order ?? [[sortBy, order], ['id', order]],
       distinct: true,
     });
 

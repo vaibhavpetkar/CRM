@@ -178,10 +178,12 @@ export default function ItemsPage() {
     { header: 'HSN/SAC', accessor: (i) => <span className="text-slate-600">{i.hsnCode || '—'}</span> },
     {
       header: 'Tax',
+      sortKey: (i) => (i.taxName ? Number(i.taxRate) || 0 : null),
       accessor: (i) => <span className="text-slate-600">{i.taxName ? `${i.taxName} (${Number(i.taxRate).toFixed(2)}%)` : '—'}</span>,
     },
     {
       header: 'Selling Price',
+      sortKey: (i) => Number(i.sellingPrice) || 0,
       accessor: (i) => <span className="font-medium text-slate-900">{formatCurrency(Number(i.sellingPrice) || 0)}</span>,
     },
     {

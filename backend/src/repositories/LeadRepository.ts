@@ -191,6 +191,57 @@ const toNumber = (value: unknown) => {
 // Lead date filter: whole days in Indian time, like the sales reports.
 const toDay = (value: unknown) => (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null);
 
+// Columns the leads table can sort by (header click). The whole list is
+// sorted on the server, so it's right across every page, not just the loaded
+// rows. Empty values always go last.
+const LEAD_SORT_FIELDS: Record<string, string[]> = {
+  leadNumber: ['id'],
+  name: ['firstName', 'lastName'],
+  company: ['company'],
+  status: ['status'],
+  lastNoteDate: ['lastNoteDate'],
+  configuration: ['configuration'],
+  propertyType: ['propertyType'],
+  budget: ['budgetMin', 'budgetMax'],
+  preferredLocation: ['preferredLocation'],
+  projectName: ['projectName'],
+  phone: ['phone'],
+  mobile: ['mobile'],
+  alternateMobile: ['alternateMobile'],
+  email: ['email'],
+  leadSource: ['leadSource'],
+  subSource: ['subSource'],
+  industry: ['industry'],
+  score: ['score'],
+  value: ['value'],
+  city: ['city'],
+  createdAt: ['createdAt'],
+  nextFollowUp: ['nextFollowUp'],
+  lastContacted: ['lastContacted'],
+  notesCount: ['notesCount'],
+  lastNoteBy: ['lastNoteBy'],
+};
+
+const leadSortOrder = (params: ListQueryParams): any[] => {
+  const key = String(params.sortBy || '');
+  const dir = String(params.order || 'DESC').toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+  const nulls = `${dir} NULLS LAST`;
+  if (key === 'assignedTo') {
+    return [[{ model: User, as: 'assignedTo' }, 'firstName', nulls], [{ model: User, as: 'assignedTo' }, 'lastName', nulls], ['id', dir]];
+  }
+  const fields = LEAD_SORT_FIELDS[key];
+  // Unknown or no sort: newest first.
+  if (!fields) return [['createdAt', 'DESC'], ['id', 'DESC']];
+  // Blank text ('') sorts with the empties, last.
+  const order: any[] = fields.map((f) =>
+    ['firstName', 'lastName', 'company', 'phone', 'mobile', 'alternateMobile', 'email', 'configuration', 'propertyType', 'preferredLocation', 'projectName', 'leadSource', 'subSource', 'industry', 'city', 'lastNoteBy'].includes(f)
+      ? [sequelize.fn('NULLIF', sequelize.fn('TRIM', sequelize.col(`Lead.${f}`)), ''), nulls]
+      : [f, nulls]
+  );
+  order.push(['id', dir]);
+  return order;
+};
+
 class LeadRepository extends BaseRepository<Lead> {
   constructor() {
     super(
@@ -309,7 +360,7 @@ class LeadRepository extends BaseRepository<Lead> {
   }
 
   async list(params: ListQueryParams): Promise<PaginatedResult<Lead>> {
-    return this.findAll(params, { include: [assignedToInclude] });
+    return this.findAll(params, { include: [assignedToInclude], order: leadSortOrder(params) });
   }
 
   async getByIdWithDetails(id: number | string, transaction?: Transaction): Promise<Lead | null> {
