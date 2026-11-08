@@ -42,8 +42,8 @@ const tenDigits = (label: string) =>
 const leadSchema = z.object({
   // Customer Details
   prefix: z.string().optional(),
-  firstName: z.string().trim().min(1, 'First name is required'),
-  lastName: z.string().trim().min(1, 'Last name is required'),
+  firstName: z.string().trim().optional().or(z.literal('')),
+  lastName: z.string().trim().optional().or(z.literal('')),
   email: z.string().trim().refine((v) => !v || z.string().email().safeParse(v).success, 'Enter a valid email address').optional(),
   mobile: z.string().regex(/^\d{10}$/, 'Mobile number must be 10 digits'),
   alternateMobile: tenDigits('Alternate mobile'),
@@ -246,10 +246,10 @@ export default function NewLeadPage() {
             ))}
           </select>
         </Field>
-        <Field label="First Name" required error={errors.firstName?.message}>
+        <Field label="First Name" error={errors.firstName?.message}>
           <IconInput icon={<UserIcon />} placeholder="Enter first name" invalid={!!errors.firstName} {...register('firstName')} />
         </Field>
-        <Field label="Last Name" required error={errors.lastName?.message}>
+        <Field label="Last Name" error={errors.lastName?.message}>
           <IconInput icon={<UserIcon />} placeholder="Enter last name" invalid={!!errors.lastName} {...register('lastName')} />
         </Field>
         <Field label="Email" error={errors.email?.message}>

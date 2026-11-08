@@ -7,8 +7,8 @@ import { LEAD_SOURCE_OPTIONS, LEAD_STATUS_VALUES } from '../lead-options';
 // then drop <ImportExportButtons config={{ ... fields: MY_FIELDS ... }} /> on the page.
 
 export const LEAD_FIELDS: ImportExportField[] = [
-  { key: 'firstName', label: 'First Name', required: true, type: 'text' },
-  { key: 'lastName', label: 'Last Name', required: true, type: 'text' },
+  { key: 'firstName', label: 'First Name', type: 'text' },
+  { key: 'lastName', label: 'Last Name', type: 'text' },
   { key: 'mobile', label: 'Mobile', required: true, type: 'mobile' },
   { key: 'email', label: 'Email', type: 'email' },
   { key: 'phone', label: 'Phone', type: 'text' },
