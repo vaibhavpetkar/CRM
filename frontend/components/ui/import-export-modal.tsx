@@ -65,6 +65,9 @@ export default function ImportExportModal({ open, onClose, config, initialTab = 
       ])
   );
   const [exporting, setExporting] = useState(false);
+  // Rows ticked in the table: export just those unless the user picks "all".
+  const selectedData = useMemo(() => config.getSelectedData?.() ?? [], [config]);
+  const [exportScope, setExportScope] = useState<'selected' | 'all'>(selectedData.length ? 'selected' : 'all');
   const [exportError, setExportError] = useState<string | null>(null);
 
   // ── Import state ───────────────────────────────────────────────────────────
@@ -108,7 +111,7 @@ export default function ImportExportModal({ open, onClose, config, initialTab = 
     setExportError(null);
     setExporting(true);
     try {
-      const data = await config.getExportData();
+      const data = exportScope === 'selected' && selectedData.length ? selectedData : await config.getExportData();
       await runExport(
         format,
         data,
@@ -142,8 +145,34 @@ export default function ImportExportModal({ open, onClose, config, initialTab = 
     if (file) handleFile(file);
   };
 
+  // Editing a failed row puts it back in the queue, so Import tries it again.
   const updateCell = (rowId: string, key: string, value: string) => {
-    setRows((prev) => prev.map((r) => (r.__rowId === rowId ? { ...r, [key]: value } : r)));
+    setRows((prev) =>
+      prev.map((r) =>
+        r.__rowId === rowId
+          ? { ...r, [key]: value, ...(r.__status === 'error' ? { __status: 'pending' as const, __error: undefined, __selected: true } : {}) }
+          : r
+      )
+    );
+  };
+
+  /** The rows that failed, as an Excel file with an "Import Error" column, to fix and import again. */
+  const downloadFailed = async () => {
+    const failed = rows.filter((r) => r.__status === 'error');
+    if (!failed.length) return;
+    const fields = config.fields.filter((f) => !f.exportOnly);
+    try {
+      await runExport(
+        'excel',
+        failed.map((r) => ({ ...r, __importError: r.__error || 'Failed' })),
+        [...fields, { key: '__importError', label: 'Import Error', type: 'text' }],
+        `${config.entityNamePlural}-failed`,
+        childTable ? { table: childTable, fields: childTable.fields.filter((f) => !f.exportOnly) } : undefined,
+        config.groupKey
+      );
+    } catch (err: any) {
+      toast.error(err.message || 'Could not create the file.');
+    }
   };
 
   const updateChildCell = (rowId: string, childIdx: number, key: string, value: string) => {
@@ -302,7 +331,12 @@ export default function ImportExportModal({ open, onClose, config, initialTab = 
     config.onImportComplete?.();
   };
 
-  const previewColumns = importFields.slice(0, 6);
+  // Preview the columns the file actually has (plus required ones), so a
+  // failed row can be fixed in place (up to 8).
+  const previewColumns = useMemo(() => {
+    const filled = importFields.filter((f) => f.required || rows.some((r) => String(r[f.key] ?? '').trim() !== ''));
+    return (filled.length ? filled : importFields).slice(0, 8);
+  }, [importFields, rows]);
   // checkbox + preview columns + (items) + status + remove
   const previewColSpan = previewColumns.length + (childTable ? 4 : 3);
 
@@ -345,6 +379,32 @@ export default function ImportExportModal({ open, onClose, config, initialTab = 
         <div className="flex-1 overflow-y-auto px-6 py-5">
           {tab === 'export' && (
             <div className="space-y-6">
+              {selectedData.length > 0 && (
+                <div>
+                  <p className="mb-2 text-sm font-medium text-slate-700">Which rows</p>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    {([
+                      ['selected', `Selected rows (${selectedData.length})`, 'Only the rows you ticked in the table'],
+                      ['all', 'All matching rows', 'Every row that fits the current search and filters'],
+                    ] as const).map(([id, label, hint]) => (
+                      <button
+                        key={id}
+                        type="button"
+                        onClick={() => setExportScope(id)}
+                        className={cn(
+                          'rounded-lg border p-3 text-left text-sm transition-colors',
+                          exportScope === id
+                            ? 'border-[var(--primary)] bg-[var(--primary)]/5 text-[var(--primary)]'
+                            : 'border-slate-200 text-slate-600 hover:border-slate-300'
+                        )}
+                      >
+                        <span className="block font-medium">{label}</span>
+                        <span className="text-xs text-slate-400">{hint}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div>
                 <p className="mb-2 text-sm font-medium text-slate-700">Choose a format</p>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -499,6 +559,16 @@ export default function ImportExportModal({ open, onClose, config, initialTab = 
                           <input type="checkbox" checked={onlyFailed} onChange={(e) => setOnlyFailed(e.target.checked)} className="h-3.5 w-3.5" />
                           Show only failed
                         </label>
+                      )}
+                      {errorCount > 0 && (
+                        <button
+                          type="button"
+                          onClick={downloadFailed}
+                          className="flex items-center gap-1 font-medium text-[var(--primary)] hover:underline"
+                          title="Excel file of the failed rows with the reason, to fix and import again"
+                        >
+                          <ArrowDownTrayIcon className="h-3.5 w-3.5" /> Download failed rows
+                        </button>
                       )}
                     </div>
                     <button
@@ -662,12 +732,10 @@ export default function ImportExportModal({ open, onClose, config, initialTab = 
                       Every selected row is imported, not only the ones shown.
                     </p>
                   )}
-                  {importFields.length > previewColumns.length && (
-                    <p className="text-xs text-slate-400">
-                      Showing the first {previewColumns.length} of {importFields.length} columns in the preview — every
-                      column is still imported.
-                    </p>
-                  )}
+                  <p className="text-xs text-slate-400">
+                    Showing the {previewColumns.length} column{previewColumns.length === 1 ? '' : 's'} your file has data in. Click a cell to fix a
+                    failed row, then Import again, or download the failed rows to fix them in Excel.
+                  </p>
                 </>
               )}
             </div>

@@ -1,4 +1,4 @@
-import { Op, Transaction } from 'sequelize';
+import { Op, QueryTypes, Transaction } from 'sequelize';
 import sequelize from '../config/database';
 import Lead from '../models/Lead';
 import LeadNote from '../models/LeadNote';
@@ -358,18 +358,46 @@ export const notesActivity = async (
 };
 
 /** Lead ids with a note matching the filters, as SQL for the Leads page (company scoped by the lead itself). */
-export const noteExistsSql = (filters: { from?: string | null; to?: string | null; text?: string | null; status?: string[]; userId?: number | null; name?: string | null }) => {
-  const parts: string[] = ['n."leadId" = "Lead"."id"'];
+export type NoteFilter = { from?: string | null; to?: string | null; text?: string | null; status?: string[]; userId?: number | null; name?: string | null };
+
+/** "switch off" -> a Postgres pattern for those words from their start ("vis" finds "visit", "ni" doesn't find "visiting"). */
+export const wholeWordsPattern = (text: string) => {
+  const escaped = text.trim().split(/\s+/).map((w) => w.replace(/[.*+?^$()|[\]{}\\]/g, '\\$&'));
+  return '\\m' + escaped.join('\\s+');
+};
+
+/** SQL conditions on a lead_notes row aliased `n` for the Notes filters. */
+const noteWhereParts = (filters: NoteFilter) => {
+  const parts: string[] = [];
   const esc = (v: string) => sequelize.escape(v);
   if (filters.from) parts.push(`n."noteDate" >= ${esc(filters.from)}`);
   if (filters.to) parts.push(`n."noteDate" <= ${esc(filters.to)}`);
   if (filters.text) {
-    const like = esc(`%${filters.text.replace(/[\\%_]/g, (c) => `\\${c}`)}%`);
-    parts.push(`(n."text" ILIKE ${like} OR n."salesPersonName" ILIKE ${like})`);
+    // From the start of a word, so "ni" doesn't find "visiting"; a status word ("CNR") also
+    // finds notes with that status written another way ("not picking").
+    const re = esc(wholeWordsPattern(filters.text));
+    const status = detectNoteStatus(filters.text);
+    parts.push(`(n."text" ~* ${re} OR n."salesPersonName" ~* ${re}${status ? ` OR n."status" = ${esc(status)}` : ''})`);
   }
   if (filters.status?.length) parts.push(`n."status" IN (${filters.status.map(esc).join(', ')})`);
   if (filters.userId) parts.push(`n."userId" = ${Number(filters.userId)}`);
   if (filters.name) parts.push(`n."userId" IS NULL AND n."salesPersonName" ILIKE ${esc(filters.name)}`);
-  return `EXISTS (SELECT 1 FROM "lead_notes" AS n WHERE ${parts.join(' AND ')})`;
+  return parts;
+};
+
+export const noteExistsSql = (filters: NoteFilter) =>
+  `EXISTS (SELECT 1 FROM "lead_notes" AS n WHERE ${['n."leadId" = "Lead"."id"', ...noteWhereParts(filters)].join(' AND ')})`;
+
+/** For "Any note": the newest note of each lead that fits the filters, so the list shows why it matched. */
+export const matchingNotes = async (leadIds: number[], filters: NoteFilter) => {
+  if (!leadIds.length) return new Map<number, any>();
+  const rows = (await sequelize.query(
+    `SELECT DISTINCT ON (n."leadId") n."leadId", n."noteDate", n."text", n."salesPersonName", n."status"
+       FROM "lead_notes" AS n
+      WHERE n."leadId" IN (${leadIds.map(Number).join(', ')}) AND ${['TRUE', ...noteWhereParts(filters)].join(' AND ')}
+      ORDER BY n."leadId", n."noteDate" DESC, n."id" DESC`,
+    { type: QueryTypes.SELECT }
+  )) as any[];
+  return new Map(rows.map((r) => [Number(r.leadId), r]));
 };
 

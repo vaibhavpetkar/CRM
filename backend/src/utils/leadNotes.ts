@@ -32,10 +32,18 @@ export const NOTE_STATUS_KEYWORDS: { status: string; phrases: string[] }[] = [
   { status: 'not-interested', phrases: ['not interested', 'not intrested', 'no interest', 'not interest', 'ni', 'no requirement', 'no need'] },
   { status: 'invalid-number', phrases: ['invalid number', 'invalid no', 'invalid', 'number does not exist', 'does not exist', 'not exist', 'incorrect number'] },
   { status: 'wrong-number', phrases: ['wrong number', 'wrong no', 'wrong'] },
-  { status: 'whatsapp-done', phrases: ['whatsapp done', 'whatsapp', 'whats app', 'wa done', 'watsapp', 'whatsup', 'msg done', 'message done'] },
-  { status: 'details-shared', phrases: ['details shared', 'detail shared', 'details sent', 'detail sent', 'shared details', 'brochure sent', 'brochure shared', 'info shared'] },
-  { status: 'site-visit-done', phrases: ['site visit done', 'site visit', 'visit done', 'sv done', 'site visited', 'visited site'] },
-  { status: 'revisit-done', phrases: ['revisit done', 'revisit', 're visit', 'second visit'] },
+  // "Done" statuses need a word saying it happened ("done", "dn", "sent",
+  // "visited"): "will come for revisit" or "will visit 14 nov" is not a visit.
+  {
+    status: 'whatsapp-done',
+    phrases: ['whatsapp done', 'whats app done', 'wa done', 'watsapp done', 'whatsup done', 'whatsapp sent', 'sent on whatsapp', 'shared on whatsapp', 'msg done', 'message done', 'msg sent', 'message sent'],
+  },
+  { status: 'details-shared', phrases: ['details shared', 'detail shared', 'details sent', 'detail sent', 'shared details', 'sent details', 'brochure sent', 'brochure shared', 'info shared'] },
+  {
+    status: 'site-visit-done',
+    phrases: ['site visit done', 'visit done', 'sv done', 'site visited', 'visited site', 'visited the site', 'visited project', 'visit completed', 'visit complete', 'visited'],
+  },
+  { status: 'revisit-done', phrases: ['revisit done', 're visit done', 'second visit done', 'revisited', 'revisit completed', 'came for revisit', 'came for re visit'] },
   { status: 'ready-possession', phrases: ['ready possession', 'ready to move', 'ready possesion', 'looking for ready'] },
   { status: 'budget-issue', phrases: ['budget issue', 'budget problem', 'low budget', 'budget', 'too costly', 'costly', 'expensive', 'high price'] },
   { status: 'loan-problem', phrases: ['loan problem', 'loan issue', 'loan not approved', 'loan'] },
@@ -65,8 +73,20 @@ const words = (text: string) => {
     out.push(w);
   }
   if (run) out.push(run);
-  return out;
+  // Short forms for "done": "visit dn", "sv dne".
+  return out.map((w) => (w === 'dn' || w === 'dne' || w === 'don' || w === 'dun' ? 'done' : w));
 };
+
+// Statuses that say something already happened. They don't count when the
+// words just before them say it is still to come or didn't happen
+// ("will come for revisit done", "not visited yet", "visit pending").
+const DONE_STATUSES = new Set(['whatsapp-done', 'details-shared', 'site-visit-done', 'revisit-done']);
+const NOT_YET_BEFORE = new Set(['will', 'wil', 'shall', 'going', 'gonna', 'plan', 'planning', 'planned', 'coming', 'come', 'not', 'no', 'yet', 'tomorrow', 'next', 'may', 'might', 'should', 'want', 'wants', 'to']);
+const NOT_YET_AFTER = new Set(['pending', 'remaining', 'tomorrow', 'later', 'planned', 'scheduled']);
+
+const notYet = (tokens: string[], pos: number, size: number) =>
+  tokens.slice(Math.max(0, pos - 3), pos).some((w) => NOT_YET_BEFORE.has(w)) ||
+  tokens.slice(pos + size, pos + size + 2).some((w) => NOT_YET_AFTER.has(w));
 
 const editDistance = (a: string, b: string, max: number) => {
   if (Math.abs(a.length - b.length) > max) return max + 1;
@@ -119,6 +139,12 @@ export const detectNoteStatus = (text: string): string | null => {
         if (mistakes > limit) continue;
         // A fuzzy match must line up word for word, or "invalid" would match inside other text.
         if (mistakes > 0 && size !== k) continue;
+        if (DONE_STATUSES.has(phrase.status)) {
+          if (notYet(tokens, pos, size)) continue;
+          // A typo is fine ("whatsap done"), but the word saying it happened must be there:
+          // "site visit" is not "site visited".
+          if (mistakes > 0 && window[window.length - 1] !== phrase.tokens[phrase.tokens.length - 1]) continue;
+        }
         const better =
           !best ||
           pos < best.pos ||
@@ -147,7 +173,8 @@ const realDay = (d: number, m: number, y: number) => {
 };
 
 // 31/10/26, 31-10-2026, 31.10.26, "31 / 10 / 26" (day first, the Indian way).
-const DATE_IN_TEXT = /(?<!\d)(\d{1,2})\s*[/\-.]\s*(\d{1,2})\s*[/\-.]\s*(\d{4}|\d{2})(?!\d)/g;
+// Doubled separators ("21/07//26") are typing slips and still count.
+const DATE_IN_TEXT = /(?<!\d)(\d{1,2})\s*[/\-.]{1,2}\s*(\d{1,2})\s*[/\-.]{1,2}\s*(\d{4}|\d{2})(?!\d)/g;
 
 const SEPARATORS = /^[\s\-–—:,.;|/\\]+|[\s\-–—:,.;|/\\]+$/g;
 

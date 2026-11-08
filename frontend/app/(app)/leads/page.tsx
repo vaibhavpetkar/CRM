@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import PageHeader from '@/components/ui/page-header';
 import SearchInput from '@/components/ui/search-input';
-import { LeadStatusBadge, LeadStatusSelect } from '@/components/leads/lead-status';
+import { LeadSourceSelect, LeadStatusBadge, LeadStatusSelect } from '@/components/leads/lead-status';
 import { LeadStatusColorsButton, useLeadStatusColors } from '@/components/leads/lead-status-colors';
 import SiteVisitModal from '@/components/sales/site-visit-modal';
 import Button from '@/components/ui/button';
@@ -14,7 +14,7 @@ import { LEAD_FIELDS } from '@/lib/import-export/field-configs';
 import { formatCurrency } from '@/lib/utils';
 import { leadsApi, usersApi, salesApi, getStoredUser, PresenceState } from '@/lib/api';
 import { lastNoteLine } from '@/components/leads/lead-notes';
-import { VISIT_LEAD_STATUSES, leadStatusLabel, LEAD_STATUS_OPTIONS, LEAD_SOURCE_OPTIONS, LEAD_STATUS_VALUES, leadStatusRowColor, CONFIGURATION_OPTIONS, PROPERTY_TYPE_OPTIONS, BUDGET_OPTIONS, leadSourceLabel, budgetRange } from '@/lib/lead-options';
+import { VISIT_LEAD_STATUSES, leadStatusLabel, LEAD_STATUS_OPTIONS, LEAD_STATUS_VALUES, leadStatusRowColor, CONFIGURATION_OPTIONS, PROPERTY_TYPE_OPTIONS, BUDGET_OPTIONS, leadSourceLabel, budgetRange } from '@/lib/lead-options';
 import { AgentStatusDot } from '@/components/sales/agent-status';
 import { hasPermission } from '@/lib/permissions';
 import { useKeyboardShortcuts } from '@/lib/hooks/useKeyboardShortcuts';
@@ -376,12 +376,20 @@ export default function LeadsPage() {
       id: 'lastNote',
       sortKey: (lead) => String(lead.lastNoteDate || ''),
       accessor: (lead) => {
-        const line = lastNoteLine(lead);
+        // "Any note" filter: show the note that matched rather than the latest one.
+        const m = lead.matchedNote;
+        const line = m
+          ? lastNoteLine({ lastNoteDate: m.noteDate, lastNoteText: m.text, lastNoteBy: m.salesPersonName })
+          : lastNoteLine(lead);
         if (!line) return <span className="text-slate-400">—</span>;
         return (
           <Link href={`/leads/${lead.id}`} className="block max-w-[260px] text-slate-600 hover:text-[var(--primary)]" title={line}>
             <span className="block truncate">{line}</span>
-            {lead.notesCount > 1 && <span className="block text-[11px] text-slate-400">{lead.notesCount} notes</span>}
+            {m ? (
+              <span className="block text-[11px] text-[var(--primary)]">Matching note{lead.notesCount > 1 ? ` · ${lead.notesCount} notes` : ''}</span>
+            ) : (
+              lead.notesCount > 1 && <span className="block text-[11px] text-slate-400">{lead.notesCount} notes</span>
+            )}
           </Link>
         );
       },
@@ -512,6 +520,8 @@ export default function LeadsPage() {
                 fields: LEAD_FIELDS,
                 // Export still includes every lead that matches the filters.
                 getExportData: () => leadsApi.getAllLeads(listParams),
+                // Ticked rows: Export offers just those.
+                getSelectedData: () => leads.filter((l) => selectedLeadIds.includes(l.id)),
                 onImportRow: handleImportRow,
                 onImportBatch: handleImportBatch,
                 importBatchSize: 500,
@@ -572,12 +582,12 @@ export default function LeadsPage() {
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div>
               <label className="block text-xs font-medium text-slate-500">Lead source</label>
-              <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)} className={filterField}>
-                <option value="all">All sources</option>
-                {LEAD_SOURCE_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
+              <LeadSourceSelect
+                value={sourceFilter}
+                onChange={setSourceFilter}
+                extraOptions={ALL_SOURCES}
+                className="mt-1"
+              />
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-500">Sales person</label>
@@ -786,6 +796,7 @@ export default function LeadsPage() {
 }
 
 const ALL_STATUSES_OPTION = [{ value: 'all', label: 'All Statuses' }];
+const ALL_SOURCES = [{ value: 'all', label: 'All sources' }];
 
 function LeadsKanban({
   leads,
