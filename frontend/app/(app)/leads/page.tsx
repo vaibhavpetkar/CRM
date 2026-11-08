@@ -42,7 +42,7 @@ export default function LeadsPage() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [showFilters, setShowFilters] = useState(false);
-  // Call note filters: on each lead's latest note, or on any one note.
+  // Notes filters: on each lead's latest note, or on any one note.
   const [noteScope, setNoteScope] = useState<'last' | 'any'>('last');
   const [noteFrom, setNoteFrom] = useState('');
   const [noteTo, setNoteTo] = useState('');
@@ -299,11 +299,6 @@ export default function LeadsPage() {
 
   const importPayload = (row: Record<string, any>) => {
     const payload: Record<string, any> = { ...row };
-    // A Notes column written as dated call notes ("31/10/26- CNR (SS) ...") is the call history.
-    if (!payload.callNotes && /\d{1,2}\s*[/.-]\s*\d{1,2}\s*[/.-]\s*\d{2,4}/.test(String(payload.notes || ''))) {
-      payload.callNotes = payload.notes;
-      delete payload.notes;
-    }
     if (payload.leadSource) payload.leadSource = String(payload.leadSource).toLowerCase().trim().replace(/\s+/g, '-');
     if (payload.status) payload.status = String(payload.status).toLowerCase().trim();
     ['score', 'value', 'noOfEmployees', 'latitude', 'longitude', 'budgetMin', 'budgetMax'].forEach((key) => {
@@ -635,7 +630,7 @@ export default function LeadsPage() {
           </div>
           <div className="mt-4 border-t border-slate-100 pt-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Call notes</span>
+              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Notes</span>
               <div className="flex items-center gap-1 rounded-lg border border-slate-200 p-0.5 text-xs font-medium">
                 {(['last', 'any'] as const).map((k) => (
                   <button

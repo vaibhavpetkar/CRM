@@ -350,7 +350,7 @@ export interface LeadListParams {
   budgetTo?: number | string;
   dateFrom?: string; // YYYY-MM-DD
   dateTo?: string;
-  // Call notes: the latest note on each lead, or any one note with noteScope=any.
+  // Notes: the latest note on each lead, or any one note with noteScope=any.
   noteScope?: 'last' | 'any';
   noteFrom?: string; // YYYY-MM-DD
   noteTo?: string;

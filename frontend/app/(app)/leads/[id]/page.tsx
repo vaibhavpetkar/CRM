@@ -22,7 +22,7 @@ import { LeadStatusSelect } from '@/components/leads/lead-status';
 import SiteVisitsCard from '@/components/sales/site-visits-card';
 import SiteVisitModal from '@/components/sales/site-visit-modal';
 import FollowUpHistoryDrawer from '@/components/leads/follow-up-history-drawer';
-import { LeadNotesBox, lastNoteLine } from '@/components/leads/lead-notes';
+import { LeadNotesField, lastNoteLine } from '@/components/leads/lead-notes';
 
 // Today as YYYY-MM-DD in the browser's time zone, for the follow-up date picker's minimum.
 const todayStr = () => {
@@ -53,8 +53,6 @@ export default function LeadDetailsPage() {
   const [timelineLoading, setTimelineLoading] = useState(false);
   const [revertingId, setRevertingId] = useState<number | string | null>(null);
   const [remarksOpen, setRemarksOpen] = useState(false);
-  // A call note that moves the lead to Site Visit Done asks for the visit first.
-  const [noteVisit, setNoteVisit] = useState<{ status: string; resolve: (ok: boolean) => void } | null>(null);
 
   // Assign To — name typeahead datalist, resolved back to a user ID on save.
   const [assignableUsers, setAssignableUsers] = useState<{ id: number; name: string }[]>([]);
@@ -111,7 +109,8 @@ export default function LeadDetailsPage() {
     try {
       const data = await leadsApi.getLead(leadId); // Need to make sure this API method exists
       setLead(data);
-      setFormData(data);
+      // Notes (RFQ Details) is for writing a new note; the latest one shows above it.
+      setFormData({ ...data, notes: '' });
       setAssignedToName(data.assignedTo || '');
       setQualifiedByName(data.qualifiedBy || '');
       setInterestedItems(
@@ -207,6 +206,18 @@ export default function LeadDetailsPage() {
     if (newFollowUp && newFollowUp !== savedFollowUp && newFollowUp < todayStr()) {
       toast.warning("Next Follow-up date can't be before today.");
       return;
+    }
+
+    // A new note that means Site Visit Done / Revisit Done: log the visit first,
+    // like picking that status (the note decides the status when none was picked).
+    const newNote = String(formData.notes || '').trim();
+    if (newNote && !opts.visitLogged && formData.status === lead?.status) {
+      const noteStatus = (await leadsApi.detectNoteStatus(newNote).catch(() => ({ status: null }))).status;
+      if (noteStatus && VISIT_LEAD_STATUSES[noteStatus] && noteStatus !== lead?.status) {
+        setFormData({ ...formData, status: noteStatus });
+        setVisitPrompt(true);
+        return;
+      }
     }
 
     // Moving the lead to a site-visit status: log the visit first (the popup
@@ -521,30 +532,6 @@ export default function LeadDetailsPage() {
               </div>
             </div>
 
-            {/* Call notes: "13/09/26 CNR (SAKSHI)", date-wise behind the arrow */}
-            <LeadNotesBox
-              leadId={leadId}
-              leadName={leadName}
-              currentStatus={lead.status}
-              lastNote={lastNoteLine(lead)}
-              beforeStatus={(status) =>
-                VISIT_LEAD_STATUSES[status]
-                  ? new Promise<boolean>((resolve) => setNoteVisit({ status, resolve }))
-                  : Promise.resolve(true)
-              }
-              onSaved={(res) => {
-                const patch = {
-                  status: res.status,
-                  lastNoteDate: res.note.noteDate >= String(lead.lastNoteDate || '') ? res.note.noteDate : lead.lastNoteDate,
-                  lastNoteText: res.note.noteDate >= String(lead.lastNoteDate || '') ? res.note.text : lead.lastNoteText,
-                  lastNoteBy: res.note.noteDate >= String(lead.lastNoteDate || '') ? res.note.salesPersonName : lead.lastNoteBy,
-                };
-                setLead((l: any) => ({ ...l, ...patch }));
-                // Keep the form in step, so Save doesn't put the old status back.
-                setFormData((f: any) => ({ ...f, status: res.status }));
-              }}
-            />
-
             {/* Property Requirement (real estate) */}
             <div>
               <h4 className="mb-3 flex items-center justify-between border-b border-slate-100 pb-2 text-sm font-semibold text-slate-900">
@@ -704,12 +691,13 @@ export default function LeadDetailsPage() {
                 </select>
               </div>
               <div className="col-span-2">
-                <label className="block text-sm font-medium text-slate-700">Notes</label>
-                <textarea
+                <LeadNotesField
+                  leadId={leadId}
+                  leadName={leadName}
                   value={formData.notes || ''}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  rows={4}
-                  className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
+                  onChange={(notes) => setFormData({ ...formData, notes })}
+                  currentStatus={lead.status}
+                  latest={lastNoteLine(lead) || lead.notes || ''}
                 />
               </div>
             </div>
@@ -811,24 +799,6 @@ export default function LeadDetailsPage() {
           onSaved={() => {
             setVisitPrompt(false);
             handleSave({ preventDefault: () => {} } as FormEvent, { visitLogged: true });
-          }}
-        />
-      )}
-      {noteVisit && (
-        <SiteVisitModal
-          lead={{ id: Number(leadId), name: leadName || `Lead #${leadId}`, projectName: lead.projectName, preferredLocation: lead.preferredLocation }}
-          agents={assignableUsers}
-          canPickAgent={hasPermission(getStoredUser(), 'sales:team')}
-          currentUserId={getStoredUser()?.id}
-          initialStatus={VISIT_LEAD_STATUSES[noteVisit.status]}
-          intro={`This note moves the lead to "${leadStatusLabel(noteVisit.status)}". Log the site visit to save it.`}
-          onClose={() => {
-            noteVisit.resolve(false);
-            setNoteVisit(null);
-          }}
-          onSaved={() => {
-            noteVisit.resolve(true);
-            setNoteVisit(null);
           }}
         />
       )}

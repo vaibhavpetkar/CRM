@@ -53,15 +53,18 @@ export const importLeads = asyncHandler(async (req: AuthRequest, res: Response) 
 
   const results: { ok: boolean; id?: number; error?: string; duplicate?: boolean; notesAdded?: number; updated?: boolean }[] = [];
   // Names in the notes column's brackets ("(SS)", "(SADIYA)") are matched to users once per batch.
-  const hasNotes = rows.some((r: any) => r && String(r.callNotes ?? '').trim());
+  const notesOf = (r: any) => (r ? r.notes ?? r.callNotes : undefined);
+  const hasNotes = rows.some((r: any) => String(notesOf(r) ?? '').trim());
   const matcher = hasNotes ? await leadNotes.loadNoteUserMatcher() : null;
   for (const raw of rows) {
     const rowReq = { body: raw && typeof raw === 'object' && !Array.isArray(raw) ? { ...raw } : {} } as any;
-    // The notes column: "31/10/26- CNR (SS) 01/11/26- BUSY (SS) ...". The
+    // The Notes column: "31/10/26- CNR (SS) 01/11/26- BUSY (SS) ...". The
     // last note gives the lead its status and, when the name is a user and
     // the sheet has no owner, its sales person.
-    const prepared = matcher && String(rowReq.body.callNotes ?? '').trim() ? leadNotes.prepareImportedNotes(rowReq.body.callNotes, matcher) : null;
+    const notesCell = notesOf(rowReq.body);
+    const prepared = matcher && String(notesCell ?? '').trim() ? leadNotes.prepareImportedNotes(notesCell, matcher) : null;
     delete rowReq.body.callNotes;
+    if (prepared) delete rowReq.body.notes; // saved as dated notes below, not as raw text
     if (prepared?.current) {
       if (!rowReq.body.status && prepared.current.status) rowReq.body.status = prepared.current.status;
       if (!rowReq.body.assignedToId && prepared.current.userId) rowReq.body.assignedToId = prepared.current.userId;

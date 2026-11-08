@@ -4,12 +4,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { CalendarDaysIcon, ChatBubbleLeftEllipsisIcon, ChevronRightIcon, TrashIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { leadsApi, LeadNoteEntry, getStoredUser } from '@/lib/api';
 import { hasPermission } from '@/lib/permissions';
-import { leadStatusLabel } from '@/lib/lead-options';
 import { LeadStatusBadge } from '@/components/leads/lead-status';
 import { useToast } from '@/components/ui/toast';
 import { cn } from '@/lib/utils';
 
-// Call notes on a lead, written like the team always has: "13/09/26 CNR (SAKSHI)".
+// Notes on a lead, written like the team always has: "13/09/26 CNR (SAKSHI)".
 // The date and the writer's name are added automatically, and when the text
 // says a status (CNR, Busy, Switch Off, WhatsApp Done ...) the lead moves to it.
 
@@ -22,7 +21,7 @@ export const shortNoteDay = (day?: string | null) => {
 const longDay = (day: string) =>
   new Date(`${day}T00:00:00Z`).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
 
-const todayStr = () => {
+const todayIso = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
@@ -32,46 +31,44 @@ export const lastNoteLine = (lead: { lastNoteDate?: string | null; lastNoteText?
   lead?.lastNoteDate ? `${shortNoteDay(lead.lastNoteDate)} ${lead.lastNoteText || ''}${lead.lastNoteBy ? ` (${lead.lastNoteBy})` : ''}`.trim() : '';
 
 /**
- * The note box on the lead page. `beforeStatus` runs when the note will move
- * the lead to a status that needs more (a site visit); returning false keeps
- * the note unsaved.
+ * The Notes field in RFQ Details. Whatever is typed is saved with the lead
+ * (Save) as a new note, stamped with today's date and the writer's name; a
+ * status word in it moves the lead to that status. The latest note shows
+ * above the box, and the arrow opens every note date-wise.
  */
-export function LeadNotesBox({
+export function LeadNotesField({
   leadId,
   leadName,
+  value,
+  onChange,
   currentStatus,
-  lastNote,
-  onSaved,
-  beforeStatus,
+  latest,
 }: {
   leadId: string | number;
   leadName?: string;
+  value: string;
+  onChange: (value: string) => void;
   currentStatus?: string | null;
-  lastNote?: string;
-  onSaved: (result: { status: string; statusChanged: boolean; note: LeadNoteEntry }) => void;
-  beforeStatus?: (status: string) => Promise<boolean>;
+  latest?: string;
 }) {
-  const toast = useToast();
-  const [text, setText] = useState('');
-  const [day, setDay] = useState(todayStr());
   const [detected, setDetected] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
   const [open, setOpen] = useState(false);
   const [version, setVersion] = useState(0);
   const me = getStoredUser();
   const myName = me?.firstName || me?.name || '';
+  const typed = value.trim();
+  const hasOwnDates = /\d{1,2}\s*[/.-]\s*\d{1,2}\s*[/.-]\s*\d{2,4}/.test(typed);
 
   // What status the note will set, shown while typing.
   useEffect(() => {
-    const value = text.trim();
-    if (!value) {
+    if (!typed) {
       setDetected(null);
       return;
     }
     let cancelled = false;
     const t = setTimeout(() => {
       leadsApi
-        .detectNoteStatus(value)
+        .detectNoteStatus(typed)
         .then((r) => !cancelled && setDetected(r.status))
         .catch(() => {});
     }, 250);
@@ -79,91 +76,54 @@ export function LeadNotesBox({
       cancelled = true;
       clearTimeout(t);
     };
-  }, [text]);
-
-  const save = async () => {
-    const value = text.trim();
-    if (!value || saving) return;
-    setSaving(true);
-    try {
-      const status = (await leadsApi.detectNoteStatus(value).catch(() => ({ status: detected }))).status;
-      if (status && status !== currentStatus && day === todayStr() && beforeStatus && !(await beforeStatus(status))) {
-        toast.warning('Note not saved.');
-        return;
-      }
-      const res = await leadsApi.addLeadNote(leadId, { text: value, noteDate: day });
-      setText('');
-      setDay(todayStr());
-      setDetected(null);
-      setVersion((v) => v + 1);
-      toast.success(res.statusChanged ? `Note saved. Status changed to ${leadStatusLabel(res.status)}.` : 'Note saved.');
-      onSaved(res);
-    } catch (err: any) {
-      toast.error(err.message || 'Could not save the note.');
-    } finally {
-      setSaving(false);
-    }
-  };
+  }, [typed]);
 
   return (
     <div>
-      <label className="block text-sm font-medium text-slate-700">Call Note</label>
-      <div className="mt-1 flex items-center gap-2">
-        <input
-          type="text"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              save();
-            }
-          }}
-          placeholder="e.g. CNR, Busy, Switch Off, WhatsApp Done"
-          maxLength={2000}
-          className="w-full min-w-0 rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
-        />
-        <input
-          type="date"
-          value={day}
-          max={todayStr()}
-          onChange={(e) => setDay(e.target.value || todayStr())}
-          aria-label="Note date"
-          title="Note date (today unless you change it)"
-          className="w-36 shrink-0 rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
-        />
-        <button
-          type="button"
-          onClick={save}
-          disabled={!text.trim() || saving}
-          className="shrink-0 rounded-lg bg-[var(--primary)] px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
-        >
-          {saving ? 'Adding…' : 'Add'}
-        </button>
+      <div className="flex items-center justify-between gap-2">
+        <label className="block text-sm font-medium text-slate-700">Notes</label>
         <button
           type="button"
           onClick={() => setOpen(true)}
           title="See all notes date-wise"
           aria-label="See all notes date-wise"
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition-colors hover:border-[var(--primary)] hover:bg-blue-50 hover:text-[var(--primary)]"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition-colors hover:border-[var(--primary)] hover:bg-blue-50 hover:text-[var(--primary)]"
         >
           <ChevronRightIcon className="h-4 w-4" />
         </button>
       </div>
+      {latest && (
+        <p className="mt-1 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
+          <span className="text-xs font-medium text-slate-400">Latest: </span>
+          {latest}
+        </p>
+      )}
+      <textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        rows={3}
+        maxLength={4000}
+        placeholder="Write a new note, e.g. CNR, Busy, Switch Off, WhatsApp Done"
+        className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
+      />
       <p className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-slate-400">
-        {text.trim() ? (
+        {typed ? (
           <>
-            Saves as <b className="font-semibold text-slate-600">{`${shortNoteDay(day)} ${text.trim()}${myName ? ` (${myName})` : ''}`}</b>
+            {hasOwnDates ? (
+              'Saves each dated part as its own note.'
+            ) : (
+              <>
+                Saves as <b className="font-semibold text-slate-600">{`${shortNoteDay(todayIso())} ${typed}${myName ? ` (${myName})` : ''}`}</b>
+              </>
+            )}
             {detected && detected !== currentStatus && (
               <>
                 · status changes to <LeadStatusBadge status={detected} className="!px-2 !py-0 !text-[10px]" />
               </>
             )}
           </>
-        ) : lastNote ? (
-          <>Last note: <b className="font-semibold text-slate-600">{lastNote}</b></>
         ) : (
-          'Date and your name are added automatically. A status word in the note updates the lead status.'
+          'Date and your name are added on Save. A status word in the note updates the lead status.'
         )}
       </p>
       <LeadNotesDrawer key={version} leadId={leadId} leadName={leadName} open={open} onClose={() => setOpen(false)} onChanged={() => setVersion((v) => v + 1)} />
@@ -246,7 +206,7 @@ export function LeadNotesDrawer({
       />
       <aside
         role="dialog"
-        aria-label="Call notes"
+        aria-label="Notes"
         className={cn(
           'absolute inset-y-0 right-0 flex w-full max-w-md flex-col bg-white shadow-2xl transition-transform duration-300 ease-out',
           open ? 'translate-x-0' : 'translate-x-full'
@@ -258,7 +218,7 @@ export function LeadNotesDrawer({
               <ChatBubbleLeftEllipsisIcon className="h-5 w-5" />
             </span>
             <div>
-              <h3 className="text-base font-semibold text-slate-900">Call Notes</h3>
+              <h3 className="text-base font-semibold text-slate-900">Notes</h3>
               <p className="text-xs text-slate-500">
                 {leadName ? `${leadName} · ` : ''}
                 {notes.length} note{notes.length === 1 ? '' : 's'}
@@ -273,7 +233,7 @@ export function LeadNotesDrawer({
         <div className="flex-1 overflow-y-auto px-6 py-5">
           {loading && <p className="py-10 text-center text-sm text-slate-400">Loading...</p>}
           {!loading && error && <p className="py-10 text-center text-sm text-red-500">{error}</p>}
-          {!loading && !error && notes.length === 0 && <p className="py-10 text-center text-sm text-slate-400">No notes yet. Write one in the Call Note box.</p>}
+          {!loading && !error && notes.length === 0 && <p className="py-10 text-center text-sm text-slate-400">No notes yet. Write one in RFQ Details, Notes, and save.</p>}
           {!loading && !error && byDay.length > 0 && (
             <ol className="relative space-y-4 border-l-2 border-slate-100 pl-6">
               {byDay.map((group, i) => {

@@ -70,6 +70,8 @@ export const refreshLeadNoteSummary = async (
     lastNoteUserId: latest?.userId ?? null,
     notesCount: count,
   };
+  // RFQ Details > Notes shows the latest note ("06/11/26 SWITCH OFF (SHABINA)").
+  if (latest) patch.notes = formatNoteLine(latest);
   const newStatus = latest?.status && LEAD_STATUSES.includes(latest.status) ? latest.status : null;
   if (opts.applyStatus && newStatus && newStatus !== before) patch.status = newStatus;
   await lead.update(patch, { transaction: t, hooks: true });
@@ -121,6 +123,53 @@ export const addNote = async (leadId: number | string, user: any, body: Record<s
     const result = await refreshLeadNoteSummary(lead, { applyStatus: true, userId: user?.id ?? null, transaction: t });
     return { note: serializeNote(note), ...result, lead: { id: lead.id, status: lead.status, lastNoteDate: lead.lastNoteDate, lastNoteBy: lead.lastNoteBy, notesCount: lead.notesCount } };
   });
+};
+
+/**
+ * What someone typed into the lead's Notes field (RFQ Details). Plain text
+ * ("CNR") becomes one note dated today with the writer's name; text that
+ * already has dates and names ("31/10/26- CNR (SS) 01/11/26 BUSY (SS)") is
+ * split into those notes. The lead's status follows the newest note unless
+ * `applyStatus` is false (the user picked a status in the same save).
+ */
+export const addNotesFromText = async (
+  lead: Lead,
+  rawText: unknown,
+  writerId: number | null | undefined,
+  opts: { transaction?: Transaction; applyStatus?: boolean } = {}
+) => {
+  const text = String(rawText ?? '').trim();
+  if (!text) return 0;
+  const t = opts.transaction;
+  const writer = writerId ? await User.findByPk(writerId, { attributes: ['id', 'firstName', 'lastName', 'email'], transaction: t }) : null;
+  const writerName = writer ? String(writer.firstName || '').trim() || String(writer.lastName || '').trim() || String(writer.email || '').split('@')[0] : null;
+  const parsed = parseNotesCell(text, localDay(new Date()));
+  if (!parsed.length) return 0;
+  const named = parsed.some((n) => n.salesPersonName);
+  const matcher = named ? await loadNoteUserMatcher() : null;
+  const rows = parsed.map((n) => ({
+    leadId: lead.id,
+    noteDate: n.noteDate,
+    text: n.text.slice(0, MAX_NOTE),
+    status: n.status,
+    salesPersonName: n.salesPersonName || writerName,
+    userId: n.salesPersonName ? matcher!(n.salesPersonName) : writer?.id ?? null,
+    createdById: writerId ?? null,
+    source: 'manual' as const,
+  }));
+  const created = await LeadNote.bulkCreate(rows, { transaction: t });
+  await logActivity(
+    {
+      action: 'note_added',
+      entityType: 'Lead',
+      entityId: lead.id,
+      performedById: writerId ?? null,
+      details: `Note: ${created.map((n) => formatNoteLine(n)).join(', ')}`.slice(0, 1000),
+    },
+    t
+  );
+  await refreshLeadNoteSummary(lead, { applyStatus: opts.applyStatus !== false, userId: writerId, transaction: t });
+  return created.length;
 };
 
 /** The writer of a note, or anyone who sees the team, can remove it. */

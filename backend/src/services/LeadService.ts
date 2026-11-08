@@ -21,6 +21,7 @@ import { assigneeForNewLead } from './leadRotation';
 import { NotFoundError, ConflictError, ValidationError } from '../errors/AppError';
 import { isModuleEnabled } from '../middleware/moduleGate';
 import LeadFollowUp from '../models/LeadFollowUp';
+import { addNotesFromText } from './leadNoteService';
 import { localDay } from '../utils/reportTime';
 
 /** The calendar day ("2026-10-20") a follow-up date falls on, in the CRM's local time. */
@@ -260,7 +261,7 @@ class LeadService {
           description: data.description ?? null,
           score: data.score ?? 0,
           value: data.value ?? null,
-          notes: data.notes ?? null,
+          notes: null, // filled from the call notes below
           assignedToId: data.assignedToId ?? null,
           sourceDetails: data.sourceDetails ?? null,
           lastContacted: data.lastContacted ?? null,
@@ -307,6 +308,11 @@ class LeadService {
         },
         t
       );
+
+      // Notes typed on create become dated call notes ("08/11/26 CNR (Vaibhav)").
+      if (typeof data.notes === 'string' && data.notes.trim()) {
+        await addNotesFromText(lead, data.notes, userId, { transaction: t, applyStatus: !data.status });
+      }
 
       const fullLead = await leadRepository.getByIdWithDetails(lead.id, t);
 
@@ -397,7 +403,7 @@ class LeadService {
         description: data.description !== undefined ? data.description : lead.description,
         score: data.score !== undefined ? data.score : lead.score,
         value: data.value !== undefined ? data.value : lead.value,
-        notes: data.notes !== undefined ? data.notes : lead.notes,
+        notes: lead.notes, // new text in Notes is added as a call note below
         assignedToId: data.assignedToId !== undefined ? data.assignedToId : lead.assignedToId,
         sourceDetails: data.sourceDetails !== undefined ? data.sourceDetails : lead.sourceDetails,
         lastContacted: data.lastContacted !== undefined ? data.lastContacted : lead.lastContacted,
@@ -582,6 +588,15 @@ class LeadService {
             }).catch(() => {});
           }
         }
+      }
+
+      // RFQ Details > Notes: new text is a call note, stamped with the date and
+      // the writer; a status word in it moves the lead (unless a status was
+      // picked in this same save). The field then shows the latest note.
+      const newNote = typeof data.notes === 'string' ? data.notes.trim() : '';
+      if (newNote && newNote !== String(before.notes ?? '').trim()) {
+        const statusPicked = data.status !== undefined && data.status !== before[STATUS_FIELD];
+        await addNotesFromText(lead, newNote, userId, { transaction: t, applyStatus: !statusPicked });
       }
 
       const fullLead = await leadRepository.getByIdWithDetails(lead.id, t);

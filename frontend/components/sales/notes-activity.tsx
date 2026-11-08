@@ -9,7 +9,7 @@ import { LeadStatusBadge } from '@/components/leads/lead-status';
 import { leadStatusLabel } from '@/lib/lead-options';
 import { cn } from '@/lib/utils';
 
-// Call notes per sales person for the picked range: how many notes, on how
+// Notes per sales person for the picked range: how many notes, on how
 // many leads, what they said, and (opened) every note with its lead.
 
 const shortDay = (day?: string | null) => {
@@ -39,7 +39,7 @@ export default function NotesActivityCard({ from, to, userId }: { from: string; 
           setOpenKey(res.people[0].key);
         }
       })
-      .catch((err) => !cancelled && setError(err.message || 'Could not load call notes.'));
+      .catch((err) => !cancelled && setError(err.message || 'Could not load notes.'));
     return () => {
       cancelled = true;
     };
@@ -66,13 +66,13 @@ export default function NotesActivityCard({ from, to, userId }: { from: string; 
 
   return (
     <Card
-      title="Call notes by sales person"
+      title="Notes by sales person"
       className="mb-6"
       action={data ? <span className="text-xs text-slate-500">{data.totals.notes} notes on {data.totals.leads} leads</span> : undefined}
     >
       {error && <p className="text-sm text-red-600">{error}</p>}
       {!data && !error && <p className="py-6 text-center text-sm text-slate-400">Loading…</p>}
-      {data && data.people.length === 0 && <p className="py-6 text-center text-sm text-slate-400">No call notes in this range.</p>}
+      {data && data.people.length === 0 && <p className="py-6 text-center text-sm text-slate-400">No notes in this range.</p>}
       {data && data.people.length > 0 && (
         <div className="-mx-6 -my-6 overflow-x-auto">
           <table className="w-full min-w-[720px] text-sm">
