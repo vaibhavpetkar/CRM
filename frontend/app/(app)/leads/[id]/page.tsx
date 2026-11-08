@@ -6,7 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { leadsApi, usersApi, itemsApi, aiApi, getStoredUser } from '@/lib/api';
 import { isModuleEnabled } from '@/lib/modules';
 import { hasPermission } from '@/lib/permissions';
-import { VISIT_LEAD_STATUSES, leadStatusLabel, LEAD_SOURCE_OPTIONS, CONFIGURATION_OPTIONS, PROPERTY_TYPE_OPTIONS, leadSourceLabel, budgetRange } from '@/lib/lead-options';
+import { VISIT_LEAD_STATUSES, leadStatusLabel, CONFIGURATION_OPTIONS, PROPERTY_TYPE_OPTIONS, budgetRange } from '@/lib/lead-options';
 import Button from '@/components/ui/button';
 import Card from '@/components/ui/card';
 import DataTable from '@/components/ui/data-table';
@@ -18,7 +18,7 @@ import { useKeyboardShortcuts } from '@/lib/hooks/useKeyboardShortcuts';
 import CallButton from '@/components/calls/call-button';
 import CallHistory from '@/components/calls/call-history';
 import LogCallModal from '@/components/calls/log-call-modal';
-import { LeadStatusSelect } from '@/components/leads/lead-status';
+import { LeadSourceSelect, LeadStatusSelect } from '@/components/leads/lead-status';
 import SiteVisitsCard from '@/components/sales/site-visits-card';
 import SiteVisitModal from '@/components/sales/site-visit-modal';
 import FollowUpHistoryDrawer from '@/components/leads/follow-up-history-drawer';
@@ -475,18 +475,11 @@ export default function LeadDetailsPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700">Lead Source</label>
-                  <select
+                  <LeadSourceSelect
                     value={formData.leadSource || ''}
-                    onChange={(e) => setFormData({ ...formData, leadSource: e.target.value })}
-                    className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
-                  >
-                    {formData.leadSource && !LEAD_SOURCE_OPTIONS.some((o) => o.value === formData.leadSource) && (
-                      <option value={formData.leadSource}>{leadSourceLabel(formData.leadSource)}</option>
-                    )}
-                    {LEAD_SOURCE_OPTIONS.map((o) => (
-                      <option key={o.value} value={o.value}>{o.label}</option>
-                    ))}
-                  </select>
+                    onChange={(v) => setFormData({ ...formData, leadSource: v })}
+                    className="mt-1"
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700">Next Follow-up Schedule</label>

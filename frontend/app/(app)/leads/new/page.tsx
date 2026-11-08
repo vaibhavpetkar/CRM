@@ -11,7 +11,6 @@ import {
   UserPlusIcon,
   EnvelopeIcon,
   PhoneIcon,
-  MegaphoneIcon,
   CalendarDaysIcon,
   ChevronDownIcon,
   HomeModernIcon,
@@ -27,8 +26,8 @@ import { getStoredUser, leadsApi, salesApi, usersApi } from '@/lib/api';
 import { hasPermission } from '@/lib/permissions';
 import SiteVisitModal, { SiteVisitInput } from '@/components/sales/site-visit-modal';
 import { cn } from '@/lib/utils';
-import { LeadStatusSelect } from '@/components/leads/lead-status';
-import { VISIT_LEAD_STATUSES, leadStatusLabel, CONFIGURATION_OPTIONS, LEAD_SOURCE_OPTIONS, PROPERTY_TYPE_OPTIONS } from '@/lib/lead-options';
+import { LeadSourceSelect, LeadStatusSelect } from '@/components/leads/lead-status';
+import { VISIT_LEAD_STATUSES, leadStatusLabel, CONFIGURATION_OPTIONS, PROPERTY_TYPE_OPTIONS } from '@/lib/lead-options';
 
 // Today as YYYY-MM-DD in the browser's time zone.
 const todayStr = () => {
@@ -265,11 +264,7 @@ export default function NewLeadPage() {
           <IconInput icon={<PhoneIcon />} type="tel" placeholder="Landline (optional)" {...register('phone')} />
         </Field>
         <Field label="Lead Source">
-          <IconSelect icon={<MegaphoneIcon />} {...register('leadSource')}>
-            {LEAD_SOURCE_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </IconSelect>
+          <LeadSourceSelect value={watch('leadSource') || 'website'} onChange={(v) => setValue('leadSource', v)} />
         </Field>
         <Field label="Status">
           <LeadStatusSelect value={watch('status') || 'new'} onChange={(v) => setValue('status', v)} />
