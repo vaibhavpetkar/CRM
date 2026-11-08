@@ -10,6 +10,7 @@ import { validationResult } from 'express-validator';
 import { createLeadValidation } from '../validations/leadValidation';
 import { ConflictError, ValidationError } from '../errors/AppError';
 import * as leadNotes from '../services/leadNoteService';
+import { NOTE_STATUS_KEYWORDS } from '../utils/leadNotes';
 import leadRepository from '../repositories/LeadRepository';
 
 export const getLeads = asyncHandler(async (req: AuthRequest, res: Response) => {
@@ -153,6 +154,11 @@ export const deleteLeadNote = asyncHandler(async (req: AuthRequest, res: Respons
 
 export const detectNoteStatus = asyncHandler(async (req: AuthRequest, res: Response) => {
   return res.json(leadNotes.detectStatus(req.query.text));
+});
+
+/** The words in a note that set each status, for the keyword list and suggestions under Notes. */
+export const getNoteKeywords = asyncHandler(async (_req: AuthRequest, res: Response) => {
+  return res.json({ keywords: NOTE_STATUS_KEYWORDS });
 });
 
 export const getNoteNames = asyncHandler(async (_req: AuthRequest, res: Response) => {

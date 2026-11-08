@@ -30,6 +30,47 @@ const todayIso = () => {
 export const lastNoteLine = (lead: { lastNoteDate?: string | null; lastNoteText?: string | null; lastNoteBy?: string | null }) =>
   lead?.lastNoteDate ? `${shortNoteDay(lead.lastNoteDate)} ${lead.lastNoteText || ''}${lead.lastNoteBy ? ` (${lead.lastNoteBy})` : ''}`.trim() : '';
 
+// The words that set each status ("cnr", "not picking", "switch off" ...),
+// loaded once from the server, which uses the same list to read notes.
+type Keyword = { status: string; phrases: string[] };
+let keywordCache: Promise<Keyword[]> | null = null;
+const loadKeywords = () => {
+  if (!keywordCache) {
+    keywordCache = leadsApi
+      .getNoteKeywords()
+      .then((r) => r.keywords || [])
+      .catch(() => {
+        keywordCache = null;
+        return [];
+      });
+  }
+  return keywordCache;
+};
+
+/** Keywords that finish what is being typed at the end of the note ("swi" -> "switch off"). */
+const suggestionsFor = (text: string, keywords: Keyword[]) => {
+  const tail = text.toLowerCase().match(/[a-z][a-z ]*$/)?.[0] || '';
+  if (!tail.trim()) return [];
+  const words = tail.split(' ').filter(Boolean);
+  const out: { status: string; phrase: string; replace: number }[] = [];
+  const seen = new Set<string>();
+  // Try the last one, two and three words as the start of a keyword.
+  for (let n = Math.min(3, words.length); n >= 1; n--) {
+    const frag = words.slice(-n).join(' ') + (tail.endsWith(' ') ? ' ' : '');
+    if (frag.trim().length < 2) continue;
+    const replace = tail.trimEnd().length - tail.trimEnd().split(' ').slice(-n).join(' ').length;
+    // One suggestion per status: its first matching keyword (the list puts the usual spelling first).
+    for (const k of keywords) {
+      if (seen.has(k.status)) continue;
+      const phrase = k.phrases.find((ph) => ph.length >= 3 && ph !== frag.trim() && ph.startsWith(frag));
+      if (!phrase) continue;
+      seen.add(k.status);
+      out.push({ status: k.status, phrase, replace: text.length - (tail.length - replace) });
+    }
+  }
+  return out.slice(0, 6);
+};
+
 /**
  * The Notes field in RFQ Details. Whatever is typed is saved with the lead
  * (Save) as a new note, stamped with today's date and the writer's name; a
@@ -53,11 +94,28 @@ export function LeadNotesField({
 }) {
   const [detected, setDetected] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+  const [keywords, setKeywords] = useState<Keyword[]>([]);
+  const [showKeywords, setShowKeywords] = useState(false);
+  const boxRef = useRef<HTMLTextAreaElement>(null);
   const [version, setVersion] = useState(0);
   const me = getStoredUser();
   const myName = me?.firstName || me?.name || '';
   const typed = value.trim();
   const hasOwnDates = /\d{1,2}\s*[/.-]\s*\d{1,2}\s*[/.-]\s*\d{2,4}/.test(typed);
+
+  useEffect(() => {
+    loadKeywords().then(setKeywords);
+  }, []);
+
+  const suggestions = useMemo(() => suggestionsFor(value, keywords), [value, keywords]);
+
+  /** Writes a keyword into the note, in capitals like the team writes them. */
+  const insert = (phrase: string, from = value.length) => {
+    const before = value.slice(0, from);
+    const sep = before && !/[\s,(]$/.test(before) ? ' ' : '';
+    onChange(`${before}${sep}${phrase.toUpperCase()} `);
+    setTimeout(() => boxRef.current?.focus(), 0);
+  };
 
   // What status the note will set, shown while typing.
   useEffect(() => {
@@ -82,6 +140,15 @@ export function LeadNotesField({
     <div>
       <div className="flex items-center justify-between gap-2">
         <label className="block text-sm font-medium text-slate-700">Notes</label>
+        <span className="ml-auto" />
+        <button
+          type="button"
+          onClick={() => setShowKeywords((v) => !v)}
+          aria-expanded={showKeywords}
+          className="text-xs font-medium text-[var(--primary)] hover:underline"
+        >
+          {showKeywords ? 'Hide keywords' : 'Keywords'}
+        </button>
         <button
           type="button"
           onClick={() => setOpen(true)}
@@ -98,14 +165,60 @@ export function LeadNotesField({
           {latest}
         </p>
       )}
+      {showKeywords && (
+        <div className="mt-1 max-h-56 overflow-y-auto rounded-lg border border-slate-200 bg-white p-3">
+          <p className="mb-2 text-[11px] text-slate-400">Any of these words in a note sets the status. Small spelling mistakes are fine. Click one to add it.</p>
+          <div className="space-y-1.5">
+            {keywords.map((k) => (
+              <div key={k.status} className="flex flex-wrap items-center gap-1">
+                <LeadStatusBadge status={k.status} className="!px-2 !py-0 !text-[10px]" />
+                {k.phrases.map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => insert(p)}
+                    className="rounded border border-slate-200 px-1.5 py-0.5 text-[11px] text-slate-600 hover:border-[var(--primary)] hover:text-[var(--primary)]"
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       <textarea
+        ref={boxRef}
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => {
+          // Tab takes the first suggestion.
+          if (e.key === 'Tab' && !e.shiftKey && suggestions.length) {
+            e.preventDefault();
+            insert(suggestions[0].phrase, suggestions[0].replace);
+          }
+        }}
         rows={3}
         maxLength={4000}
         placeholder="Write a new note, e.g. CNR, Busy, Switch Off, WhatsApp Done"
         className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
       />
+      {suggestions.length > 0 && (
+        <div className="mt-1 flex flex-wrap items-center gap-1.5">
+          <span className="text-[11px] text-slate-400">Suggestions (Tab):</span>
+          {suggestions.map((sug) => (
+            <button
+              key={sug.phrase}
+              type="button"
+              onClick={() => insert(sug.phrase, sug.replace)}
+              className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white py-0.5 pl-2 pr-1 text-xs font-medium text-slate-700 hover:border-[var(--primary)]"
+            >
+              {sug.phrase.toUpperCase()}
+              <LeadStatusBadge status={sug.status} className="!px-1.5 !py-0 !text-[10px]" />
+            </button>
+          ))}
+        </div>
+      )}
       <p className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-slate-400">
         {typed ? (
           <>
