@@ -12,6 +12,11 @@ import { ConflictError, ValidationError } from '../errors/AppError';
 import * as leadNotes from '../services/leadNoteService';
 import { NOTE_STATUS_KEYWORDS } from '../utils/leadNotes';
 import leadRepository from '../repositories/LeadRepository';
+import SiteVisit, { DONE_VISIT_STATUSES } from '../models/SiteVisit';
+import { localDay } from '../utils/reportTime';
+import {
+  splitMobiles, normalizeImportSource, normalizeImportStatus, splitFullName, importDay, VISIT_FROM_LEAD_STATUS,
+} from '../utils/leadImport';
 
 export const getLeads = asyncHandler(async (req: AuthRequest, res: Response) => {
   const result = await leadService.list(req.query as any);
@@ -45,6 +50,51 @@ const rowErrorMessage = (err: unknown) => {
   return e?.message || 'Import failed';
 };
 
+// Lead fields an import may fill in on a lead that is already in the CRM
+// (only where the lead has nothing yet; what the team typed is kept).
+const IMPORT_FILL_FIELDS = [
+  'firstName', 'lastName', 'email', 'alternateMobile', 'phone', 'company', 'leadSource', 'subSource',
+  'configuration', 'propertyType', 'projectName', 'preferredLocation', 'budgetMin', 'budgetMax',
+  'city', 'state', 'country', 'street', 'zipCode', 'territory', 'industry', 'jobTitle',
+] as const;
+
+const isBlank = (v: unknown) => v === undefined || v === null || String(v).trim() === '';
+
+type ImportedVisit = { day: string; status: 'completed' | 'revisit-done'; userId: number | null; notes: string | null };
+
+/** Adds the site visits an imported row says happened, skipping ones the lead already has that day. */
+const saveImportedVisits = async (lead: Lead, visits: ImportedVisit[], importerId: number | null | undefined) => {
+  if (!visits.length) return 0;
+  const existing = await SiteVisit.findAll({
+    where: { leadId: lead.id, status: DONE_VISIT_STATUSES },
+    attributes: ['scheduledAt', 'status'],
+    raw: true,
+  });
+  const have = new Set(existing.map((v) => `${localDay(new Date(v.scheduledAt))}|${v.status}`));
+  let added = 0;
+  for (const v of visits) {
+    const key = `${v.day}|${v.status}`;
+    if (have.has(key)) continue;
+    have.add(key);
+    const userId = v.userId ?? lead.assignedToId ?? importerId;
+    if (!userId) continue;
+    const at = new Date(`${v.day}T12:00:00+05:30`);
+    await SiteVisit.create({
+      leadId: lead.id,
+      userId,
+      scheduledAt: at,
+      status: v.status,
+      projectName: lead.projectName ?? null,
+      location: lead.preferredLocation ?? null,
+      notes: v.notes ? v.notes.slice(0, 5000) : null,
+      completedAt: at,
+      createdById: importerId ?? null,
+    });
+    added += 1;
+  }
+  return added;
+};
+
 export const importLeads = asyncHandler(async (req: AuthRequest, res: Response) => {
   const rows = req.body?.rows;
   if (!Array.isArray(rows) || rows.length === 0) throw new ValidationError('No rows to import.');
@@ -52,24 +102,84 @@ export const importLeads = asyncHandler(async (req: AuthRequest, res: Response) 
     throw new ValidationError(`Send at most ${IMPORT_BATCH_MAX.toLocaleString('en-IN')} rows per request.`);
   }
 
-  const results: { ok: boolean; id?: number; error?: string; duplicate?: boolean; notesAdded?: number; updated?: boolean }[] = [];
-  // Names in the notes column's brackets ("(SS)", "(SADIYA)") are matched to users once per batch.
+  const results: {
+    ok: boolean; id?: number; error?: string; duplicate?: boolean; notesAdded?: number; visitsAdded?: number; updated?: boolean;
+  }[] = [];
+  const importerId = req.user?.id;
+  // Names in the notes column's brackets ("(SS)", "(SADIYA)") and in the
+  // Executive Name column are matched to users once per batch.
   const notesOf = (r: any) => (r ? r.notes ?? r.callNotes : undefined);
-  const hasNotes = rows.some((r: any) => String(notesOf(r) ?? '').trim());
-  const matcher = hasNotes ? await leadNotes.loadNoteUserMatcher() : null;
+  const execOf = (r: any) => (r ? r.assignedTo ?? r.salesPerson ?? r.executiveName : undefined);
+  const needsMatcher = rows.some((r: any) => String(notesOf(r) ?? '').trim() || String(execOf(r) ?? '').trim());
+  const matcher = needsMatcher ? await leadNotes.loadNoteUserMatcher() : null;
+  const today = localDay(new Date());
+
   for (const raw of rows) {
-    const rowReq = { body: raw && typeof raw === 'object' && !Array.isArray(raw) ? { ...raw } : {} } as any;
-    // The Notes column: "31/10/26- CNR (SS) 01/11/26- BUSY (SS) ...". The
-    // last note gives the lead its status and, when the name is a user and
-    // the sheet has no owner, its sales person.
-    const notesCell = notesOf(rowReq.body);
-    const prepared = matcher && String(notesCell ?? '').trim() ? leadNotes.prepareImportedNotes(notesCell, matcher) : null;
-    delete rowReq.body.callNotes;
-    if (prepared) delete rowReq.body.notes; // saved as dated notes below, not as raw text
-    if (prepared?.current) {
-      if (!rowReq.body.status && prepared.current.status) rowReq.body.status = prepared.current.status;
-      if (!rowReq.body.assignedToId && prepared.current.userId) rowReq.body.assignedToId = prepared.current.userId;
+    const body: Record<string, any> = raw && typeof raw === 'object' && !Array.isArray(raw) ? { ...raw } : {};
+    const rowReq = { body } as any;
+
+    // "Name" column -> first and last name.
+    if (!isBlank(body.name) && isBlank(body.firstName) && isBlank(body.lastName)) {
+      [body.firstName, body.lastName] = splitFullName(body.name);
     }
+    delete body.name;
+
+    // "9822675337/  9175444667" -> Mobile and Alternate Mobile.
+    const mobiles = splitMobiles(body.mobile);
+    if (mobiles.length) body.mobile = mobiles[0];
+    if (mobiles[1] && isBlank(body.alternateMobile)) body.alternateMobile = mobiles[1];
+    if (!isBlank(body.alternateMobile)) body.alternateMobile = splitMobiles(body.alternateMobile)[0];
+
+    if (!isBlank(body.leadSource)) body.leadSource = normalizeImportSource(body.leadSource);
+    if (!isBlank(body.status)) {
+      const status = normalizeImportStatus(body.status);
+      if (status) body.status = status;
+      else delete body.status;
+    } else delete body.status;
+
+    // "Executive Name" -> the lead's sales person, when it names one user.
+    const execName = isBlank(execOf(body)) ? null : String(execOf(body)).trim();
+    delete body.assignedTo;
+    delete body.salesPerson;
+    delete body.executiveName;
+    const execId = execName && matcher ? matcher(execName) : null;
+    if (execId && isBlank(body.assignedToId)) body.assignedToId = execId;
+
+    // "Site Visit Date": the visit happened that day.
+    const visitDay = importDay(body.siteVisitDate);
+    delete body.siteVisitDate;
+    if (visitDay && !body.status) body.status = 'site-visit-done';
+    const sheetStatus: string | undefined = body.status;
+
+    // The Notes column: "31/10/26- CNR (SS) 01/11/26- BUSY (SS) ...". The
+    // last note gives the lead its status (unless the sheet has a Status) and,
+    // when the name is a user and the sheet has no owner, its sales person.
+    const notesCell = notesOf(body);
+    const prepared = matcher && String(notesCell ?? '').trim()
+      ? leadNotes.prepareImportedNotes(notesCell, matcher, { day: visitDay, name: execName })
+      : null;
+    delete body.callNotes;
+    if (prepared) delete body.notes; // saved as dated notes below, not as raw text
+    if (prepared?.current) {
+      if (!body.status && prepared.current.status) body.status = prepared.current.status;
+      if (isBlank(body.assignedToId) && prepared.current.userId) body.assignedToId = prepared.current.userId;
+    }
+
+    // Site visits this row says happened: notes such as "site visit done",
+    // a Site Visit Date, or a Site Visit Done / Revisit Done status.
+    const visits: ImportedVisit[] = [];
+    for (const n of prepared?.notes ?? []) {
+      const status = n.status ? VISIT_FROM_LEAD_STATUS[n.status] : undefined;
+      if (status) visits.push({ day: n.noteDate, status, userId: n.userId, notes: n.text });
+    }
+    if (visitDay && !visits.some((v) => v.day === visitDay)) {
+      visits.push({ day: visitDay, status: 'completed', userId: execId, notes: prepared?.current?.text ?? null });
+    }
+    const statusVisit = body.status ? VISIT_FROM_LEAD_STATUS[body.status] : undefined;
+    if (statusVisit && !visits.some((v) => v.status === statusVisit)) {
+      visits.push({ day: prepared?.current?.noteDate ?? today, status: statusVisit, userId: execId, notes: prepared?.current?.text ?? null });
+    }
+
     try {
       await Promise.all(createLeadValidation.map((chain) => chain.run(rowReq)));
       const invalid = validationResult(rowReq);
@@ -77,32 +187,51 @@ export const importLeads = asyncHandler(async (req: AuthRequest, res: Response) 
         results.push({ ok: false, error: invalid.array()[0].msg });
         continue;
       }
-      const created = await leadService.create(rowReq.body, req.user?.id);
-      let notesAdded: number | undefined;
-      if (prepared?.notes.length) {
-        const lead = await Lead.findByPk(created.id);
-        if (lead) notesAdded = await leadNotes.saveImportedNotes(lead, prepared.notes, req.user?.id);
-      }
-      results.push({ ok: true, id: created.id, notesAdded });
+      const created = await leadService.create(body as any, importerId);
+      const lead = prepared?.notes.length || visits.length ? await Lead.findByPk(created.id) : null;
+      const notesAdded = lead && prepared?.notes.length ? await leadNotes.saveImportedNotes(lead, prepared.notes, importerId, undefined, !sheetStatus) : undefined;
+      const visitsAdded = lead && visits.length ? await saveImportedVisits(lead, visits, importerId) : undefined;
+      results.push({ ok: true, id: created.id, notesAdded, visitsAdded });
     } catch (err) {
-      // Already in the CRM: a sheet with newer notes adds them to that lead.
-      if (err instanceof ConflictError && prepared?.notes.length) {
-        const existing = await leadRepository.findDuplicate({ email: rowReq.body.email || null, mobile: rowReq.body.mobile || null });
-        if (existing) {
-          const lead = await Lead.findByPk(existing.id);
-          const notesAdded = lead ? await leadNotes.saveImportedNotes(lead, prepared.notes, req.user?.id) : 0;
-          if (notesAdded > 0) {
-            results.push({ ok: true, id: existing.id, updated: true, notesAdded });
-            continue;
-          }
-        }
+      if (!(err instanceof ConflictError)) {
+        results.push({ ok: false, error: rowErrorMessage(err) });
+        continue;
       }
-      results.push({ ok: false, error: rowErrorMessage(err), duplicate: err instanceof ConflictError || undefined });
+      // Already in the CRM (same mobile or email): add the new notes and
+      // visits to that lead, fill its empty fields, and apply the sheet's status.
+      try {
+        const existing = await leadRepository.findDuplicate({ email: body.email || null, mobile: body.mobile || null });
+        const lead = existing ? await Lead.findByPk(existing.id) : null;
+        if (!lead) {
+          results.push({ ok: false, error: rowErrorMessage(err), duplicate: true });
+          continue;
+        }
+        const patch: Record<string, any> = {};
+        for (const key of IMPORT_FILL_FIELDS) {
+          if (!isBlank(body[key]) && isBlank((lead as any)[key])) patch[key] = body[key];
+        }
+        if (!isBlank(body.assignedToId) && !lead.assignedToId) patch.assignedToId = body.assignedToId;
+        if (sheetStatus && sheetStatus !== lead.status) patch.status = sheetStatus;
+        if (Object.keys(patch).length) {
+          await leadService.update(lead.id, patch as any, importerId);
+          await lead.reload();
+        }
+        const notesAdded = prepared?.notes.length ? await leadNotes.saveImportedNotes(lead, prepared.notes, importerId, undefined, !sheetStatus) : 0;
+        const visitsAdded = await saveImportedVisits(lead, visits, importerId);
+        if (Object.keys(patch).length || notesAdded || visitsAdded) {
+          results.push({ ok: true, id: lead.id, updated: true, notesAdded, visitsAdded });
+        } else {
+          results.push({ ok: false, error: 'Already in the CRM, nothing new to add', duplicate: true });
+        }
+      } catch (updateErr) {
+        results.push({ ok: false, error: rowErrorMessage(updateErr), duplicate: true });
+      }
     }
   }
 
   return res.json({
-    created: results.filter((r) => r.ok).length,
+    created: results.filter((r) => r.ok && !r.updated).length,
+    updated: results.filter((r) => r.updated).length,
     failed: results.filter((r) => !r.ok).length,
     results,
   });

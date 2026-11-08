@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx';
 import type { ImportExportChildTable, ImportExportField, ImportRow } from './types';
-import { normalizeCell } from './validate';
+import { normalizeCell, splitMobileCell } from './validate';
 
 function normalize(str: string) {
   return str.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -75,6 +75,15 @@ export async function parseImportFile(
       if (!col) return;
       (col.child ? child : parent)[col.field.key] = normalizeCell(col.field, cellText(row[idx]));
     });
+
+    // Two numbers in one Mobile cell: the second becomes the Alternate Mobile.
+    for (const f of fields) {
+      if (f.type !== 'mobile' || !f.splitInto || !parent[f.key]) continue;
+      const numbers = splitMobileCell(parent[f.key]);
+      if (numbers.length < 2) continue;
+      parent[f.key] = numbers[0];
+      if (!parent[f.splitInto]) parent[f.splitInto] = numbers[1];
+    }
 
     const hasParentValues = Object.values(parent).some((v) => v !== '');
     const hasChildValues = Object.values(child).some((v) => v !== '');

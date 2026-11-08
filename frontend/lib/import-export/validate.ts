@@ -47,7 +47,30 @@ export function validateCell(field: ImportExportField, raw: unknown): string | n
 /** Case-insensitively maps a select value onto its canonical option, e.g.
  * "Flat" -> "flat". Other values are returned unchanged. */
 export function normalizeCell(field: ImportExportField, raw: string): string {
+  if (field.type === 'date') {
+    // "31/10/26", "31-10-2026" (day first, as written in India) -> "2026-10-31"
+    const m = /^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2}|\d{4})$/.exec(raw.trim());
+    if (!m) return raw;
+    const y = m[3].length === 2 ? 2000 + Number(m[3]) : Number(m[3]);
+    return `${y}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+  }
   if (field.type !== 'select' || !field.options) return raw;
-  const match = field.options.find((o) => o.toLowerCase() === raw.trim().toLowerCase());
+  // "1bhk" -> "1 BHK", "Site Visit Done" -> "site-visit-done"
+  const loose = (v: string) => v.toLowerCase().replace(/[^a-z0-9.+]/g, '');
+  const match =
+    field.options.find((o) => o.toLowerCase() === raw.trim().toLowerCase()) ||
+    field.options.find((o) => loose(o) === loose(raw));
   return match ?? raw;
+}
+
+/** "9822675337/  9175444667" -> ["9822675337", "9175444667"]; one number or none -> []. */
+export function splitMobileCell(raw: string): string[] {
+  const parts = raw
+    .split(/[\/,;|&\n]+|\s{2,}|\bor\b|\band\b/i)
+    .map((p) => normalizeMobile(p))
+    .filter((p): p is string => !!p);
+  if (parts.length >= 2) return [...new Set(parts)];
+  const digits = raw.replace(/\D/g, '');
+  if (parts.length === 0 && digits.length === 20) return [digits.slice(0, 10), digits.slice(10)];
+  return [];
 }
