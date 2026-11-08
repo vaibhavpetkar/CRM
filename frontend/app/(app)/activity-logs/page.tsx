@@ -59,6 +59,7 @@ export default function ActivityLogsPage() {
     },
     {
       header: 'Time',
+      sortKey: (log) => (log.createdAt ? new Date(log.createdAt).getTime() : null),
       accessor: (log) => (
         <div className="flex items-center gap-1 text-slate-500 text-sm">
           <ClockIcon className="h-4 w-4" />

@@ -131,11 +131,11 @@ export default function CampaignsPage() {
     },
     { header: 'Type', accessor: (c) => <span className="capitalize text-slate-600">{c.type}</span> },
     { header: 'Status', accessor: (c) => <StatusBadge status={c.status} /> },
-    { header: 'Sent', accessor: (c) => <span className="text-slate-600">{Number(c.sent || 0).toLocaleString()}</span> },
-    { header: 'Opened', accessor: (c) => <span className="text-slate-600">{Number(c.opened || 0).toLocaleString()}</span> },
-    { header: 'Clicked', accessor: (c) => <span className="text-slate-600">{Number(c.clicked || 0).toLocaleString()}</span> },
-    { header: 'Converted', accessor: (c) => <span className="font-medium text-emerald-600">{c.converted || 0}</span> },
-    { header: 'Start Date', accessor: (c) => <span className="text-slate-500">{c.startDate ? String(c.startDate).split('T')[0] : 'N/A'}</span> },
+    { header: 'Sent', sortKey: (c) => Number(c.sent || 0), accessor: (c) => <span className="text-slate-600">{Number(c.sent || 0).toLocaleString()}</span> },
+    { header: 'Opened', sortKey: (c) => Number(c.opened || 0), accessor: (c) => <span className="text-slate-600">{Number(c.opened || 0).toLocaleString()}</span> },
+    { header: 'Clicked', sortKey: (c) => Number(c.clicked || 0), accessor: (c) => <span className="text-slate-600">{Number(c.clicked || 0).toLocaleString()}</span> },
+    { header: 'Converted', sortKey: (c) => Number(c.converted || 0), accessor: (c) => <span className="font-medium text-emerald-600">{c.converted || 0}</span> },
+    { header: 'Start Date', sortKey: (c) => (c.startDate ? new Date(c.startDate).getTime() : null), accessor: (c) => <span className="text-slate-500">{c.startDate ? String(c.startDate).split('T')[0] : 'N/A'}</span> },
   ];
 
   return (

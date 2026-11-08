@@ -58,6 +58,7 @@ export default function RecycleBinPage() {
     },
     {
       header: 'Deleted At',
+      sortKey: (record) => (record.deletedAt ? new Date(record.deletedAt).getTime() : null),
       accessor: (record) => (
         <div className="flex items-center gap-1 text-slate-500 text-sm">
           <TrashIcon className="h-4 w-4" />

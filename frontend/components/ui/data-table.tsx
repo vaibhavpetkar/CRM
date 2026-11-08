@@ -32,6 +32,12 @@ export type DataTableColumn<T> = {
   accessor: (row: T, index: number) => React.ReactNode;
   /** Optional function to extract primitive value for auto-sorting */
   sortKey?: (row: T) => string | number | boolean | Date | null | undefined;
+  /**
+   * Server-side sort field. With `onSortChange` on the table, clicking the
+   * header asks the server to sort by this field (so every record is sorted,
+   * not just the loaded page). Columns without one aren't sortable then.
+   */
+  sortField?: string;
   /** If provided, enables inline text editing */
   editValue?: (row: T) => string;
   /** Called when inline edit is committed */
@@ -77,6 +83,12 @@ type DataTableProps<T> = {
   totalEntries?: number;
   /** Unique identifier for persisting column order & visibility per user/table */
   tableId?: string;
+  /**
+   * Server-side sorting: called with the clicked column's `sortField` and
+   * direction (or null when sorting is cleared). The table then shows `data`
+   * in the order given instead of sorting it itself.
+   */
+  onSortChange?: (sort: { field: string; direction: 'asc' | 'desc' } | null) => void;
   /** User permission flag: controls if right-click inline edit is unlocked */
   canEdit?: boolean;
   /**
@@ -256,6 +268,20 @@ function EditableCell<T>({
   );
 }
 
+/** The plain text inside a rendered cell, for sorting columns that have no sortKey. */
+function nodeText(node: React.ReactNode): string {
+  if (node === null || node === undefined || typeof node === 'boolean') return '';
+  if (typeof node === 'string' || typeof node === 'number') return String(node);
+  if (Array.isArray(node)) return node.map(nodeText).join(' ');
+  if (React.isValidElement(node)) {
+    const props = node.props as { children?: React.ReactNode; status?: unknown; title?: unknown };
+    // Badges like <StatusBadge status="new" /> carry their value in a prop.
+    if (props.children === undefined && typeof props.status === 'string') return props.status;
+    return nodeText(props.children);
+  }
+  return '';
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // DataTable Main Component
 // ─────────────────────────────────────────────────────────────────────────────
@@ -275,6 +301,7 @@ export default function DataTable<T>({
   showToolbar       = false,
   totalEntries,
   tableId           = 'default_datatable',
+  onSortChange,
   canEdit           = true,
   bulkDelete,
 }: DataTableProps<T>) {
@@ -324,7 +351,13 @@ export default function DataTable<T>({
               colMap.delete(id);
             }
           });
-          colMap.forEach((col) => reordered.push(col));
+          // Columns added since the settings were saved: optional ones start hidden.
+          const added = Array.from(colMap.entries());
+          added.forEach(([, col]) => reordered.push(col));
+          const addedOptional = added.filter(([, col]) => col.optional).map(([id]) => id);
+          if (addedOptional.length) {
+            setHiddenColumnIds((prev) => new Set([...Array.from(prev), ...addedOptional]));
+          }
           setOrderedColumns(reordered);
           return;
         }
@@ -406,20 +439,27 @@ export default function DataTable<T>({
   );
 
   // ── 2. Automatic Header Sorting State ──
-  const [sortColIndex, setSortColIndex] = useState<number | null>(null);
+  // Sorted column by its id (not position), so hiding or moving columns keeps the sort.
+  const [sortColId, setSortColId] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc' | null>(null);
+  const colKey = (col: DataTableColumn<T>, idx: number) => col.id || col.header || String(idx);
+  const serverSort = !!onSortChange;
+  const canSortColumn = (col: DataTableColumn<T>) =>
+    serverSort ? !!col.sortField : true;
 
   const handleHeaderClick = (colIndex: number) => {
-    if (sortColIndex === colIndex) {
-      if (sortDirection === 'asc') setSortDirection('desc');
-      else if (sortDirection === 'desc') {
-        setSortDirection(null);
-        setSortColIndex(null);
-      }
+    const col = visibleColumns[colIndex];
+    if (!col || !canSortColumn(col)) return;
+    const key = colKey(col, colIndex);
+    let next: { id: string | null; dir: 'asc' | 'desc' | null };
+    if (sortColId === key) {
+      next = sortDirection === 'asc' ? { id: key, dir: 'desc' } : { id: null, dir: null };
     } else {
-      setSortColIndex(colIndex);
-      setSortDirection('asc');
+      next = { id: key, dir: 'asc' };
     }
+    setSortColId(next.id);
+    setSortDirection(next.dir);
+    if (serverSort) onSortChange!(next.id && next.dir && col.sortField ? { field: col.sortField, direction: next.dir } : null);
   };
 
   // ── 3. Right-Click Context Menu State ──
@@ -597,39 +637,36 @@ export default function DataTable<T>({
 
   // ── Apply Sorting ──
   const sortedData = React.useMemo(() => {
-    if (sortColIndex === null || !sortDirection || !visibleColumns[sortColIndex]) {
-      return data;
-    }
-    const targetCol = visibleColumns[sortColIndex];
-    return [...data].sort((a, b) => {
-      let valA: any;
-      let valB: any;
-
-      if (targetCol.sortKey) {
-        valA = targetCol.sortKey(a);
-        valB = targetCol.sortKey(b);
-      } else if (targetCol.editValue) {
-        valA = targetCol.editValue(a);
-        valB = targetCol.editValue(b);
-      } else {
-        // Fallback string conversion
-        valA = String(a);
-        valB = String(b);
-      }
-
-      if (valA == null) return 1;
-      if (valB == null) return -1;
-
-      let result = 0;
-      if (typeof valA === 'number' && typeof valB === 'number') {
-        result = valA - valB;
-      } else {
-        result = String(valA).localeCompare(String(valB), undefined, { numeric: true, sensitivity: 'base' });
-      }
-
+    // The server already sorted it (and has the records not loaded yet).
+    if (serverSort) return data;
+    const idx = visibleColumns.findIndex((c, i) => colKey(c, i) === sortColId);
+    if (idx < 0 || !sortDirection) return data;
+    const targetCol = visibleColumns[idx];
+    const valueOf = (row: T, i: number): any => {
+      if (targetCol.sortKey) return targetCol.sortKey(row);
+      if (targetCol.editValue) return targetCol.editValue(row);
+      // No sort key: sort by the text the cell shows ("—" counts as empty).
+      const text = nodeText(targetCol.accessor(row, i)).trim();
+      return text === '—' || text === '-' || text === 'N/A' ? '' : text;
+    };
+    const blank = (v: any) => v === null || v === undefined || v === '' || (typeof v === 'number' && Number.isNaN(v));
+    const comparable = (v: any) => (v instanceof Date ? v.getTime() : typeof v === 'boolean' ? Number(v) : v);
+    const keyed = data.map((row, i) => ({ row, v: comparable(valueOf(row, i)) }));
+    return keyed.sort((x, y) => {
+      const valA = x.v;
+      const valB = y.v;
+      // Empty values go last whichever way the column is sorted.
+      if (blank(valA) && blank(valB)) return 0;
+      if (blank(valA)) return 1;
+      if (blank(valB)) return -1;
+      const result =
+        typeof valA === 'number' && typeof valB === 'number'
+          ? valA - valB
+          : String(valA).localeCompare(String(valB), undefined, { numeric: true, sensitivity: 'base' });
       return sortDirection === 'asc' ? result : -result;
-    });
-  }, [data, sortColIndex, sortDirection, visibleColumns]);
+    }).map((x) => x.row);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, sortColId, sortDirection, visibleColumns, serverSort]);
 
   // Apply Density Slicing
   const displayData =
@@ -723,7 +760,7 @@ export default function DataTable<T>({
                     Check a column to show it. Pin <MapPinIcon className="inline h-3 w-3 -translate-y-px" /> a column to freeze just that column while scrolling — pin as many as you like.
                   </p>
 
-                  <div className="max-h-60 space-y-1.5 overflow-y-auto pr-1">
+                  <div className="max-h-[60vh] space-y-1.5 overflow-y-auto pr-1">
                     {orderedColumns.map((col, idx) => {
                       const colId = col.id || col.header || String(idx);
                       const isHidden = hiddenColumnIds.has(colId);
@@ -846,20 +883,23 @@ export default function DataTable<T>({
 
               {/* Dynamic Header Columns with Auto Sort */}
               {visibleColumns.map((col, i) => {
-                const isSorted = sortColIndex === i;
                 const key = col.id || col.header || String(i);
+                const isSorted = sortColId === key && !!sortDirection;
+                const sortable = canSortColumn(col);
                 return (
                   <th
                     key={i}
                     ref={(el) => { if (el) headerCellRefs.current.set(key, el); }}
                     onClick={() => handleHeaderClick(i)}
+                    aria-sort={isSorted ? (sortDirection === 'asc' ? 'ascending' : 'descending') : undefined}
                     className={cn(
-                      'group cursor-pointer select-none px-4 py-3 transition hover:bg-slate-100',
+                      'group select-none px-4 py-3 transition',
+                      sortable && 'cursor-pointer hover:bg-slate-100',
                       col.headerClassName,
                       isLastFrozenKey(key) && 'shadow-[2px_0_4px_-2px_rgba(0,0,0,0.15)]'
                     )}
                     style={getStickyStyle(key, 'rgb(248 250 252 / 0.8)')}
-                    title="Click to sort Ascending / Descending"
+                    title={sortable ? 'Click to sort A→Z, again for Z→A, a third time to clear' : undefined}
                   >
                     <div className="flex items-center justify-between gap-1.5">
                       <span>{col.header}</span>
@@ -871,7 +911,7 @@ export default function DataTable<T>({
                             <ArrowDownIcon className="h-3.5 w-3.5 text-[var(--primary)]" />
                           )
                         ) : (
-                          <ArrowsUpDownIcon className="h-3.5 w-3.5 opacity-0 transition-opacity group-hover:opacity-100 text-slate-400" />
+                          sortable && <ArrowsUpDownIcon className="h-3.5 w-3.5 opacity-0 transition-opacity group-hover:opacity-100 text-slate-400" />
                         )}
                       </span>
                     </div>

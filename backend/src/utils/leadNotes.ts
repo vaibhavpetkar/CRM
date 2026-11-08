@@ -79,13 +79,19 @@ const words = (text: string) => {
 
 // Statuses that say something already happened. They don't count when the
 // words just before them say it is still to come or didn't happen
-// ("will come for revisit done", "not visited yet", "visit pending").
+// ("will come for revisit done", "not visited yet", "visit pending"), or
+// when someone else did it ("his friend visited").
 const DONE_STATUSES = new Set(['whatsapp-done', 'details-shared', 'site-visit-done', 'revisit-done']);
 const NOT_YET_BEFORE = new Set(['will', 'wil', 'shall', 'going', 'gonna', 'plan', 'planning', 'planned', 'coming', 'come', 'not', 'no', 'yet', 'tomorrow', 'next', 'may', 'might', 'should', 'want', 'wants', 'to']);
 const NOT_YET_AFTER = new Set(['pending', 'remaining', 'tomorrow', 'later', 'planned', 'scheduled']);
 
+// Someone other than the lead did it: "someone of his known visited our
+// project", "his friend visited". That is not the lead's own visit.
+const SOMEONE_ELSE = new Set(['someone', 'somebody', 'some1', 'friend', 'friends', 'relative', 'relatives', 'known', 'colleague', 'colleagues', 'neighbour', 'neighbor', 'neighbours', 'neighbors', 'other', 'others']);
+
 const notYet = (tokens: string[], pos: number, size: number) =>
   tokens.slice(Math.max(0, pos - 3), pos).some((w) => NOT_YET_BEFORE.has(w)) ||
+  tokens.slice(Math.max(0, pos - 5), pos).some((w) => SOMEONE_ELSE.has(w)) ||
   tokens.slice(pos + size, pos + size + 2).some((w) => NOT_YET_AFTER.has(w));
 
 const editDistance = (a: string, b: string, max: number) => {

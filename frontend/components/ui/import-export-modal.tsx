@@ -21,7 +21,7 @@ import Button from './button';
 import { cn } from '@/lib/utils';
 import type { ImportExportConfig, ImportRow } from '@/lib/import-export/types';
 import { runExport, downloadTemplate, type ExportFormat } from '@/lib/import-export/exporters';
-import { parseImportFile } from '@/lib/import-export/parse';
+import { parseImportFile, splitMobileFields } from '@/lib/import-export/parse';
 import { normalizeMobile, validateCell } from '@/lib/import-export/validate';
 import { useToast } from '@/components/ui/toast';
 
@@ -150,7 +150,7 @@ export default function ImportExportModal({ open, onClose, config, initialTab = 
     setRows((prev) =>
       prev.map((r) =>
         r.__rowId === rowId
-          ? { ...r, [key]: value, ...(r.__status === 'error' ? { __status: 'pending' as const, __error: undefined, __selected: true } : {}) }
+          ? { ...splitMobileFields({ ...r, [key]: value }, importFields), ...(r.__status === 'error' ? { __status: 'pending' as const, __error: undefined, __selected: true } : {}) }
           : r
       )
     );
@@ -250,7 +250,10 @@ export default function ImportExportModal({ open, onClose, config, initialTab = 
   // 30,000-row file, updating state after every single row re-rendered (and
   // re-copied) the whole list 30,000 times and froze the tab.
   const handleImport = async () => {
-    const targets = rows.filter((r) => r.__selected && r.__status !== 'success');
+    // Split "A/B" mobiles here too, so a typed-in or older row is not refused.
+    const splitRows = rows.map((r) => splitMobileFields(r, importFields));
+    if (splitRows.some((r, i) => r !== rows[i])) setRows(splitRows);
+    const targets = splitRows.filter((r) => r.__selected && r.__status !== 'success');
     if (targets.length === 0) return;
     setImporting(true);
     setImportSummary({ done: 0, total: targets.length });
@@ -282,7 +285,7 @@ export default function ImportExportModal({ open, onClose, config, initialTab = 
       const key = config.uniqueKey;
       const field = importFields.find((f) => f.key === key);
       const firstRowOf = new Map<string, number>();
-      rows.forEach((row, index) => {
+      splitRows.forEach((row, index) => {
         const raw = String(row[key] ?? '').trim();
         if (!raw) return;
         const value = field?.type === 'mobile' ? normalizeMobile(raw) || raw : raw.toLowerCase();
