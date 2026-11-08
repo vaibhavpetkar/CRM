@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { PhoneIcon, PhoneArrowUpRightIcon, MapPinIcon, ClockIcon, UserPlusIcon, PlusIcon, SignalIcon, UsersIcon, CalendarDaysIcon, ArrowPathIcon, ChevronUpIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
+import { PhoneIcon, PhoneArrowUpRightIcon, MapPinIcon, ClockIcon, PlusIcon, SignalIcon, UsersIcon, CalendarDaysIcon, ArrowPathIcon, ChevronUpIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import PageHeader from '@/components/ui/page-header';
 import Card from '@/components/ui/card';
@@ -35,6 +35,8 @@ const talkTime = (seconds: number) => {
 
 const shortDay = (d: string) => new Date(`${d}T00:00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
 
+const minutes = (m: number) => (m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`);
+
 const clock = (v: string | null) => (v ? new Date(v).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : '—');
 
 type SortKey = keyof SalesAgentActivity;
@@ -43,6 +45,7 @@ type SortKey = keyof SalesAgentActivity;
 const COLUMNS: { key: SortKey; label: string; title?: string; render?: (a: SalesAgentActivity) => React.ReactNode; className?: string }[] = [
   { key: 'callsToday', label: 'Calls today', title: 'Calls made today, whatever range is picked', render: (a) => <><b className="text-slate-900">{a.callsToday}</b>{a.connectedToday > 0 && <span className="block text-[11px] text-emerald-700">{a.connectedToday} connected</span>}</> },
   { key: 'leadsWorkedToday', label: 'Leads today', title: 'Different leads worked on today (called, updated, follow-up or remark)' },
+  { key: 'activeMinutesToday', label: 'Active today', title: 'Time using the CRM today', render: (a) => minutes(a.activeMinutesToday) },
   { key: 'calls', label: 'Calls', render: (a) => <><b className="text-slate-900">{a.calls}</b>{a.incoming > 0 && <span className="block text-[11px] text-slate-400">{a.incoming} in</span>}</> },
   { key: 'connected', label: 'Connected', render: (a) => <><span className="text-emerald-700">{a.connected}</span><span className="block text-[11px] text-slate-400">{a.connectRate}%</span></> },
   { key: 'missed', label: 'Missed', className: 'text-rose-600' },
@@ -52,6 +55,8 @@ const COLUMNS: { key: SortKey; label: string; title?: string; render?: (a: Sales
   { key: 'avgCallsPerDay', label: 'Calls / day', title: 'Average calls per day worked' },
   { key: 'leadsWorked', label: 'Leads worked', title: 'Different leads called, updated, followed up or visited', render: (a) => <b className="text-slate-900">{a.leadsWorked}</b> },
   { key: 'leadsCalled', label: 'Leads called', title: 'Different leads called' },
+  { key: 'leadsCreated', label: 'Leads added', title: 'Leads this person created' },
+  { key: 'leadsUpdated', label: 'Lead updates', title: 'Times this person saved changes to a lead' },
   { key: 'followUpsDone', label: 'Follow-ups', title: 'Follow-ups and remarks written' },
   { key: 'notesWritten', label: 'Notes', title: 'Notes written (by the date on the note)', render: (a) => <b className="text-slate-900">{a.notesWritten}</b> },
   { key: 'leadsNoted', label: 'Leads noted', title: 'Different leads with a note' },
@@ -61,7 +66,10 @@ const COLUMNS: { key: SortKey; label: string; title?: string; render?: (a: Sales
   { key: 'visitsScheduled', label: 'Visits booked' },
   { key: 'conversions', label: 'Converted' },
   { key: 'leadsAssigned', label: 'New leads', title: 'New leads assigned in the range' },
-  { key: 'activeDays', label: 'Days active' },
+  { key: 'activeMinutes', label: 'Active in CRM', title: 'Time using the CRM in the range (tab open and in use)', render: (a) => <b className="text-slate-900">{minutes(a.activeMinutes)}</b> },
+  { key: 'activeDays', label: 'Days worked' },
+  { key: 'firstSeenAt', label: 'First login', title: 'First time seen in the CRM in the range', render: (a) => <span className="whitespace-nowrap text-xs">{clock(a.firstSeenAt)}</span> },
+  { key: 'lastSeenAt', label: 'Last seen', render: (a) => <span className="whitespace-nowrap text-xs">{clock(a.lastSeenAt)}</span> },
   { key: 'firstActivityAt', label: 'First action', render: (a) => <span className="whitespace-nowrap text-xs">{clock(a.firstActivityAt)}</span> },
   { key: 'lastActivityAt', label: 'Last action', render: (a) => <span className="whitespace-nowrap text-xs">{clock(a.lastActivityAt)}</span> },
 ];
@@ -72,6 +80,7 @@ const EXPORT_COLUMNS = [
   { key: 'callsToday', label: 'Calls today' },
   { key: 'connectedToday', label: 'Connected today' },
   { key: 'leadsWorkedToday', label: 'Leads worked today' },
+  { key: 'activeToday', label: 'Active in CRM today' },
   { key: 'calls', label: 'Calls' },
   { key: 'incoming', label: 'Incoming' },
   { key: 'connected', label: 'Connected' },
@@ -83,6 +92,8 @@ const EXPORT_COLUMNS = [
   { key: 'avgCallsPerDay', label: 'Calls per day' },
   { key: 'leadsWorked', label: 'Leads worked' },
   { key: 'leadsCalled', label: 'Leads called' },
+  { key: 'leadsCreated', label: 'Leads added' },
+  { key: 'leadsUpdated', label: 'Lead updates' },
   { key: 'followUpsDone', label: 'Follow-ups done' },
   { key: 'notesWritten', label: 'Notes' },
   { key: 'leadsNoted', label: 'Leads noted' },
@@ -94,7 +105,10 @@ const EXPORT_COLUMNS = [
   { key: 'visitsCancelled', label: 'Visits cancelled / no-show' },
   { key: 'conversions', label: 'Converted' },
   { key: 'leadsAssigned', label: 'New leads' },
-  { key: 'activeDays', label: 'Days active' },
+  { key: 'activeTime', label: 'Active in CRM' },
+  { key: 'activeDays', label: 'Days worked' },
+  { key: 'firstSeen', label: 'First login' },
+  { key: 'lastSeen', label: 'Last seen' },
   { key: 'first', label: 'First action' },
   { key: 'last', label: 'Last action' },
 ];
@@ -147,6 +161,7 @@ export default function SalesActivityPage() {
   const chart = useMemo(() => (data?.daily || []).map((d) => ({ ...d, label: shortDay(d.date) })), [data]);
   const t = data?.totals;
   const connectRate = t && t.calls ? Math.round((t.connected / t.calls) * 100) : 0;
+  const person = userId !== 'all' || (data && !data.canSeeTeam) ? data?.agents[0] || null : null;
   const isToday = !!data && data.from === data.to && data.from === presetRange('today').from;
 
   const rows = useMemo(() => {
@@ -174,6 +189,10 @@ export default function SalesActivityPage() {
       avgCall: talkTime(a.avgTalkSeconds),
       talkTime: talkTime(a.talkSeconds),
       longest: talkTime(a.longestCallSeconds),
+      activeToday: minutes(a.activeMinutesToday),
+      activeTime: minutes(a.activeMinutes),
+      firstSeen: a.firstSeenAt ? new Date(a.firstSeenAt).toLocaleString('en-IN') : '',
+      lastSeen: a.lastSeenAt ? new Date(a.lastSeenAt).toLocaleString('en-IN') : '',
       first: a.firstActivityAt ? new Date(a.firstActivityAt).toLocaleString('en-IN') : '',
       last: a.lastActivityAt ? new Date(a.lastActivityAt).toLocaleString('en-IN') : '',
     }));
@@ -229,15 +248,34 @@ export default function SalesActivityPage() {
 
       {data && t && (
         <>
+          {person && (
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200/80 bg-white px-5 py-4 shadow-xs">
+              <div className="flex items-center gap-3">
+                <AgentStatusDot state={person.state} />
+                <div>
+                  <p className="text-base font-bold text-slate-900">{person.name}</p>
+                  <p className="text-xs text-slate-500">
+                    {person.position || person.department || 'Sales person'} · first login {clock(person.firstSeenAt)} · last seen {clock(person.lastSeenAt)}
+                  </p>
+                </div>
+                <AgentStatusBadge state={person.state} detail={person.onCallWith} />
+              </div>
+              <div className="flex gap-2">
+                <Link href={`/call-tracking?userId=${person.userId}&from=${data.from}&to=${data.to}`}><Button size="sm" variant="secondary"><PhoneIcon className="h-4 w-4" /> Call log</Button></Link>
+                {canPickAgent && <Button size="sm" variant="ghost" onClick={() => setUserId('all')}>Whole team</Button>}
+              </div>
+            </div>
+          )}
+
           <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
             <StatCard label="Calls today" value={t.callsToday} change={isToday ? `${connectRate}% connected` : `${t.calls} in this range`} icon={<PhoneIcon className="h-5 w-5" />} />
             <StatCard label="Connected calls" value={t.connected} change={`${connectRate}% of ${t.calls} · ${t.missed} missed`} icon={<PhoneArrowUpRightIcon className="h-5 w-5" />} tone="emerald" />
-            <StatCard label="Avg call time" value={talkTime(t.avgTalkSeconds)} change={`${talkTime(t.talkSeconds)} total talk time`} icon={<ClockIcon className="h-5 w-5" />} tone="indigo" />
-            <StatCard label="Leads worked" value={t.leadsWorked} change={`${t.notesWritten || 0} notes · ${t.statusChanges} status changes`} icon={<UsersIcon className="h-5 w-5" />} tone="sky" />
+            <StatCard label="Calling time" value={talkTime(t.talkSeconds)} change={`${talkTime(t.avgTalkSeconds)} average call`} icon={<ClockIcon className="h-5 w-5" />} tone="indigo" />
+            <StatCard label="Active in CRM" value={minutes(t.activeMinutes)} change={person ? `${minutes(person.activeMinutesToday)} today` : `across ${data.agents.length} people`} icon={<SignalIcon className="h-5 w-5" />} tone="cyan" />
+            <StatCard label="Leads worked" value={t.leadsWorked} change={`${t.leadsCreated} added · ${t.leadsUpdated} updates · ${t.notesWritten || 0} notes`} icon={<UsersIcon className="h-5 w-5" />} tone="sky" />
             <StatCard label="Follow-ups done" value={t.followUpsDone} change={t.followUpsOverdue ? `${t.followUpsOverdue} overdue now` : 'None overdue'} changeType={t.followUpsOverdue ? 'negative' : 'positive'} icon={<CalendarDaysIcon className="h-5 w-5" />} tone="violet" />
-            <StatCard label="Visits done" value={t.visitsCompleted} change={`${t.visitsScheduled} booked`} icon={<MapPinIcon className="h-5 w-5" />} tone="amber" />
-            <StatCard label="Converted" value={t.conversions} icon={<ArrowPathIcon className="h-5 w-5" />} tone="emerald" />
-            <StatCard label="New leads" value={t.leadsAssigned} change={t.incoming ? `${t.incoming} incoming calls` : undefined} icon={<UserPlusIcon className="h-5 w-5" />} tone="rose" />
+            <StatCard label="Site visits done" value={t.visitsCompleted} change={`${t.visitsScheduled} booked`} icon={<MapPinIcon className="h-5 w-5" />} tone="amber" />
+            <StatCard label="Status changes" value={t.statusChanges} change={`${t.conversions} converted · ${t.leadsAssigned} new leads`} icon={<ArrowPathIcon className="h-5 w-5" />} tone="emerald" />
           </div>
 
           <Card title="Performance by sales person" className="mb-6">
@@ -263,9 +301,13 @@ export default function SalesActivityPage() {
                         <div className="flex items-center gap-2.5">
                           <AgentStatusDot state={a.state} />
                           <div className="min-w-0">
-                            <Link href={`/call-tracking?userId=${a.userId}&from=${data.from}&to=${data.to}`} className="font-semibold text-slate-900 hover:text-[var(--primary)] hover:underline">
-                              {a.name}
-                            </Link>
+                            {canPickAgent ? (
+                              <button onClick={() => setUserId(String(a.userId))} className="text-left font-semibold text-slate-900 hover:text-[var(--primary)] hover:underline" title="Show this person's dashboard">
+                                {a.name}
+                              </button>
+                            ) : (
+                              <span className="font-semibold text-slate-900">{a.name}</span>
+                            )}
                             {(a.position || a.department) && <p className="truncate text-xs text-slate-400">{a.position || a.department}</p>}
                           </div>
                         </div>

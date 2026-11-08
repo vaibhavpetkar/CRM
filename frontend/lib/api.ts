@@ -1386,6 +1386,12 @@ export interface SalesAgentActivity {
   callsToday: number;
   connectedToday: number;
   leadsWorkedToday: number;
+  leadsCreated: number;
+  leadsUpdated: number;
+  activeMinutes: number;
+  activeMinutesToday: number;
+  firstSeenAt: string | null;
+  lastSeenAt: string | null;
 }
 
 export interface SalesActivity {
@@ -1410,6 +1416,9 @@ export interface SalesActivity {
     statusChanges: number;
     conversions: number;
     callsToday: number;
+    leadsCreated: number;
+    leadsUpdated: number;
+    activeMinutes: number;
     onCall: number;
     online: number;
   };
@@ -1540,6 +1549,7 @@ export const salesApi = {
     request<NotesActivity>(`/sales/notes${qs(params)}`),
   getActivity: async (params: { from?: string; to?: string; userId?: number | string } = {}) =>
     request<SalesActivity>(`/sales/activity${qs(params)}`),
+  heartbeat: async () => request<{ ok: boolean }>('/sales/heartbeat', { method: 'POST' }),
   getLeadSources: async (params: { from?: string; to?: string } = {}) =>
     request<LeadSourceReport>(`/sales/lead-sources${qs(params)}`),
   getCallLog: async (params: { from?: string; to?: string; userId?: number | string; status?: string; direction?: string; number?: string; page?: number; limit?: number } = {}) =>

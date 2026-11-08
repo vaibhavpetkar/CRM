@@ -42,6 +42,7 @@ import MetaLeadEvent from '../models/MetaLeadEvent';
 import Call from '../models/Call';
 import CallerNumber from '../models/CallerNumber';
 import SiteVisit from '../models/SiteVisit';
+import UserActiveDay from '../models/UserActiveDay';
 import PortalConnection from '../models/PortalConnection';
 import PortalLeadEvent from '../models/PortalLeadEvent';
 
@@ -102,6 +103,7 @@ export const TENANT_MODELS: ModelStatic<Model>[] = [
   Call,
   CallerNumber,
   SiteVisit,
+  UserActiveDay,
   PortalConnection,
   PortalLeadEvent,
 ];

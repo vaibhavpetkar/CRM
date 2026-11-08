@@ -54,11 +54,15 @@ export default function SiteVisitsPage() {
   const [agents, setAgents] = useState<{ id: number; name: string }[]>([]);
   const [states, setStates] = useState<Map<number, PresenceState>>(new Map());
   const [editing, setEditing] = useState<SiteVisitRow | 'new' | null>(null);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const load = useCallback(async () => {
     try {
       const res = await salesApi.listVisits({ ...range, userId, status });
       setVisits(res.visits);
+      // Keep only selections that are still on the page.
+      setSelected((prev) => new Set(res.visits.filter((v) => prev.has(v.id)).map((v) => v.id)));
     } catch (err: any) {
       toast.error(err.message || 'Could not load site visits.');
       setVisits([]);
@@ -103,6 +107,52 @@ export default function SiteVisitsPage() {
     }
   };
 
+  const allSelected = !!visits && visits.length > 0 && visits.every((v) => selected.has(v.id));
+  const toggle = (id: number) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const toggleAll = () => setSelected(allSelected ? new Set() : new Set((visits || []).map((v) => v.id)));
+
+  const bulk = async (action: SiteVisitStatus | 'delete') => {
+    const ids = [...selected];
+    if (!ids.length) return;
+    if (action === 'delete' && !confirm(`Delete ${ids.length} site visit${ids.length === 1 ? '' : 's'}?`)) return;
+    setBulkBusy(true);
+    let failed = 0;
+    for (const id of ids) {
+      try {
+        if (action === 'delete') await salesApi.deleteVisit(id);
+        else await salesApi.updateVisit(id, { status: action });
+      } catch {
+        failed += 1;
+      }
+    }
+    setBulkBusy(false);
+    if (failed) toast.error(`${failed} of ${ids.length} could not be updated.`);
+    else toast.success(`${ids.length} site visit${ids.length === 1 ? '' : 's'} ${action === 'delete' ? 'deleted' : 'updated'}.`);
+    if (action === 'delete') setSelected(new Set());
+    load();
+  };
+
+  const toExportRow = (v: SiteVisitRow) => ({
+    date: new Date(v.scheduledAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+    time: new Date(v.scheduledAt).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' }),
+    leadNumber: v.leadNumber || '',
+    leadName: v.leadName || '',
+    leadMobile: v.leadMobile || '',
+    projectName: v.projectName || '',
+    location: v.location || '',
+    agentName: v.agentName || '',
+    status: VISIT_STATUS_LABEL[v.status] || v.status,
+    notes: v.notes || '',
+    completedAt: stamp(v.completedAt),
+    createdAt: stamp(v.createdAt),
+  });
+
   const select =
     'rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]';
 
@@ -118,23 +168,12 @@ export default function SiteVisitsPage() {
               fileName={`site-visits-${range.from}-to-${range.to}`}
               columns={EXPORT_COLUMNS}
               disabled={!visits || visits.length === 0}
+              label={selected.size ? `Export ${selected.size} selected` : 'Export'}
               getRows={async () => {
-                // Same filters as the table, without the 500-row page cap.
+                // Ticked rows only, or everything matching the filters (without the 500-row page cap).
+                if (selected.size) return (visits || []).filter((v) => selected.has(v.id)).map(toExportRow);
                 const { visits: all } = await salesApi.listVisits({ ...range, userId, status, limit: 10000 });
-                return all.map((v) => ({
-                  date: new Date(v.scheduledAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
-                  time: new Date(v.scheduledAt).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' }),
-                  leadNumber: v.leadNumber || '',
-                  leadName: v.leadName || '',
-                  leadMobile: v.leadMobile || '',
-                  projectName: v.projectName || '',
-                  location: v.location || '',
-                  agentName: v.agentName || '',
-                  status: VISIT_STATUS_LABEL[v.status] || v.status,
-                  notes: v.notes || '',
-                  completedAt: stamp(v.completedAt),
-                  createdAt: stamp(v.createdAt),
-                }));
+                return all.map(toExportRow);
               }}
             />}
             {canCreate && <Button size="sm" onClick={() => setEditing('new')}><PlusIcon className="h-4 w-4" /> Log site visit</Button>}
@@ -173,6 +212,22 @@ export default function SiteVisitsPage() {
         </div>
       </div>
 
+      {selected.size > 0 && (
+        <div className="sticky top-2 z-20 mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-[var(--primary)]/30 bg-blue-50 px-4 py-2.5 text-sm">
+          <span className="font-semibold text-slate-800">{selected.size} selected</span>
+          {canEdit && (
+            <>
+              <Button size="sm" variant="secondary" disabled={bulkBusy} onClick={() => bulk('completed')}>Visit done</Button>
+              <Button size="sm" variant="secondary" disabled={bulkBusy} onClick={() => bulk('revisit-done')}>Revisit done</Button>
+              <Button size="sm" variant="secondary" disabled={bulkBusy} onClick={() => bulk('no-show')}>No show</Button>
+              <Button size="sm" variant="secondary" disabled={bulkBusy} onClick={() => bulk('cancelled')}>Cancelled</Button>
+            </>
+          )}
+          {canDelete && <Button size="sm" variant="ghost" className="text-red-600" disabled={bulkBusy} onClick={() => bulk('delete')}>Delete</Button>}
+          <button onClick={() => setSelected(new Set())} className="ml-auto text-xs font-semibold text-slate-500 hover:text-slate-800">Clear selection</button>
+        </div>
+      )}
+
       <Card>
         {!visits ? (
           <div className="flex justify-center py-12"><LoadingSpinner /></div>
@@ -186,7 +241,10 @@ export default function SiteVisitsPage() {
             <table className="w-full min-w-[820px] text-sm">
               <thead>
                 <tr className="border-b border-slate-100 text-left text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                  <th className="px-6 py-3">When</th>
+                  <th className="w-10 pl-6 pr-1 py-3">
+                    <input type="checkbox" checked={allSelected} onChange={toggleAll} aria-label="Select all visits" className="h-4 w-4 rounded border-slate-300 accent-[var(--primary)]" />
+                  </th>
+                  <th className="px-3 py-3">When</th>
                   <th className="px-3 py-3">Lead</th>
                   <th className="px-3 py-3">Project / location</th>
                   <th className="px-3 py-3">Sales person</th>
@@ -197,8 +255,11 @@ export default function SiteVisitsPage() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {visits.map((v) => (
-                  <tr key={v.id} className="align-top" style={{ backgroundColor: leadStatusRowColor(`visit:${v.status}`) }}>
-                    <td className="whitespace-nowrap px-6 py-3 text-slate-700">
+                  <tr key={v.id} className={cn('align-top', selected.has(v.id) && 'outline outline-2 -outline-offset-2 outline-[var(--primary)]/40')} style={{ backgroundColor: leadStatusRowColor(`visit:${v.status}`) }}>
+                    <td className="w-10 pl-6 pr-1 py-3">
+                      <input type="checkbox" checked={selected.has(v.id)} onChange={() => toggle(v.id)} aria-label={`Select visit ${v.leadName || v.id}`} className="h-4 w-4 rounded border-slate-300 accent-[var(--primary)]" />
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-3 text-slate-700">
                       {new Date(v.scheduledAt).toLocaleString(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}
                     </td>
                     <td className="px-3 py-3">

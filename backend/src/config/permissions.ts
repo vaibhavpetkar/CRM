@@ -14,10 +14,10 @@ export interface PermissionDef {
   label: string; // human readable
 }
 
-const modules: { module: string; label: string; appModule?: ModuleKey; actions: { action: string; label: string }[] }[] = [
+const modules: { module: string; label: string; appModule?: ModuleKey; hidden?: boolean; actions: { action: string; label: string }[] }[] = [
   {
     module: 'leads',
-    label: 'Leads',
+    label: 'Leads page',
     actions: [
       { action: 'read', label: 'View leads' },
       { action: 'create', label: 'Create leads' },
@@ -29,7 +29,7 @@ const modules: { module: string; label: string; appModule?: ModuleKey; actions: 
   },
   {
     module: 'site_visits',
-    label: 'Site visits',
+    label: 'Site Visits page',
     actions: [
       { action: 'read', label: 'View site visits' },
       { action: 'create', label: 'Log / schedule site visits' },
@@ -40,7 +40,7 @@ const modules: { module: string; label: string; appModule?: ModuleKey; actions: 
   },
   {
     module: 'calls',
-    label: 'Calling',
+    label: 'Calling (Leads page and Call Tracking)',
     actions: [
       { action: 'make', label: 'Click-to-call and log calls on leads' },
       { action: 'recordings', label: 'Listen to call recordings' },
@@ -48,9 +48,10 @@ const modules: { module: string; label: string; appModule?: ModuleKey; actions: 
   },
   {
     module: 'sales',
-    label: 'Sales activity & call tracking',
+    label: 'Sales Activity & Call Tracking pages',
     actions: [
-      { action: 'team', label: 'See the whole team (activity, call log, site visits, live calls); without it people see only their own' },
+      { action: 'view', label: 'Open the pages (own numbers)' },
+      { action: 'team', label: 'See the whole team, not only their own numbers' },
       { action: 'export', label: 'Export sales performance' },
     ],
   },
@@ -78,7 +79,7 @@ const modules: { module: string; label: string; appModule?: ModuleKey; actions: 
   },
   {
     module: 'users',
-    label: 'Team members',
+    label: 'Team page',
     actions: [
       { action: 'read', label: 'View team' },
       { action: 'invite', label: 'Invite team members' },
@@ -88,7 +89,7 @@ const modules: { module: string; label: string; appModule?: ModuleKey; actions: 
   },
   {
     module: 'roles',
-    label: 'Roles & permissions',
+    label: 'Roles page',
     actions: [
       { action: 'read', label: 'View roles' },
       { action: 'create', label: 'Create roles' },
@@ -128,7 +129,7 @@ const modules: { module: string; label: string; appModule?: ModuleKey; actions: 
   },
   {
     module: 'reports',
-    label: 'Reports & analytics',
+    label: 'Reports & Analytics page',
     actions: [{ action: 'view', label: 'View reports' }],
   },
   {
@@ -144,7 +145,7 @@ const modules: { module: string; label: string; appModule?: ModuleKey; actions: 
   },
   {
     module: 'document_templates',
-    label: 'Document Templates',
+    label: 'Document Templates page',
     actions: [
       { action: 'read', label: 'View templates' },
       { action: 'create', label: 'Create templates' },
@@ -187,23 +188,25 @@ const modules: { module: string; label: string; appModule?: ModuleKey; actions: 
   },
   {
     module: 'company',
-    label: 'Company Settings',
+    label: 'Company & Subscription pages',
     actions: [{ action: 'manage', label: 'Manage company settings (name, currency, etc.)' }],
   },
   {
     module: 'settings',
     label: 'System Settings',
+    // Nothing in the app checks it any more; kept so existing roles stay valid.
+    hidden: true,
     actions: [{ action: 'manage', label: 'Manage environment variables & system settings' }],
   },
   {
     module: 'integrations',
-    label: 'Integrations',
+    label: 'Integrations page',
     actions: [{ action: 'manage', label: 'Connect/disconnect third-party integrations' }],
   },
   {
     module: 'ai',
-    label: 'AI Assistant',
-    actions: [{ action: 'use', label: 'Generate AI summaries & suggestions (leads, deals, quotes)' }],
+    label: 'AI summaries (Leads page)',
+    actions: [{ action: 'use', label: 'Generate AI summaries on leads' }],
   },
 ];
 
@@ -216,7 +219,17 @@ export const PERMISSION_CATALOG: PermissionDef[] = modules.flatMap((m) =>
   }))
 );
 
-export const PERMISSION_GROUPS = modules.filter((m) => !m.appModule || isModuleEnabled(m.appModule)).map((m) => ({
+// Same order as the sidebar, so the role editor reads like the menu.
+const SIDEBAR_ORDER = ['reports', 'leads', 'calls', 'ai', 'sales', 'site_visits', 'tasks', 'meetings', 'deals', 'contacts', 'quotes', 'invoices', 'marketing', 'items', 'item_categories', 'taxes', 'expenses', 'document_templates', 'users', 'company', 'integrations', 'roles'];
+const rank = (module: string) => {
+  const i = SIDEBAR_ORDER.indexOf(module);
+  return i === -1 ? SIDEBAR_ORDER.length : i;
+};
+
+export const PERMISSION_GROUPS = modules
+  .filter((m) => !m.hidden && (!m.appModule || isModuleEnabled(m.appModule)))
+  .sort((a, b) => rank(a.module) - rank(b.module))
+  .map((m) => ({
   module: m.module,
   label: m.label,
   permissions: m.actions.map((a) => ({ key: `${m.module}:${a.action}`, label: a.label })),
@@ -235,7 +248,7 @@ export const DEFAULT_ROLES: { name: string; description: string; permissions: st
       'leads:read', 'leads:create', 'leads:update', 'leads:delete', 'leads:import', 'leads:export',
       'site_visits:read', 'site_visits:create', 'site_visits:update', 'site_visits:delete', 'site_visits:export',
       'calls:make', 'calls:recordings',
-      'sales:team', 'sales:export',
+      'sales:view', 'sales:team', 'sales:export',
       'deals:read', 'deals:create', 'deals:update', 'deals:delete',
       'contacts:read', 'contacts:create', 'contacts:update', 'contacts:delete',
       'quotes:view', 'invoices:view', 'tasks:view', 'meetings:view',
@@ -255,6 +268,7 @@ export const DEFAULT_ROLES: { name: string; description: string; permissions: st
       'leads:read', 'leads:create', 'leads:update',
       'site_visits:read', 'site_visits:create', 'site_visits:update',
       'calls:make', 'calls:recordings',
+      'sales:view',
       'deals:read', 'deals:create', 'deals:update',
       'contacts:read', 'contacts:create', 'contacts:update',
       'quotes:view', 'tasks:view', 'meetings:view',
@@ -279,5 +293,6 @@ export const PERMISSION_GRANTS: { name: string; ifHas: string; grant: string[] }
   { name: 'perm-2026-11-leads-import', ifHas: 'leads:create', grant: ['leads:import'] },
   { name: 'perm-2026-11-leads-read', ifHas: 'leads:read', grant: ['leads:export', 'site_visits:read', 'site_visits:export', 'calls:make', 'calls:recordings'] },
   { name: 'perm-2026-11-leads-update', ifHas: 'leads:update', grant: ['site_visits:create', 'site_visits:update', 'site_visits:delete'] },
+  { name: 'perm-2026-11-sales-view', ifHas: 'leads:read', grant: ['sales:view'] },
   { name: 'perm-2026-11-team', ifHas: 'users:read', grant: ['sales:team', 'sales:export'] },
 ];
