@@ -20,6 +20,8 @@ export type ImportExportField = {
   strict?: boolean;
   /** computed/system values: exported, but left out of the import template and preview */
   exportOnly?: boolean;
+  /** other column headers that mean this field on import (e.g. "Remarks") */
+  aliases?: string[];
 };
 
 /** A child table (e.g. a Quote's line items). In a spreadsheet each child row

@@ -12,6 +12,7 @@ router.get('/activity', protect, salesController.getActivity);
 router.post('/heartbeat', protect, salesController.heartbeat);
 router.get('/lead-sources', protect, authorize('leads:read'), salesController.getLeadSources);
 router.get('/calls', protect, salesController.getCallLog);
+router.get('/notes', protect, salesController.getNotesActivity);
 
 router.get('/visits', protect, salesController.listVisits);
 router.post('/visits', protect, salesController.createVisit);

@@ -13,6 +13,7 @@ import LoadingSpinner from '@/components/ui/loading-spinner';
 import DateRangePicker, { DateRange, presetRange } from '@/components/sales/date-range';
 import { AgentStatusBadge, AgentStatusDot } from '@/components/sales/agent-status';
 import SiteVisitModal from '@/components/sales/site-visit-modal';
+import NotesActivityCard from '@/components/sales/notes-activity';
 import { getStoredUser, salesApi, SalesActivity, SalesAgentActivity, usersApi } from '@/lib/api';
 import { getSocket } from '@/lib/socket';
 import { hasPermission } from '@/lib/permissions';
@@ -57,6 +58,8 @@ const COLUMNS: { key: SortKey; label: string; title?: string; render?: (a: Sales
   { key: 'leadsCreated', label: 'Leads added', title: 'Leads this person created' },
   { key: 'leadsUpdated', label: 'Lead updates', title: 'Times this person saved changes to a lead' },
   { key: 'followUpsDone', label: 'Follow-ups', title: 'Follow-ups and remarks written' },
+  { key: 'notesWritten', label: 'Notes', title: 'Notes written (by the date on the note)', render: (a) => <b className="text-slate-900">{a.notesWritten}</b> },
+  { key: 'leadsNoted', label: 'Leads noted', title: 'Different leads with a note' },
   { key: 'followUpsOverdue', label: 'Overdue', title: 'Open assigned leads whose follow-up date has passed', render: (a) => <span className={a.followUpsOverdue ? 'font-semibold text-rose-600' : ''}>{a.followUpsOverdue}</span> },
   { key: 'statusChanges', label: 'Status changes' },
   { key: 'visitsCompleted', label: 'Visits done', render: (a) => <b className="text-slate-900">{a.visitsCompleted}</b> },
@@ -92,6 +95,8 @@ const EXPORT_COLUMNS = [
   { key: 'leadsCreated', label: 'Leads added' },
   { key: 'leadsUpdated', label: 'Lead updates' },
   { key: 'followUpsDone', label: 'Follow-ups done' },
+  { key: 'notesWritten', label: 'Notes' },
+  { key: 'leadsNoted', label: 'Leads noted' },
   { key: 'followUpsOverdue', label: 'Follow-ups overdue' },
   { key: 'followUpsDueToday', label: 'Follow-ups due today' },
   { key: 'statusChanges', label: 'Status changes' },
@@ -267,7 +272,7 @@ export default function SalesActivityPage() {
             <StatCard label="Connected calls" value={t.connected} change={`${connectRate}% of ${t.calls} · ${t.missed} missed`} icon={<PhoneArrowUpRightIcon className="h-5 w-5" />} tone="emerald" />
             <StatCard label="Calling time" value={talkTime(t.talkSeconds)} change={`${talkTime(t.avgTalkSeconds)} average call`} icon={<ClockIcon className="h-5 w-5" />} tone="indigo" />
             <StatCard label="Active in CRM" value={minutes(t.activeMinutes)} change={person ? `${minutes(person.activeMinutesToday)} today` : `across ${data.agents.length} people`} icon={<SignalIcon className="h-5 w-5" />} tone="cyan" />
-            <StatCard label="Leads worked" value={t.leadsWorked} change={`${t.leadsCreated} added · ${t.leadsUpdated} updates`} icon={<UsersIcon className="h-5 w-5" />} tone="sky" />
+            <StatCard label="Leads worked" value={t.leadsWorked} change={`${t.leadsCreated} added · ${t.leadsUpdated} updates · ${t.notesWritten || 0} notes`} icon={<UsersIcon className="h-5 w-5" />} tone="sky" />
             <StatCard label="Follow-ups done" value={t.followUpsDone} change={t.followUpsOverdue ? `${t.followUpsOverdue} overdue now` : 'None overdue'} changeType={t.followUpsOverdue ? 'negative' : 'positive'} icon={<CalendarDaysIcon className="h-5 w-5" />} tone="violet" />
             <StatCard label="Site visits done" value={t.visitsCompleted} change={`${t.visitsScheduled} booked`} icon={<MapPinIcon className="h-5 w-5" />} tone="amber" />
             <StatCard label="Status changes" value={t.statusChanges} change={`${t.conversions} converted · ${t.leadsAssigned} new leads`} icon={<ArrowPathIcon className="h-5 w-5" />} tone="emerald" />
@@ -322,6 +327,8 @@ export default function SalesActivityPage() {
               </table>
             </div>
           </Card>
+
+          <NotesActivityCard from={data.from} to={data.to} userId={userId} />
 
           {chart.length > 1 && (
             <Card title="Calls, leads worked and visits per day">

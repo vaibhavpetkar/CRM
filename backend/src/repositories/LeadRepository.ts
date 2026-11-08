@@ -5,6 +5,8 @@ import LeadProduct from '../models/LeadProduct';
 import LeadTax from '../models/LeadTax';
 import { BaseRepository, ListQueryParams, PaginatedResult } from './BaseRepository';
 import { localDay, startOfLocalDay } from '../utils/reportTime';
+import { noteExistsSql } from '../services/leadNoteService';
+import sequelize from '../config/database';
 
 const assignedToInclude = {
   model: User,
@@ -241,8 +243,45 @@ class LeadRepository extends BaseRepository<Lead> {
       and.push({ createdAt: range });
     }
 
+    and.push(...this.noteFilters(params));
+
     if (!and.length) return base;
     return { ...base, [Op.and]: and };
+  }
+
+  /**
+   * Call note filters. By default they look at each lead's latest note (its
+   * date, what it said, who wrote it), the way the lead's status does;
+   * noteScope=any looks for any one note that fits all of them.
+   */
+  private noteFilters(params: ListQueryParams): any[] {
+    const from = toDay(params.noteFrom);
+    const to = toDay(params.noteTo);
+    const text = String(params.noteSearch ?? '').trim().slice(0, 200) || null;
+    const statuses = csv(params.noteStatus);
+    const by = String(params.noteBy ?? '').trim();
+    const byUserId = /^\d+$/.test(by) ? Number(by) : null;
+    const byName = by.startsWith('name:') ? by.slice(5).trim() || null : null;
+    if (!from && !to && !text && !statuses.length && !byUserId && !byName) return [];
+
+    if (String(params.noteScope ?? '') === 'any') {
+      return [sequelize.literal(noteExistsSql({ from, to, text, status: statuses, userId: byUserId, name: byName }))];
+    }
+    const out: any[] = [];
+    if (from || to) {
+      const range: any = {};
+      if (from) range[Op.gte] = from;
+      if (to) range[Op.lte] = to;
+      out.push({ lastNoteDate: range });
+    }
+    if (text) {
+      const like = `%${escapeLike(text)}%`;
+      out.push({ [Op.or]: [{ lastNoteText: { [Op.iLike]: like } }, { lastNoteBy: { [Op.iLike]: like } }] });
+    }
+    if (statuses.length) out.push({ lastNoteStatus: { [Op.in]: statuses } });
+    if (byUserId) out.push({ lastNoteUserId: byUserId });
+    if (byName) out.push({ lastNoteUserId: null, lastNoteBy: { [Op.iLike]: escapeLike(byName) } });
+    return out;
   }
 
   async list(params: ListQueryParams): Promise<PaginatedResult<Lead>> {

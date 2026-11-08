@@ -160,6 +160,20 @@ const SCHEMA_PATCHES: { name: string; sql: string }[] = [
     sql: `ALTER TABLE "leads" ADD COLUMN IF NOT EXISTS "followUpRemark" TEXT;`,
   },
   {
+    // The latest call note on each lead (every note is a row in lead_notes,
+    // which sync creates), so the Leads page can filter by it quickly.
+    name: 'leads last note',
+    sql: `
+      ALTER TABLE "leads" ADD COLUMN IF NOT EXISTS "lastNoteDate" DATE;
+      ALTER TABLE "leads" ADD COLUMN IF NOT EXISTS "lastNoteStatus" VARCHAR(40);
+      ALTER TABLE "leads" ADD COLUMN IF NOT EXISTS "lastNoteText" TEXT;
+      ALTER TABLE "leads" ADD COLUMN IF NOT EXISTS "lastNoteBy" VARCHAR(100);
+      ALTER TABLE "leads" ADD COLUMN IF NOT EXISTS "lastNoteUserId" INTEGER;
+      ALTER TABLE "leads" ADD COLUMN IF NOT EXISTS "notesCount" INTEGER NOT NULL DEFAULT 0;
+      CREATE INDEX IF NOT EXISTS "leads_company_last_note" ON "leads" ("companyId", "lastNoteDate");
+    `,
+  },
+  {
     // Incoming calls (a customer calling the company's Vi / Exotel number)
     // are logged next to click-to-call ones.
     name: 'calls.direction',

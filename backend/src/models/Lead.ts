@@ -82,6 +82,13 @@ interface LeadAttributes {
   projectName?: string | null; // project or listing the enquiry came for
   subSource?: string | null; // finer than leadSource: the campaign, form, project or listing it came from (set automatically by integrations)
   followUpRemark?: string | null; // remark for the current Next Follow-up; earlier ones live in lead_follow_ups
+  // The latest call note ("06/11/26 SWITCH OFF (SHABINA)"); every note lives in lead_notes.
+  lastNoteDate?: string | null; // YYYY-MM-DD
+  lastNoteStatus?: string | null;
+  lastNoteText?: string | null;
+  lastNoteBy?: string | null; // sales person's name as written on the note
+  lastNoteUserId?: number | null; // that sales person's user, when known
+  notesCount?: number;
   budgetMin?: number | null; // rupees
   budgetMax?: number | null;
 
@@ -171,6 +178,12 @@ class Lead extends Model<LeadAttributes, LeadCreationAttributes> implements Lead
   public projectName?: string | null;
   public subSource?: string | null;
   public followUpRemark?: string | null;
+  public lastNoteDate?: string | null;
+  public lastNoteStatus?: string | null;
+  public lastNoteText?: string | null;
+  public lastNoteBy?: string | null;
+  public lastNoteUserId?: number | null;
+  public notesCount?: number;
   public budgetMin?: number | null;
   public budgetMax?: number | null;
   public createdById?: number | null;
@@ -442,6 +455,12 @@ Lead.init(
     projectName: { type: DataTypes.STRING(255), allowNull: true },
     subSource: { type: DataTypes.STRING(255), allowNull: true },
     followUpRemark: { type: DataTypes.TEXT, allowNull: true },
+    lastNoteDate: { type: DataTypes.DATEONLY, allowNull: true },
+    lastNoteStatus: { type: DataTypes.STRING(40), allowNull: true },
+    lastNoteText: { type: DataTypes.TEXT, allowNull: true },
+    lastNoteBy: { type: DataTypes.STRING(100), allowNull: true },
+    lastNoteUserId: { type: DataTypes.INTEGER, allowNull: true },
+    notesCount: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
     budgetMin: { type: DataTypes.DECIMAL(15, 2), allowNull: true },
     budgetMax: { type: DataTypes.DECIMAL(15, 2), allowNull: true },
     assignedToId: {

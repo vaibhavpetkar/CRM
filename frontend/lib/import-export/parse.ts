@@ -10,7 +10,10 @@ function normalize(str: string) {
  * "Label *" required-marker, different casing, spacing, punctuation, etc. */
 function matchField(header: string, fields: ImportExportField[]): ImportExportField | undefined {
   const cleanHeader = normalize(header.replace('*', ''));
-  return fields.find((f) => normalize(f.label) === cleanHeader || normalize(f.key) === cleanHeader);
+  return (
+    fields.find((f) => normalize(f.label) === cleanHeader || normalize(f.key) === cleanHeader) ||
+    fields.find((f) => (f.aliases || []).some((a) => normalize(a) === cleanHeader))
+  );
 }
 
 /** Child columns are matched by label only, so a child "Amount" key can never

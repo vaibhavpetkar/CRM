@@ -9,6 +9,8 @@ import { Op } from 'sequelize';
 import { validationResult } from 'express-validator';
 import { createLeadValidation } from '../validations/leadValidation';
 import { ConflictError, ValidationError } from '../errors/AppError';
+import * as leadNotes from '../services/leadNoteService';
+import leadRepository from '../repositories/LeadRepository';
 
 export const getLeads = asyncHandler(async (req: AuthRequest, res: Response) => {
   const result = await leadService.list(req.query as any);
@@ -49,9 +51,24 @@ export const importLeads = asyncHandler(async (req: AuthRequest, res: Response) 
     throw new ValidationError(`Send at most ${IMPORT_BATCH_MAX.toLocaleString('en-IN')} rows per request.`);
   }
 
-  const results: { ok: boolean; id?: number; error?: string; duplicate?: boolean }[] = [];
+  const results: { ok: boolean; id?: number; error?: string; duplicate?: boolean; notesAdded?: number; updated?: boolean }[] = [];
+  // Names in the notes column's brackets ("(SS)", "(SADIYA)") are matched to users once per batch.
+  const notesOf = (r: any) => (r ? r.notes ?? r.callNotes : undefined);
+  const hasNotes = rows.some((r: any) => String(notesOf(r) ?? '').trim());
+  const matcher = hasNotes ? await leadNotes.loadNoteUserMatcher() : null;
   for (const raw of rows) {
     const rowReq = { body: raw && typeof raw === 'object' && !Array.isArray(raw) ? { ...raw } : {} } as any;
+    // The Notes column: "31/10/26- CNR (SS) 01/11/26- BUSY (SS) ...". The
+    // last note gives the lead its status and, when the name is a user and
+    // the sheet has no owner, its sales person.
+    const notesCell = notesOf(rowReq.body);
+    const prepared = matcher && String(notesCell ?? '').trim() ? leadNotes.prepareImportedNotes(notesCell, matcher) : null;
+    delete rowReq.body.callNotes;
+    if (prepared) delete rowReq.body.notes; // saved as dated notes below, not as raw text
+    if (prepared?.current) {
+      if (!rowReq.body.status && prepared.current.status) rowReq.body.status = prepared.current.status;
+      if (!rowReq.body.assignedToId && prepared.current.userId) rowReq.body.assignedToId = prepared.current.userId;
+    }
     try {
       await Promise.all(createLeadValidation.map((chain) => chain.run(rowReq)));
       const invalid = validationResult(rowReq);
@@ -59,9 +76,26 @@ export const importLeads = asyncHandler(async (req: AuthRequest, res: Response) 
         results.push({ ok: false, error: invalid.array()[0].msg });
         continue;
       }
-      const lead = await leadService.create(rowReq.body, req.user?.id);
-      results.push({ ok: true, id: lead.id });
+      const created = await leadService.create(rowReq.body, req.user?.id);
+      let notesAdded: number | undefined;
+      if (prepared?.notes.length) {
+        const lead = await Lead.findByPk(created.id);
+        if (lead) notesAdded = await leadNotes.saveImportedNotes(lead, prepared.notes, req.user?.id);
+      }
+      results.push({ ok: true, id: created.id, notesAdded });
     } catch (err) {
+      // Already in the CRM: a sheet with newer notes adds them to that lead.
+      if (err instanceof ConflictError && prepared?.notes.length) {
+        const existing = await leadRepository.findDuplicate({ email: rowReq.body.email || null, mobile: rowReq.body.mobile || null });
+        if (existing) {
+          const lead = await Lead.findByPk(existing.id);
+          const notesAdded = lead ? await leadNotes.saveImportedNotes(lead, prepared.notes, req.user?.id) : 0;
+          if (notesAdded > 0) {
+            results.push({ ok: true, id: existing.id, updated: true, notesAdded });
+            continue;
+          }
+        }
+      }
       results.push({ ok: false, error: rowErrorMessage(err), duplicate: err instanceof ConflictError || undefined });
     }
   }
@@ -101,6 +135,28 @@ export const getLeadStats = asyncHandler(async (req: AuthRequest, res: Response)
 export const getLeadFollowUps = asyncHandler(async (req: AuthRequest, res: Response) => {
   const followUps = await leadService.getFollowUps(req.params.id);
   return res.json({ followUps });
+});
+
+// ─── Call notes ("13/09/26 CNR (SAKSHI)") ─────────────────────────────────────
+
+export const getLeadNotes = asyncHandler(async (req: AuthRequest, res: Response) => {
+  return res.json({ notes: await leadNotes.listNotes(req.params.id) });
+});
+
+export const addLeadNote = asyncHandler(async (req: AuthRequest, res: Response) => {
+  return res.status(201).json(await leadNotes.addNote(req.params.id, req.user, req.body || {}));
+});
+
+export const deleteLeadNote = asyncHandler(async (req: AuthRequest, res: Response) => {
+  return res.json(await leadNotes.deleteNote(req.params.id, req.params.noteId, req.user));
+});
+
+export const detectNoteStatus = asyncHandler(async (req: AuthRequest, res: Response) => {
+  return res.json(leadNotes.detectStatus(req.query.text));
+});
+
+export const getNoteNames = asyncHandler(async (_req: AuthRequest, res: Response) => {
+  return res.json({ names: await leadNotes.otherNoteNames() });
 });
 
 export const getLeadTimeline = asyncHandler(async (req: AuthRequest, res: Response) => {

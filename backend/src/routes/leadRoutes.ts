@@ -19,6 +19,10 @@ router.get('/check-duplicate', protect, authorize('leads:read'), leadController.
 // Company/Contact search for auto-populate (must come before /:id)
 router.get('/company-search', protect, authorize('leads:read'), leadController.searchCompaniesAndContacts);
 
+// Call notes: the status a note's text means, and bracket names that aren't users (before /:id).
+router.get('/notes/detect', protect, authorize('leads:read'), leadController.detectNoteStatus);
+router.get('/notes/names', protect, authorize('leads:read'), leadController.getNoteNames);
+
 // Lead CRUD routes
 // Short-lived cache keyed by the exact querystring (page/limit/filters/sort) —
 // list results aren't scoped per-user here, so it's safe to share across
@@ -37,6 +41,11 @@ router.post('/:id/convert', protect, authorize('leads:update'), validate(convert
 
 // Follow-up dates and remarks, newest first
 router.get('/:id/follow-ups', protect, authorize('leads:read'), leadController.getLeadFollowUps);
+
+// Call notes, newest first; writing one can change the lead's status
+router.get('/:id/notes', protect, authorize('leads:read'), leadController.getLeadNotes);
+router.post('/:id/notes', protect, authorize('leads:update'), leadController.addLeadNote);
+router.delete('/:id/notes/:noteId', protect, authorize('leads:update'), leadController.deleteLeadNote);
 
 // Activity timeline
 router.get('/:id/timeline', protect, authorize('leads:read'), leadController.getLeadTimeline);

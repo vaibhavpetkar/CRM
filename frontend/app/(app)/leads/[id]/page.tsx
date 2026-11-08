@@ -22,6 +22,7 @@ import { LeadStatusSelect } from '@/components/leads/lead-status';
 import SiteVisitsCard from '@/components/sales/site-visits-card';
 import SiteVisitModal from '@/components/sales/site-visit-modal';
 import FollowUpHistoryDrawer from '@/components/leads/follow-up-history-drawer';
+import { LeadNotesField, lastNoteLine } from '@/components/leads/lead-notes';
 
 // Today as YYYY-MM-DD in the browser's time zone, for the follow-up date picker's minimum.
 const todayStr = () => {
@@ -108,7 +109,8 @@ export default function LeadDetailsPage() {
     try {
       const data = await leadsApi.getLead(leadId); // Need to make sure this API method exists
       setLead(data);
-      setFormData(data);
+      // Notes (RFQ Details) is for writing a new note; the latest one shows above it.
+      setFormData({ ...data, notes: '' });
       setAssignedToName(data.assignedTo || '');
       setQualifiedByName(data.qualifiedBy || '');
       setInterestedItems(
@@ -204,6 +206,18 @@ export default function LeadDetailsPage() {
     if (newFollowUp && newFollowUp !== savedFollowUp && newFollowUp < todayStr()) {
       toast.warning("Next Follow-up date can't be before today.");
       return;
+    }
+
+    // A new note that means Site Visit Done / Revisit Done: log the visit first,
+    // like picking that status (the note decides the status when none was picked).
+    const newNote = String(formData.notes || '').trim();
+    if (newNote && !opts.visitLogged && formData.status === lead?.status) {
+      const noteStatus = (await leadsApi.detectNoteStatus(newNote).catch(() => ({ status: null }))).status;
+      if (noteStatus && VISIT_LEAD_STATUSES[noteStatus] && noteStatus !== lead?.status) {
+        setFormData({ ...formData, status: noteStatus });
+        setVisitPrompt(true);
+        return;
+      }
     }
 
     // Moving the lead to a site-visit status: log the visit first (the popup
@@ -677,12 +691,13 @@ export default function LeadDetailsPage() {
                 </select>
               </div>
               <div className="col-span-2">
-                <label className="block text-sm font-medium text-slate-700">Notes</label>
-                <textarea
+                <LeadNotesField
+                  leadId={leadId}
+                  leadName={leadName}
                   value={formData.notes || ''}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  rows={4}
-                  className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
+                  onChange={(notes) => setFormData({ ...formData, notes })}
+                  currentStatus={lead.status}
+                  latest={lastNoteLine(lead) || lead.notes || ''}
                 />
               </div>
             </div>
