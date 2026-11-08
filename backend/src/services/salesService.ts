@@ -4,6 +4,7 @@ import SiteVisit, { DONE_VISIT_STATUSES, SITE_VISIT_STATUSES, SiteVisitStatus } 
 import Lead from '../models/Lead';
 import LeadFollowUp from '../models/LeadFollowUp';
 import ActivityLog from '../models/ActivityLog';
+import UserActiveDay from '../models/UserActiveDay';
 import Contact from '../models/Contact';
 import User from '../models/User';
 import { ForbiddenError, NotFoundError, ValidationError } from '../errors/AppError';
@@ -112,6 +113,7 @@ const followUpCounts = async (when: Record<symbol, Date>, status: Record<symbol,
 };
 
 export const getActivity = async (user: any, query: Record<string, unknown>, onlineUserIds: Set<number>) => {
+  if (!userCan(user, 'sales:view')) throw new ForbiddenError();
   const { fromDay, toDay, start, end } = parseRange(query.from, query.to);
   const onlyUserId = scopedUserId(user, query.userId);
   const userWhere: any = { isActive: true };
@@ -126,7 +128,7 @@ export const getActivity = async (user: any, query: Record<string, unknown>, onl
   const now = new Date();
   const notClosed = { [Op.notIn]: [...DEAD_LEAD_STATUSES, ...WON] };
 
-  const [users, calls, visits, leads, presence, logs, followUps, todayWork, overdue, dueToday] = await Promise.all([
+  const [users, calls, visits, leads, presence, logs, followUps, todayWork, overdue, dueToday, activeDays] = await Promise.all([
     User.findAll({ where: userWhere, attributes: ['id', 'firstName', 'lastName', 'email', 'department', 'position'], order: [['firstName', 'ASC']] }),
     Call.findAll({ where: { ...byUser, createdAt: inRange } as any, attributes: ['userId', 'leadId', 'status', 'direction', 'durationSeconds', 'createdAt'], raw: true }),
     SiteVisit.findAll({ where: { ...byUser, scheduledAt: inRange }, attributes: ['userId', 'leadId', 'status', 'scheduledAt'], raw: true }),
@@ -147,7 +149,27 @@ export const getActivity = async (user: any, query: Record<string, unknown>, onl
     fromDay === today && toDay === today ? null : todayWorkByUser(todayStart, todayEnd, onlyUserId),
     followUpCounts({ [Op.lt]: now }, notClosed, onlyUserId),
     followUpCounts({ [Op.gte]: now, [Op.lt]: todayEnd }, notClosed, onlyUserId),
+    UserActiveDay.findAll({
+      where: {
+        [Op.or]: [{ day: { [Op.gte]: fromDay, [Op.lte]: toDay } }, { day: today }],
+        ...(onlyUserId ? { userId: onlyUserId } : {}),
+      } as any,
+      attributes: ['userId', 'day', 'activeMinutes', 'firstSeenAt', 'lastSeenAt'],
+      raw: true,
+    }),
   ]);
+  const active = new Map<number, { minutes: number; today: number; firstLogin: Date | null; lastSeen: Date | null }>();
+  for (const r of activeDays as any[]) {
+    const a = active.get(Number(r.userId)) || { minutes: 0, today: 0, firstLogin: null, lastSeen: null };
+    if (r.day === today) a.today = Number(r.activeMinutes) || 0;
+    active.set(Number(r.userId), a);
+    if (r.day < fromDay || r.day > toDay) continue;
+    a.minutes += Number(r.activeMinutes) || 0;
+    const first = new Date(r.firstSeenAt);
+    const last = new Date(r.lastSeenAt);
+    if (!a.firstLogin || first < a.firstLogin) a.firstLogin = first;
+    if (!a.lastSeen || last > a.lastSeen) a.lastSeen = last;
+  }
 
   const stateByUser = new Map<number, { state: PresenceState; since: Date | null; withName: string | null }>(
     presence.agents.map((a) => [a.userId, { state: a.state, since: a.since, withName: a.call?.withName || null }])
@@ -167,6 +189,8 @@ export const getActivity = async (user: any, query: Record<string, unknown>, onl
     followUpsDone: 0,
     statusChanges: 0,
     conversions: 0,
+    leadsCreated: 0,
+    leadsUpdated: 0,
   });
   // Per person: the leads they touched, the leads they called, the days they
   // worked and their first/last action in the range.
@@ -236,6 +260,8 @@ export const getActivity = async (user: any, query: Record<string, unknown>, onl
     const s = statFor(Number(l.performedById));
     if (l.action === 'status_changed') s.statusChanges += 1;
     if (l.action === 'converted') s.conversions += 1;
+    if (l.action === 'created') s.leadsCreated += 1;
+    if (l.action === 'updated') s.leadsUpdated += 1;
     touch(Number(l.performedById), l.entityId, l.createdAt);
   }
   for (const [day, set] of dailyLeads) {
@@ -268,6 +294,10 @@ export const getActivity = async (user: any, query: Record<string, unknown>, onl
       avgCallsPerDay: Math.round((s.calls / Math.max(1, activeDays || rangeDays)) * 10) / 10,
       firstActivityAt: w && Number.isFinite(w.first) ? new Date(w.first) : null,
       lastActivityAt: w && w.last ? new Date(w.last) : null,
+      activeMinutes: active.get(u.id)?.minutes || 0,
+      activeMinutesToday: active.get(u.id)?.today ?? 0,
+      firstSeenAt: active.get(u.id)?.firstLogin || null,
+      lastSeenAt: active.get(u.id)?.lastSeen || null,
       followUpsOverdue: overdue.get(u.id) || 0,
       followUpsDueToday: dueToday.get(u.id) || 0,
       // Same as the range numbers when the range is today.
@@ -294,6 +324,9 @@ export const getActivity = async (user: any, query: Record<string, unknown>, onl
       t.statusChanges += a.statusChanges;
       t.conversions += a.conversions;
       t.callsToday += a.callsToday;
+      t.leadsCreated += a.leadsCreated;
+      t.leadsUpdated += a.leadsUpdated;
+      t.activeMinutes += a.activeMinutes;
       return t;
     },
     {
@@ -310,6 +343,9 @@ export const getActivity = async (user: any, query: Record<string, unknown>, onl
       statusChanges: 0,
       conversions: 0,
       callsToday: 0,
+      leadsCreated: 0,
+      leadsUpdated: 0,
+      activeMinutes: 0,
     }
   );
   // Leads touched by anyone, counted once even when two people worked on one.
@@ -384,6 +420,7 @@ export const getLeadSources = async (query: Record<string, unknown>) => {
 // ─── Call tracking (call log) ───────────────────────────────────────────────
 
 export const listCallLog = async (user: any, query: Record<string, unknown>) => {
+  if (!userCan(user, 'sales:view')) throw new ForbiddenError();
   const { fromDay, toDay, start, end } = parseRange(query.from, query.to);
   const onlyUserId = scopedUserId(user, query.userId);
   const where: any = { createdAt: { [Op.gte]: start, [Op.lt]: end } };
@@ -607,4 +644,23 @@ export const deleteVisit = async (user: any, id: number) => {
   if (visit.userId !== user.id && !canSeeTeam(user)) throw new ForbiddenError('You can only remove your own site visits.');
   await visit.destroy();
   return { deleted: true };
+};
+
+// ─── Time active in the CRM ─────────────────────────────────────────────────
+
+// Heartbeats arrive once a minute; closer ones (two open tabs) add nothing.
+const MIN_HEARTBEAT_GAP_MS = 50 * 1000;
+
+/** One minute of the person using the CRM. */
+export const recordHeartbeat = async (user: any) => {
+  const now = new Date();
+  const day = localDay(now);
+  const [row, created] = await UserActiveDay.findOrCreate({
+    where: { userId: user.id, day },
+    defaults: { userId: user.id, day, activeMinutes: 1, firstSeenAt: now, lastSeenAt: now },
+  });
+  if (!created && now.getTime() - new Date(row.lastSeenAt).getTime() >= MIN_HEARTBEAT_GAP_MS) {
+    await row.update({ activeMinutes: row.activeMinutes + 1, lastSeenAt: now });
+  }
+  return { ok: true };
 };
