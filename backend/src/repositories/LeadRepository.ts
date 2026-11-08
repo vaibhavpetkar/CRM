@@ -133,10 +133,16 @@ export const buildLeadSearch = (raw: string): WhereOptions | null => {
   if (!text) return null;
   const and: any[] = [];
 
-  // Dates first: "20-11-26" would otherwise look like a phone number.
+  // Dates first: "20-11-26" would otherwise look like a phone number. A date
+  // finds leads whose latest note is from that day, or that were added that day.
   const dates = extractSearchDates(text);
   if (dates.range) {
-    and.push({ createdAt: { [Op.gte]: startOfLocalDay(dates.range.from), [Op.lt]: startOfLocalDay(dates.range.to, true) } });
+    and.push({
+      [Op.or]: [
+        { lastNoteDate: { [Op.gte]: dates.range.from, [Op.lte]: dates.range.to } },
+        { createdAt: { [Op.gte]: startOfLocalDay(dates.range.from), [Op.lt]: startOfLocalDay(dates.range.to, true) } },
+      ],
+    });
     text = dates.rest;
   }
 
