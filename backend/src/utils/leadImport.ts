@@ -58,6 +58,10 @@ export const normalizeImportStatus = (raw: unknown): string | undefined => {
   if (!text) return undefined;
   const dashed = text.toLowerCase().replace(/[\s_]+/g, '-');
   if (LEAD_STATUSES.includes(dashed)) return dashed;
+  // A Status column that just says "Site Visit" / "Revisit" means it happened
+  // (notes need "done"; a status column names where the lead is).
+  if (/^(site-?visit|sv|visit)$/.test(dashed)) return 'site-visit-done';
+  if (/^re-?visit$/.test(dashed)) return 'revisit-done';
   return detectNoteStatus(text) ?? undefined;
 };
 
