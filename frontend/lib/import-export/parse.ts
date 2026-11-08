@@ -39,6 +39,20 @@ const cellText = (cell: any) => {
   return String(cell).trim();
 };
 
+/** Two numbers in one Mobile cell ("9545065270/9545073870"): the first stays,
+ * the second goes to the Alternate Mobile. Returns the same record when nothing splits. */
+export function splitMobileFields<T extends Record<string, any>>(record: T, fields: ImportExportField[]): T {
+  let out = record;
+  for (const f of fields) {
+    if (f.type !== 'mobile' || !f.splitInto || !out[f.key]) continue;
+    const numbers = splitMobileCell(String(out[f.key]));
+    if (numbers.length < 2) continue;
+    out = { ...out, [f.key]: numbers[0] };
+    if (!String(out[f.splitInto] ?? '').trim()) out = { ...out, [f.splitInto]: numbers[1] };
+  }
+  return out;
+}
+
 export async function parseImportFile(
   file: File,
   allFields: ImportExportField[],
@@ -69,21 +83,14 @@ export async function parseImportFile(
 
   const records: ImportRow[] = [];
   for (const row of dataRows) {
-    const parent: Record<string, string> = {};
+    let parent: Record<string, string> = {};
     const child: Record<string, string> = {};
     columnMap.forEach((col, idx) => {
       if (!col) return;
       (col.child ? child : parent)[col.field.key] = normalizeCell(col.field, cellText(row[idx]));
     });
 
-    // Two numbers in one Mobile cell: the second becomes the Alternate Mobile.
-    for (const f of fields) {
-      if (f.type !== 'mobile' || !f.splitInto || !parent[f.key]) continue;
-      const numbers = splitMobileCell(parent[f.key]);
-      if (numbers.length < 2) continue;
-      parent[f.key] = numbers[0];
-      if (!parent[f.splitInto]) parent[f.splitInto] = numbers[1];
-    }
+    parent = splitMobileFields(parent, fields);
 
     const hasParentValues = Object.values(parent).some((v) => v !== '');
     const hasChildValues = Object.values(child).some((v) => v !== '');
