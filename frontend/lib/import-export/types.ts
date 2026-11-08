@@ -59,6 +59,8 @@ export type ImportExportConfig = {
   groupKey?: string;
   /** rows currently visible in the table, used for Export */
   getExportData: () => any[] | Promise<any[]>;
+  /** rows the user ticked in the table; when there are any, Export offers just those */
+  getSelectedData?: () => any[];
   /** called once per row when the user clicks Import — should create the record */
   onImportRow: (row: Record<string, any>) => Promise<any>;
   /**

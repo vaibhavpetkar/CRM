@@ -21,7 +21,7 @@ import { assigneeForNewLead } from './leadRotation';
 import { NotFoundError, ConflictError, ValidationError } from '../errors/AppError';
 import { isModuleEnabled } from '../middleware/moduleGate';
 import LeadFollowUp from '../models/LeadFollowUp';
-import { addNotesFromText } from './leadNoteService';
+import { addNotesFromText, matchingNotes } from './leadNoteService';
 import { localDay } from '../utils/reportTime';
 
 /** The calendar day ("2026-10-20") a follow-up date falls on, in the CRM's local time. */
@@ -148,8 +148,18 @@ const serializeLead = (lead: Lead) => {
 class LeadService {
   async list(params: ListQueryParams) {
     const result = await leadRepository.list(params);
+    const leads = result.rows.map(serializeLead);
+    // "Any note": show the note that matched, not just the lead's latest one.
+    const nf = String(params.noteScope ?? '') === 'any' ? leadRepository.noteFilterValues(params) : null;
+    if (nf && leads.length) {
+      const matched = await matchingNotes(
+        leads.map((l: any) => Number(l.id)),
+        { from: nf.from, to: nf.to, text: nf.text, status: nf.statuses, userId: nf.byUserId, name: nf.byName }
+      );
+      for (const l of leads as any[]) l.matchedNote = matched.get(Number(l.id)) || null;
+    }
     return {
-      leads: result.rows.map(serializeLead),
+      leads,
       total: result.total,
       page: result.page,
       pages: result.pages,

@@ -376,12 +376,20 @@ export default function LeadsPage() {
       id: 'lastNote',
       sortKey: (lead) => String(lead.lastNoteDate || ''),
       accessor: (lead) => {
-        const line = lastNoteLine(lead);
+        // "Any note" filter: show the note that matched rather than the latest one.
+        const m = lead.matchedNote;
+        const line = m
+          ? lastNoteLine({ lastNoteDate: m.noteDate, lastNoteText: m.text, lastNoteBy: m.salesPersonName })
+          : lastNoteLine(lead);
         if (!line) return <span className="text-slate-400">—</span>;
         return (
           <Link href={`/leads/${lead.id}`} className="block max-w-[260px] text-slate-600 hover:text-[var(--primary)]" title={line}>
             <span className="block truncate">{line}</span>
-            {lead.notesCount > 1 && <span className="block text-[11px] text-slate-400">{lead.notesCount} notes</span>}
+            {m ? (
+              <span className="block text-[11px] text-[var(--primary)]">Matching note{lead.notesCount > 1 ? ` · ${lead.notesCount} notes` : ''}</span>
+            ) : (
+              lead.notesCount > 1 && <span className="block text-[11px] text-slate-400">{lead.notesCount} notes</span>
+            )}
           </Link>
         );
       },
@@ -512,6 +520,8 @@ export default function LeadsPage() {
                 fields: LEAD_FIELDS,
                 // Export still includes every lead that matches the filters.
                 getExportData: () => leadsApi.getAllLeads(listParams),
+                // Ticked rows: Export offers just those.
+                getSelectedData: () => leads.filter((l) => selectedLeadIds.includes(l.id)),
                 onImportRow: handleImportRow,
                 onImportBatch: handleImportBatch,
                 importBatchSize: 500,

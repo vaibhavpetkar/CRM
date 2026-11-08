@@ -5,7 +5,8 @@ import LeadProduct from '../models/LeadProduct';
 import LeadTax from '../models/LeadTax';
 import { BaseRepository, ListQueryParams, PaginatedResult } from './BaseRepository';
 import { localDay, startOfLocalDay } from '../utils/reportTime';
-import { noteExistsSql } from '../services/leadNoteService';
+import { noteExistsSql, wholeWordsPattern } from '../services/leadNoteService';
+import { detectNoteStatus } from '../utils/leadNotes';
 import sequelize from '../config/database';
 
 const assignedToInclude = {
@@ -260,7 +261,8 @@ class LeadRepository extends BaseRepository<Lead> {
    * date, what it said, who wrote it), the way the lead's status does;
    * noteScope=any looks for any one note that fits all of them.
    */
-  private noteFilters(params: ListQueryParams): any[] {
+  /** The Notes filters in a request, or null when none is set. */
+  noteFilterValues(params: ListQueryParams) {
     const from = toDay(params.noteFrom);
     const to = toDay(params.noteTo);
     const text = String(params.noteSearch ?? '').trim().slice(0, 200) || null;
@@ -268,7 +270,14 @@ class LeadRepository extends BaseRepository<Lead> {
     const by = String(params.noteBy ?? '').trim();
     const byUserId = /^\d+$/.test(by) ? Number(by) : null;
     const byName = by.startsWith('name:') ? by.slice(5).trim() || null : null;
-    if (!from && !to && !text && !statuses.length && !byUserId && !byName) return [];
+    if (!from && !to && !text && !statuses.length && !byUserId && !byName) return null;
+    return { from, to, text, statuses, byUserId, byName };
+  }
+
+  private noteFilters(params: ListQueryParams): any[] {
+    const f = this.noteFilterValues(params);
+    if (!f) return [];
+    const { from, to, text, statuses, byUserId, byName } = f;
 
     if (String(params.noteScope ?? '') === 'any') {
       return [sequelize.literal(noteExistsSql({ from, to, text, status: statuses, userId: byUserId, name: byName }))];
@@ -281,8 +290,17 @@ class LeadRepository extends BaseRepository<Lead> {
       out.push({ lastNoteDate: range });
     }
     if (text) {
-      const like = `%${escapeLike(text)}%`;
-      out.push({ [Op.or]: [{ lastNoteText: { [Op.iLike]: like } }, { lastNoteBy: { [Op.iLike]: like } }] });
+      // Words from their start ("ni" doesn't find "visiting"); a status word also finds
+      // the notes that have that status ("CNR" finds "not picking").
+      const re = wholeWordsPattern(text);
+      const status = detectNoteStatus(text);
+      out.push({
+        [Op.or]: [
+          { lastNoteText: { [Op.iRegexp]: re } },
+          { lastNoteBy: { [Op.iRegexp]: re } },
+          ...(status ? [{ lastNoteStatus: status }] : []),
+        ],
+      });
     }
     if (statuses.length) out.push({ lastNoteStatus: { [Op.in]: statuses } });
     if (byUserId) out.push({ lastNoteUserId: byUserId });
