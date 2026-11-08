@@ -305,7 +305,15 @@ class LeadRepository extends BaseRepository<Lead> {
   ): Promise<Lead | null> {
     const orConditions: any[] = [];
     if (email) orConditions.push({ email });
-    if (mobile) orConditions.push({ mobile });
+    if (mobile) {
+      // The same Indian number can be saved as 9876543210, 919876543210,
+      // +919876543210 or 09876543210 (imports keep 10 digits, Facebook sends
+      // +91...), so look for every form of it.
+      const digits = String(mobile).replace(/\D/g, '');
+      const ten = digits.length === 12 && digits.startsWith('91') ? digits.slice(2) : digits.length === 11 && digits.startsWith('0') ? digits.slice(1) : digits;
+      const forms = ten.length === 10 ? [ten, `91${ten}`, `+91${ten}`, `0${ten}`, `+91 ${ten}`] : [];
+      orConditions.push({ mobile: { [Op.in]: [...new Set([String(mobile), ...forms])] } });
+    }
     if (orConditions.length === 0) return null;
 
     const where: any = { [Op.or]: orConditions };
