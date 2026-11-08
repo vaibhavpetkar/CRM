@@ -24,9 +24,16 @@ export type ChildExport = {
 
 type ExportTable = { headers: string[]; rows: string[][]; recordCount: number };
 
-function formatCell(value: any) {
+function formatCell(value: any, field?: ImportExportField) {
   if (value === null || value === undefined) return '';
   if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  // Dates go out as YYYY-MM-DD, the same way the import reads them back.
+  if (field?.type === 'date' && /^\d{4}-\d{2}-\d{2}T/.test(String(value))) {
+    const d = new Date(String(value));
+    if (!Number.isNaN(d.getTime())) {
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+  }
   return String(value);
 }
 
@@ -38,7 +45,7 @@ function buildTable(data: any[], fields: ImportExportField[], child?: ChildExpor
   const childFields = child?.fields ?? [];
   const headers = [...fields.map((f) => f.label), ...childFields.map((f) => f.label)];
   if (!child || childFields.length === 0) {
-    return { headers, rows: data.map((record) => fields.map((f) => formatCell(record[f.key]))), recordCount: data.length };
+    return { headers, rows: data.map((record) => fields.map((f) => formatCell(record[f.key], f))), recordCount: data.length };
   }
 
   const rows: string[][] = [];
@@ -47,9 +54,9 @@ function buildTable(data: any[], fields: ImportExportField[], child?: ChildExpor
     const lines = children.length ? children : [null];
     lines.forEach((childRow, idx) => {
       const parentCells = fields.map((f) =>
-        idx === 0 || f.key === groupKey ? formatCell(record[f.key]) : ''
+        idx === 0 || f.key === groupKey ? formatCell(record[f.key], f) : ''
       );
-      const childCells = childFields.map((f) => (childRow ? formatCell(childRow[f.key]) : ''));
+      const childCells = childFields.map((f) => (childRow ? formatCell(childRow[f.key], f) : ''));
       rows.push([...parentCells, ...childCells]);
     });
   });

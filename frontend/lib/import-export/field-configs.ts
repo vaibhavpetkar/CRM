@@ -1,5 +1,5 @@
 import type { ImportExportChildTable, ImportExportField } from './types';
-import { LEAD_SOURCE_OPTIONS, LEAD_STATUS_VALUES } from '../lead-options';
+import { CONFIGURATION_OPTIONS, LEAD_SOURCE_OPTIONS, LEAD_STATUS_VALUES, PROPERTY_TYPE_OPTIONS } from '../lead-options';
 
 // Each list defines exactly the columns that matter for that module.
 // To add import/export to another form (Deals, Quotes, Meetings, Tasks, ...),
@@ -7,17 +7,33 @@ import { LEAD_SOURCE_OPTIONS, LEAD_STATUS_VALUES } from '../lead-options';
 // then drop <ImportExportButtons config={{ ... fields: MY_FIELDS ... }} /> on the page.
 
 export const LEAD_FIELDS: ImportExportField[] = [
+  // A single "Name" column ("Sonal A Dabhade") is split into first and last name on import.
+  { key: 'name', label: 'Name', type: 'text', defaultExport: false, aliases: ['Full Name', 'Customer Name', 'Client Name', 'Lead Name', 'Buyer Name'] },
   { key: 'firstName', label: 'First Name', type: 'text' },
   { key: 'lastName', label: 'Last Name', type: 'text' },
-  { key: 'mobile', label: 'Mobile', required: true, type: 'mobile' },
+  // "9822675337/ 9175444667": the second number goes to Alternate Mobile.
+  { key: 'mobile', label: 'Mobile', required: true, type: 'mobile', splitInto: 'alternateMobile', aliases: ['Mobile No', 'Mobile Number', 'Phone No', 'Contact No', 'Contact Number', 'Number'] },
+  { key: 'alternateMobile', label: 'Alternate Mobile', type: 'mobile', aliases: ['Alternate Number', 'Alt Mobile', 'Mobile 2', 'Other Number'] },
   { key: 'email', label: 'Email', type: 'email' },
-  { key: 'phone', label: 'Phone', type: 'text' },
-  { key: 'company', label: 'Company', type: 'text' },
-  { key: 'jobTitle', label: 'Job Title', type: 'text' },
-  { key: 'leadSource', label: 'Lead Source', type: 'select', options: LEAD_SOURCE_OPTIONS.map((o) => o.value) },
+  { key: 'phone', label: 'Phone', type: 'text', defaultExport: false },
+  { key: 'assignedTo', label: 'Sales Person', type: 'text', aliases: ['Executive Name', 'Executive', 'Sales Executive', 'Assigned To', 'Lead Owner', 'Owner', 'Handled By'] },
+  { key: 'configuration', label: 'Requirement', type: 'select', options: CONFIGURATION_OPTIONS, aliases: ['Configuration', 'BHK', 'Flat Type', 'Unit Type'] },
+  { key: 'propertyType', label: 'Property Type', type: 'select', options: PROPERTY_TYPE_OPTIONS },
+  { key: 'projectName', label: 'Project', type: 'text', aliases: ['Project Name'] },
+  { key: 'preferredLocation', label: 'Preferred Location', type: 'text', aliases: ['Location', 'Area'] },
+  { key: 'budgetMin', label: 'Budget Min', type: 'number' },
+  { key: 'budgetMax', label: 'Budget Max', type: 'number', aliases: ['Budget'] },
+  { key: 'leadSource', label: 'Lead Source', type: 'select', options: LEAD_SOURCE_OPTIONS.map((o) => o.value), aliases: ['Source'] },
   { key: 'subSource', label: 'Sub Source', type: 'text' },
-  { key: 'status', label: 'Status', type: 'select', options: LEAD_STATUS_VALUES },
-  { key: 'industry', label: 'Industry', type: 'text' },
+  { key: 'status', label: 'Status', type: 'select', options: LEAD_STATUS_VALUES, aliases: ['Lead Status'] },
+  // A date here means the visit happened: the lead shows on the Site Visits page.
+  { key: 'siteVisitDate', label: 'Site Visit Date', type: 'date', defaultExport: false, aliases: ['Visit Date', 'SV Date', 'Site Visit Done Date'] },
+  { key: 'date', label: 'Lead Date', type: 'date', defaultExport: false },
+  { key: 'nextFollowUp', label: 'Next Follow Up', type: 'date', defaultExport: false, aliases: ['Follow Up Date'] },
+  { key: 'company', label: 'Company', type: 'text', defaultExport: false },
+  { key: 'jobTitle', label: 'Job Title', type: 'text', defaultExport: false },
+  { key: 'industry', label: 'Industry', type: 'text', defaultExport: false },
+  { key: 'territory', label: 'Territory', type: 'text', defaultExport: false },
   { key: 'noOfEmployees', label: 'No. of Employees', type: 'number', defaultExport: false },
   { key: 'annualRevenue', label: 'Annual Revenue', type: 'number', defaultExport: false },
   { key: 'rating', label: 'Rating', type: 'text', defaultExport: false },
@@ -27,8 +43,10 @@ export const LEAD_FIELDS: ImportExportField[] = [
   { key: 'city', label: 'City', type: 'text', defaultExport: false },
   { key: 'street', label: 'Street', type: 'text', defaultExport: false },
   { key: 'zipCode', label: 'Zip Code', type: 'text', defaultExport: false },
-  { key: 'score', label: 'Score', type: 'number' },
-  { key: 'value', label: 'Value', type: 'number' },
+  { key: 'score', label: 'Score', type: 'number', defaultExport: false },
+  { key: 'value', label: 'Value', type: 'number', defaultExport: false },
+  { key: 'leadNumber', label: 'Lead No', type: 'text', exportOnly: true },
+  { key: 'createdAt', label: 'Created On', type: 'date', exportOnly: true },
   // "31/10/26- CNR (SS) 01/11/26- BUSY (SS) ..." -> one dated note each; the last sets status and sales person.
   {
     key: 'notes',

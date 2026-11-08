@@ -22,6 +22,8 @@ export type ImportExportField = {
   exportOnly?: boolean;
   /** other column headers that mean this field on import (e.g. "Remarks") */
   aliases?: string[];
+  /** mobile fields: a second number in the same cell ("98xxx/ 91xxx") goes to this field */
+  splitInto?: string;
 };
 
 /** A child table (e.g. a Quote's line items). In a spreadsheet each child row

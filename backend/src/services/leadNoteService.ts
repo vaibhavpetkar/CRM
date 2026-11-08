@@ -195,8 +195,17 @@ export const detectStatus = (text: unknown) => ({ status: detectNoteStatus(Strin
 export type NoteMatcher = (name: string | null | undefined) => number | null;
 
 /** Parses a notes cell and resolves the names; the last note is the current one. */
-export const prepareImportedNotes = (cell: unknown, matcher: NoteMatcher) => {
-  const notes = parseNotesCell(cell, localDay(new Date())).map((n) => ({ ...n, userId: matcher(n.salesPersonName) }));
+export const prepareImportedNotes = (
+  cell: unknown,
+  matcher: NoteMatcher,
+  opts: { day?: string | null; name?: string | null } = {}
+) => {
+  // A note without a date gets the row's date (e.g. its Site Visit Date), and
+  // one without a name in brackets gets the row's Executive Name.
+  const notes = parseNotesCell(cell, opts.day || localDay(new Date())).map((n) => {
+    const salesPersonName = n.salesPersonName || (opts.name ? String(opts.name).trim().slice(0, 100) : null);
+    return { ...n, salesPersonName, userId: matcher(salesPersonName) };
+  });
   // Current = newest date; on the same date, the one written last.
   let current: (ParsedNote & { userId: number | null }) | null = null;
   for (const n of notes) if (!current || n.noteDate >= current.noteDate) current = n;
@@ -212,7 +221,8 @@ export const saveImportedNotes = async (
   lead: Lead,
   notes: (ParsedNote & { userId: number | null })[],
   userId: number | null | undefined,
-  transaction?: Transaction
+  transaction?: Transaction,
+  applyStatus = true
 ) => {
   if (!notes.length) return 0;
   const existing = await LeadNote.findAll({ where: { leadId: lead.id }, attributes: ['noteDate', 'text', 'salesPersonName'], transaction, raw: true });
@@ -243,7 +253,7 @@ export const saveImportedNotes = async (
     })),
     { transaction }
   );
-  await refreshLeadNoteSummary(lead, { applyStatus: true, userId, transaction });
+  await refreshLeadNoteSummary(lead, { applyStatus, userId, transaction });
   return fresh.length;
 };
 
