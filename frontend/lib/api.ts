@@ -446,6 +446,9 @@ export const leadsApi = {
   detectNoteStatus: async (text: string) =>
     request<{ status: string | null }>(`/leads/notes/detect?text=${encodeURIComponent(text)}`),
 
+  /** The words that set each status when written in a note. */
+  getNoteKeywords: async () => request<{ keywords: { status: string; phrases: string[] }[] }>('/leads/notes/keywords'),
+
   /** Names written in note brackets that aren't users, e.g. "SS". */
   getNoteNames: async () => request<{ names: string[] }>('/leads/notes/names'),
 

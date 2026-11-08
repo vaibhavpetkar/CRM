@@ -21,6 +21,7 @@ router.get('/company-search', protect, authorize('leads:read'), leadController.s
 
 // Call notes: the status a note's text means, and bracket names that aren't users (before /:id).
 router.get('/notes/detect', protect, authorize('leads:read'), leadController.detectNoteStatus);
+router.get('/notes/keywords', protect, authorize('leads:read'), leadController.getNoteKeywords);
 router.get('/notes/names', protect, authorize('leads:read'), leadController.getNoteNames);
 
 // Lead CRUD routes

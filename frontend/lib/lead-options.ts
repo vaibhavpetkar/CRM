@@ -166,9 +166,9 @@ export type LeadStatusTone = keyof typeof LEAD_STATUS_TONES;
 
 export const LEAD_STATUS_OPTIONS: { value: string; label: string; tone: LeadStatusTone }[] = [
   { value: 'new', label: 'New', tone: 'blue' },
-  { value: 'cnr', label: 'CNR (Call Not Received)', tone: 'orange' },
+  { value: 'cnr', label: 'CNR', tone: 'orange' },
   { value: 'call-busy', label: 'Call Busy', tone: 'orange' },
-  { value: 'switch-off', label: 'Switch Off / Not Reachable', tone: 'slate' },
+  { value: 'switch-off', label: 'Switch Off', tone: 'slate' },
   { value: 'call-later', label: 'Call Later', tone: 'yellow' },
   { value: 'not-interested', label: 'Not Interested', tone: 'rose' },
   { value: 'invalid-number', label: 'Invalid Number', tone: 'slate' },
@@ -210,7 +210,7 @@ export const LEGACY_LEAD_STATUS_OPTIONS: { value: string; label: string; tone: L
 
 const STATUS_BY_VALUE = Object.fromEntries([...LEAD_STATUS_OPTIONS, ...LEGACY_LEAD_STATUS_OPTIONS].map((o) => [o.value, o]));
 
-/** "cnr" -> "CNR (Call Not Received)"; unknown -> Title Case. */
+/** "cnr" -> "CNR"; unknown -> Title Case. */
 export const leadStatusLabel = (status?: string | null) => {
   const key = String(status || '').toLowerCase();
   return STATUS_BY_VALUE[key]?.label || key.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) || '—';
