@@ -281,7 +281,7 @@ export default function LeadDetailsPage() {
           <ArrowLeftIcon className="h-5 w-5" />
         </button>
         <h1 className="text-2xl font-bold text-slate-900 flex-1">
-          {lead.firstName} {lead.lastName}
+          {`${lead.firstName || ''} ${lead.lastName || ''}`.trim() || lead.mobile || lead.leadNumber || 'Unnamed lead'}
         </h1>
         {hasPermission(getStoredUser(), 'calls:make') && (
           <Button type="button" size="sm" variant="secondary" onClick={() => setLogCallOpen(true)}>

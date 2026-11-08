@@ -132,7 +132,7 @@ const serializeLead = (lead: Lead) => {
   const plain: any = lead.toJSON ? lead.toJSON() : lead;
   return {
     ...plain,
-    name: `${plain.firstName} ${plain.lastName}`,
+    name: `${plain.firstName || ''} ${plain.lastName || ''}`.trim() || plain.mobile || plain.leadNumber || '',
     source: plain.leadSource,
     assignedTo: plain.assignedTo ? `${plain.assignedTo.firstName} ${plain.assignedTo.lastName}` : null,
     qualifiedBy: plain.qualifiedBy ? `${plain.qualifiedBy.firstName} ${plain.qualifiedBy.lastName}` : null,
@@ -178,9 +178,9 @@ class LeadService {
   }
 
   async create(data: CreateLeadInput, userId?: number | null) {
-    if (!data.firstName || !data.lastName) {
-      throw new ValidationError('firstName and lastName are required');
-    }
+    // First and last name are optional; the columns are NOT NULL, so blanks are stored as ''.
+    data.firstName = String(data.firstName ?? '').trim();
+    data.lastName = String(data.lastName ?? '').trim();
 
     data = sanitizeDateFields(data, ['date', 'lastContacted', 'nextFollowUp']);
     data = sanitizeNumericFields(data, [
@@ -371,8 +371,8 @@ class LeadService {
       const updatable = {
         date: data.date ?? lead.date,
         territory: data.territory !== undefined ? data.territory : lead.territory,
-        firstName: data.firstName !== undefined ? data.firstName : lead.firstName,
-        lastName: data.lastName !== undefined ? data.lastName : lead.lastName,
+        firstName: data.firstName !== undefined ? String(data.firstName ?? '').trim() : lead.firstName,
+        lastName: data.lastName !== undefined ? String(data.lastName ?? '').trim() : lead.lastName,
         prefix: data.prefix !== undefined ? data.prefix : (data.salutation !== undefined ? data.salutation : lead.prefix),
         email: data.email !== undefined ? data.email : lead.email,
         phone: data.phone !== undefined ? data.phone : lead.phone,

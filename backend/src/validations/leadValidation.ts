@@ -33,8 +33,9 @@ export const normalizeIndianMobile = (value: unknown) => {
 const TEN_DIGITS = /^\d{10}$/;
 
 export const createLeadValidation = [
-  body('firstName').trim().notEmpty().withMessage('First name is required'),
-  body('lastName').trim().notEmpty().withMessage('Last name is required'),
+  // Names are optional: many sheets and walk-ins only have a mobile number.
+  body('firstName').optional({ nullable: true }).isString().trim(),
+  body('lastName').optional({ nullable: true }).isString().trim(),
   body('email').optional({ nullable: true, values: 'falsy' }).trim().isEmail().withMessage('Email must be valid').bail().toLowerCase(),
   body('mobile')
     .customSanitizer(normalizeIndianMobile)

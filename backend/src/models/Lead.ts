@@ -224,10 +224,12 @@ Lead.init(
     firstName: {
       type: DataTypes.STRING(100),
       allowNull: false,
+      defaultValue: '',
     },
     lastName: {
       type: DataTypes.STRING(100),
       allowNull: false,
+      defaultValue: '',
     },
     prefix: {
       type: DataTypes.STRING(20),
