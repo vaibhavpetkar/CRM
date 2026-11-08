@@ -1,3 +1,4 @@
+import { notifyUser, notifyLeadTeam } from '../utils/notificationService';
 import crypto from 'crypto';
 import { Op, col, fn, where as sqlWhere } from 'sequelize';
 import sequelize from '../config/database';
@@ -160,7 +161,7 @@ export const assigneeForNewLead = async (source?: string | null): Promise<number
 };
 
 /** Hands every unassigned open lead out in turn ("Distribute unassigned leads now"). */
-export const distributeUnassigned = async (limit = 500) => {
+export const distributeUnassigned = async (limit = 500, actorId?: number | null) => {
   const settings = await getRotationSettings();
   if (!settings.userIds.length) throw new ValidationError('Add sales people to the rotation first.');
   const leads = await Lead.findAll({
@@ -176,7 +177,25 @@ export const distributeUnassigned = async (limit = 500) => {
     await Lead.update({ assignedToId: userId }, { where: { id: lead.id } });
     counts.set(userId, (counts.get(userId) || 0) + 1);
   }
-  return { assigned: [...counts.values()].reduce((a, b) => a + b, 0), byUser: Object.fromEntries(counts) };
+  const assigned = [...counts.values()].reduce((a, b) => a + b, 0);
+  for (const [userId, n] of counts) {
+    await notifyUser({
+      userId,
+      type: 'lead_assigned',
+      title: n === 1 ? 'New lead assigned to you' : `${n} leads assigned to you`,
+      message: `${n === 1 ? 'An unassigned lead was' : `${n} unassigned leads were`} handed to you by lead rotation.`,
+      sendEmail: false,
+    }).catch(() => undefined);
+  }
+  if (assigned) {
+    await notifyLeadTeam({
+      type: 'lead_assigned',
+      title: 'Unassigned leads distributed',
+      message: `${assigned} unassigned lead${assigned === 1 ? ' was' : 's were'} shared out by lead rotation.`,
+      actorId,
+    });
+  }
+  return { assigned, byUser: Object.fromEntries(counts) };
 };
 
 const digitsLike = (column: string, number: string) =>

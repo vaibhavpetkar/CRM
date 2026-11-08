@@ -6,10 +6,11 @@ import Integration from '../models/Integration';
 import MetaPage from '../models/MetaPage';
 import MetaLeadEvent from '../models/MetaLeadEvent';
 import User from '../models/User';
+import Lead from '../models/Lead';
 import leadService from './LeadService';
 import leadRepository from '../repositories/LeadRepository';
 import { logActivity } from './activityLogger';
-import { notifyUser } from '../utils/notificationService';
+import { notifyLeadTeam } from '../utils/notificationService';
 import { mapMetaLead, MetaFieldDatum } from '../utils/metaLeadMapping';
 import { mapPropertyLead } from '../utils/propertyLeadMapping';
 import { runUnscoped, runWithTenant, currentCompanyId } from '../tenancy/context';
@@ -378,16 +379,15 @@ const getFormName = async (formId: string | undefined, token: string): Promise<s
 };
 
 const notifyTeam = async (page: MetaPage, leadId: number, title: string, message: string) => {
-  const admins = await User.findAll({ where: { isSuperAdmin: true, isActive: true }, attributes: ['id'] });
-  const ids = new Set(admins.map((u) => u.id));
-  if (page.connectedById) ids.add(page.connectedById);
-  await Promise.all(
-    [...ids].map((userId) =>
-      notifyUser({ userId, type: 'lead_facebook', title, message, entityType: 'Lead', entityId: leadId, sendEmail: false }).catch(
-        () => undefined
-      )
-    )
-  );
+  const lead = await Lead.findByPk(leadId, { attributes: ['assignedToId', 'leadOwnerId'] }).catch(() => null);
+  await notifyLeadTeam({
+    type: 'lead_facebook',
+    title,
+    message,
+    leadId,
+    people: [lead?.assignedToId, lead?.leadOwnerId],
+    actorId: page.connectedById ?? null,
+  });
 };
 
 /**
@@ -480,7 +480,8 @@ const importLead = async (page: MetaPage, leadgenId: string, prefetched?: any): 
           description: answers ? `Answers from the ${channel} lead form:\n${answers}` : null,
           allowDuplicate: true, // already checked above
         },
-        null
+        null,
+        { quiet: true } // told below, with the form and Page
       );
       leadId = (lead as { id: number }).id;
       result = 'created';

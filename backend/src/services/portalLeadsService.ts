@@ -3,10 +3,11 @@ import { Op } from 'sequelize';
 import PortalConnection from '../models/PortalConnection';
 import PortalLeadEvent from '../models/PortalLeadEvent';
 import User from '../models/User';
+import Lead from '../models/Lead';
 import leadRepository from '../repositories/LeadRepository';
 import leadService from './LeadService';
 import { logActivity } from './activityLogger';
-import { notifyUser } from '../utils/notificationService';
+import { notifyLeadTeam } from '../utils/notificationService';
 import { mapPropertyLead, PropertyLead } from '../utils/propertyLeadMapping';
 import { NotFoundError, ValidationError } from '../errors/AppError';
 import { runUnscoped, runWithTenant } from '../tenancy/context';
@@ -167,10 +168,8 @@ const getConnection = async (source: PortalSource) => {
 export type ImportResult = 'created' | 'duplicate' | 'skipped' | 'failed';
 
 const notifyAdmins = async (leadId: number, title: string, message: string) => {
-  const admins = await User.findAll({ where: { isActive: true, [Op.or]: [{ isSuperAdmin: true }] } as any, attributes: ['id'] });
-  await Promise.all(
-    admins.map((u) => notifyUser({ userId: u.id, type: 'lead_portal', title, message, entityType: 'Lead', entityId: leadId, sendEmail: false }).catch(() => undefined))
-  );
+  const lead = await Lead.findByPk(leadId, { attributes: ['assignedToId', 'leadOwnerId'] }).catch(() => null);
+  await notifyLeadTeam({ type: 'lead_portal', title, message, leadId, people: [lead?.assignedToId, lead?.leadOwnerId] });
 };
 
 const describe = (label: string, lead: PropertyLead) =>
@@ -253,7 +252,8 @@ export const importPortalLead = async (conn: PortalConnection, raw: unknown, opt
           description: extraLines || null,
           allowDuplicate: true, // checked above
         },
-        null
+        null,
+        { quiet: true } // told below, with the portal's name
       );
       leadId = created.id;
       result = 'created';

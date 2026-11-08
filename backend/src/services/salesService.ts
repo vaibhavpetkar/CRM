@@ -1,3 +1,4 @@
+import { notifyLeadTeam, leadLabel } from '../utils/notificationService';
 import { Op, fn, col } from 'sequelize';
 import Call, { TERMINAL_CALL_STATUSES } from '../models/Call';
 import SiteVisit, { DONE_VISIT_STATUSES, SITE_VISIT_STATUSES, SiteVisitStatus } from '../models/SiteVisit';
@@ -637,6 +638,20 @@ export const createVisit = async (user: any, body: Record<string, any>) => {
     performedById: user.id,
     details: `Site visit${visitLabel(visit)} ${status === 'revisit-done' ? 'revisit done' : status === 'completed' ? 'done' : 'scheduled'} for ${new Date(visit.scheduledAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' })}.`,
   }).catch(() => {});
+  if (status === 'scheduled') {
+    const full = await Lead.findByPk(leadId, { attributes: ['firstName', 'lastName', 'mobile', 'leadNumber'] });
+    const when = new Date(visit.scheduledAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' });
+    const name = full ? leadLabel(full) : `lead #${leadId}`;
+    await notifyLeadTeam({
+      type: 'site_visit',
+      title: 'Site visit scheduled',
+      message: `Site visit${visitLabel(visit)} with ${name} on ${when}.`,
+      leadId,
+      people: [visit.userId],
+      personalTitle: 'Site visit scheduled for you',
+      actorId: user.id,
+    });
+  }
   return serializeVisit(visit, await lookups([visit]));
 };
 
