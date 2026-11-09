@@ -12,6 +12,76 @@ const isEmailConfigured = (): boolean => {
   return Boolean((process.env.EMAIL_SERVICE || process.env.EMAIL_HOST) && process.env.EMAIL_USER && process.env.EMAIL_PASS);
 };
 
+const domainOf = (address: string) => (/@([^>\s]+)>?\s*$/.exec(address)?.[1] || '').toLowerCase();
+
+/** The bare sender address: EMAIL_FROM ("Name <a@b.com>" or "a@b.com"), else the SMTP login. */
+const fromAddress = () => {
+  const raw = (process.env.EMAIL_FROM || process.env.EMAIL_USER || '').trim();
+  return /<([^>]+)>/.exec(raw)?.[1] || raw;
+};
+
+/** "Shree Mahalaxmi Realty <crm@…>": a name next to the address, as people expect from a real sender. */
+const fromHeader = () => {
+  const raw = (process.env.EMAIL_FROM || process.env.EMAIL_USER || '').trim();
+  if (/<[^>]+>/.test(raw)) return raw;
+  const name = (process.env.EMAIL_FROM_NAME || process.env.COMPANY_NAME || '').trim();
+  return name ? { name, address: raw } : raw;
+};
+
+const escapeHtml = (text: string) =>
+  String(text ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+
+/** Plain-text twin of an HTML body. Mail with only HTML scores worse with spam filters. */
+export const htmlToText = (html: string) =>
+  html
+    .replace(/<(style|script)[^>]*>[\s\S]*?<\/\1>/gi, '')
+    .replace(/<a\s[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi, (_m, href, label) => {
+      const text = label.replace(/<[^>]+>/g, '').trim();
+      return text && text !== href ? `${text} (${href})` : href;
+    })
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/(p|div|h[1-6]|li|tr)>/gi, '\n')
+    .replace(/<li[^>]*>/gi, '- ')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .split('\n')
+    .map((line) => line.trim())
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+/** A complete HTML document (fragments without <html>/<body> look like spam to some filters). */
+const wrapHtml = (subject: string, html: string) => {
+  if (/<html[\s>]/i.test(html)) return html;
+  const company = escapeHtml(process.env.EMAIL_FROM_NAME || process.env.COMPANY_NAME || '');
+  return `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(subject)}</title></head>
+<body style="margin:0;padding:24px;background:#f5f7fb;font-family:Arial,Helvetica,sans-serif;color:#1e293b;font-size:14px;line-height:1.5">
+<div style="max-width:600px;margin:0 auto;background:#ffffff;border-radius:8px;padding:24px">
+${html}
+</div>
+${company ? `<p style="max-width:600px;margin:12px auto 0;color:#94a3b8;font-size:12px;text-align:center">${company}</p>` : ''}
+</body></html>`;
+};
+
+/** From, both bodies and the headers every message gets. */
+const buildMessage = (subject: string, html: string) => {
+  const from = fromHeader();
+  const replyTo = (process.env.EMAIL_REPLY_TO || '').trim();
+  return {
+    from,
+    ...(replyTo ? { replyTo } : {}),
+    subject,
+    html: wrapHtml(subject, html),
+    text: htmlToText(html),
+  };
+};
+
 const getTransporter = (): Mail | null => {
   if (!isEmailConfigured()) return null;
   if (transporter) return transporter;
@@ -25,7 +95,30 @@ const getTransporter = (): Mail | null => {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS,
     },
-  });
+    // Optional DKIM signing here, for an SMTP server that doesn't sign mail
+    // itself (Gmail, Mailcow and SES already do). The public key goes in DNS
+    // as <selector>._domainkey.<domain>.
+    ...(process.env.DKIM_DOMAIN && process.env.DKIM_SELECTOR && process.env.DKIM_PRIVATE_KEY
+      ? {
+          dkim: {
+            domainName: process.env.DKIM_DOMAIN,
+            keySelector: process.env.DKIM_SELECTOR,
+            privateKey: process.env.DKIM_PRIVATE_KEY.replace(/\\n/g, '\n'),
+          },
+        }
+      : {}),
+  } as any);
+
+  // Mail whose From domain differs from the account sending it fails SPF/DMARC
+  // alignment, which is the most common reason it lands in spam.
+  const fromDomain = domainOf(fromAddress());
+  const userDomain = domainOf(process.env.EMAIL_USER || '');
+  if (fromDomain && userDomain && fromDomain !== userDomain && !process.env.DKIM_DOMAIN) {
+    logger.warn(
+      `[mail] EMAIL_FROM (${fromDomain}) is a different domain from EMAIL_USER (${userDomain}). ` +
+        'Receivers will likely mark this mail as spam: send from an address on the account\'s own domain.'
+    );
+  }
 
   return transporter;
 };
@@ -45,12 +138,10 @@ export const sendMail = async (
 
   try {
     await transport.sendMail({
-      from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
+      ...buildMessage(subject, html),
       to,
       ...(cc && cc.length ? { cc } : {}),
       ...(options.replyTo ? { replyTo: options.replyTo } : {}),
-      subject,
-      html,
     });
     return true;
   } catch (error) {
@@ -77,10 +168,8 @@ export const sendMailWithAttachment = async (
 
   try {
     await transport.sendMail({
-      from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
+      ...buildMessage(subject, html),
       to,
-      subject,
-      html,
       attachments: [attachment],
     });
     return true;
@@ -131,9 +220,11 @@ export const sendGenericNotificationEmail = async (
   title: string,
   message: string
 ): Promise<boolean> => {
+  const appUrl = (process.env.CLIENT_URL || '').replace(/\/+$/, '');
   const html = `
-    <h3>${title}</h3>
-    <p>${message}</p>
+    <h3 style="margin:0 0 8px">${escapeHtml(title)}</h3>
+    <p style="margin:0 0 16px">${escapeHtml(message)}</p>
+    ${appUrl ? `<p style="margin:0"><a href="${escapeHtml(appUrl)}/notifications">Open in CRM</a></p>` : ''}
   `;
   return sendMail(email, title, html);
 };
