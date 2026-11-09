@@ -94,8 +94,8 @@ export const navigation: NavSection[] = [
       { name: 'Subscription', href: '/settings/subscription', icon: CreditCardIcon, permission: 'company:manage' },
       { name: 'Integrations', href: '/settings/integrations', icon: PuzzlePieceIcon, permission: 'integrations:manage' },
       { name: 'Roles', href: '/settings/roles', icon: ShieldCheckIcon, permission: ['roles:read', 'roles:view'] },
-      { name: 'Activity Logs', href: '/activity-logs', icon: ClockIcon }, // Administrator only (handled in page)
-      { name: 'Recycle Bin', href: '/recycle-bin', icon: TrashIcon }, // Administrator only
+      { name: 'Activity Logs', href: '/activity-logs', icon: ClockIcon, permission: 'activity_logs:read' },
+      { name: 'Recycle Bin', href: '/recycle-bin', icon: TrashIcon, permission: 'recycle_bin:manage' },
       { name: 'Settings', href: '/settings', icon: Cog6ToothIcon },
     ],
   },

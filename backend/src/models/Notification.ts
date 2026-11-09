@@ -11,6 +11,7 @@ interface NotificationAttributes {
   entityId?: number | null;
   isRead: boolean;
   readAt?: Date | null;
+  groupKey?: string | null; // shared by the team's copies of one event
 }
 
 interface NotificationCreationAttributes extends Optional<NotificationAttributes, 'id' | 'isRead'> {}
@@ -25,6 +26,7 @@ class Notification extends Model<NotificationAttributes, NotificationCreationAtt
   public entityId?: number | null;
   public isRead!: boolean;
   public readAt?: Date | null;
+  public groupKey?: string | null;
 
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
@@ -45,6 +47,7 @@ Notification.init(
     entityId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: true },
     isRead: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
     readAt: { type: DataTypes.DATE, allowNull: true },
+    groupKey: { type: DataTypes.STRING(64), allowNull: true },
   },
   { tableName: 'notifications', sequelize }
 );

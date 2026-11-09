@@ -51,6 +51,7 @@ import voiceWebhookRoutes from './routes/voiceWebhookRoutes';
 import portalWebhookRoutes from './routes/portalWebhookRoutes';
 import { startPortalPoller } from './services/portalLeadsService';
 import { startMetaPoller } from './services/metaLeadsService';
+import { startNotInterestedReminders } from './services/leadReminders';
 import { startViPuller } from './services/viCpaasService';
 import { startStaleCallSweeper } from './services/callService';
 import expenseRoutes from './routes/expenseRoutes';
@@ -368,6 +369,7 @@ const startServer = async () => {
       startMetaPoller();
       startViPuller();
       startStaleCallSweeper();
+      startNotInterestedReminders();
     });
 
     // Daily automatic backup, only when BACKUP_DAILY_AT is set.

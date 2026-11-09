@@ -71,6 +71,7 @@ export default function LeadsPage() {
   // menu. Was previously never computed, so DataTable's `canEdit` prop fell back
   // to its default of `true` and the permission check never actually ran.
   const canEditLeads = hasPermission(getStoredUser(), 'leads:update');
+  const canDeleteLeads = hasPermission(getStoredUser(), 'leads:delete');
   const [view, setView] = useState<'list' | 'kanban'>('list');
   const [draggedLeadId, setDraggedLeadId] = useState<string | number | null>(null);
   const [dragOverStatus, setDragOverStatus] = useState<string | null>(null);
@@ -567,7 +568,9 @@ export default function LeadsPage() {
                 onImportComplete: fetchLeads,
               }}
             />
-            <Button size="sm" onClick={() => router.push('/leads/new')}><PlusIcon className="h-4 w-4" /> Add Lead</Button>
+            {hasPermission(getStoredUser(), 'leads:create') && (
+              <Button size="sm" onClick={() => router.push('/leads/new')}><PlusIcon className="h-4 w-4" /> Add Lead</Button>
+            )}
           </>
         }
       />
@@ -773,12 +776,12 @@ export default function LeadsPage() {
           data={leads}
           rowKey={(l) => l.id}
           loading={loading}
-          bulkDelete={{
+          bulkDelete={canDeleteLeads ? {
             deleteRow: (l) => leadsApi.deleteLead(l.id),
             onComplete: fetchLeads,
             entityName: 'leads',
             restorable: true,
-          }}
+          } : undefined}
           showToolbar
           canEdit={canEditLeads}
           onSelectionChange={setSelectedLeadIds}
@@ -792,12 +795,16 @@ export default function LeadsPage() {
               <button onClick={() => router.push(`/leads/${lead.id}`)} className="text-slate-400 hover:text-[var(--primary)]" aria-label="View Details">
                 <EyeIcon className="h-4 w-4" />
               </button>
-              <button onClick={() => openEdit(lead)} className="text-slate-400 hover:text-[var(--primary)]" aria-label="Edit">
-                <PencilSquareIcon className="h-4 w-4" />
-              </button>
-              <button onClick={() => handleDelete(lead)} className="text-slate-400 hover:text-red-600" aria-label="Delete">
-                <TrashIcon className="h-4 w-4" />
-              </button>
+              {canEditLeads && (
+                <button onClick={() => openEdit(lead)} className="text-slate-400 hover:text-[var(--primary)]" aria-label="Edit">
+                  <PencilSquareIcon className="h-4 w-4" />
+                </button>
+              )}
+              {canDeleteLeads && (
+                <button onClick={() => handleDelete(lead)} className="text-slate-400 hover:text-red-600" aria-label="Delete">
+                  <TrashIcon className="h-4 w-4" />
+                </button>
+              )}
             </div>
           )}
         />

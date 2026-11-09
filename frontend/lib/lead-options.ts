@@ -181,6 +181,7 @@ export const LEAD_STATUS_OPTIONS: { value: string; label: string; tone: LeadStat
   { value: 'budget-issue', label: 'Budget Issue', tone: 'rose' },
   { value: 'loan-problem', label: 'Loan Problem', tone: 'rose' },
   { value: 'final-rate-given', label: 'Final Rate Given', tone: 'green' },
+  { value: 'booking-done', label: 'Booking Done', tone: 'green' },
   { value: 'plan-dropped', label: 'Plan Dropped', tone: 'red' },
   { value: 'plan-on-hold', label: 'Plan is on Hold', tone: 'yellow' },
   { value: 'postponed', label: 'Postponed', tone: 'yellow' },

@@ -61,6 +61,7 @@ const PIPELINE_STAGES = [
   { key: 'details-shared', label: 'Details Shared', bg: '#a8cdfb', text: '#0b2a6f' },
   { key: 'revisit-done', label: 'Revisit Done', bg: '#c4ddfc', text: '#0b2a6f' },
   { key: 'final-rate-given', label: 'Final Rate Given', bg: '#d9e9fd', text: '#0b2a6f' },
+  { key: 'booking-done', label: 'Booking Done', bg: '#dcfce7', text: '#14532d' },
   { key: 'not-interested', label: 'Not Interested', bg: '#e8f1fe', text: '#0b2a6f' },
 ];
 
