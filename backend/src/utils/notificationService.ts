@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import Notification from '../models/Notification';
 import User from '../models/User';
 import Role from '../models/Role';
@@ -15,6 +16,7 @@ interface NotifyParams {
   entityType?: string;
   entityId?: number;
   sendEmail?: boolean; // defaults to true
+  groupKey?: string; // team copies of one event share it (read by one = read by all)
 }
 
 /**
@@ -29,6 +31,7 @@ export const notifyUser = async ({
   entityType,
   entityId,
   sendEmail = true,
+  groupKey,
 }: NotifyParams): Promise<void> => {
   if (!userId) return;
 
@@ -50,6 +53,7 @@ export const notifyUser = async ({
       message,
       entityType: entityType || null,
       entityId: entityId ?? null,
+      groupKey: groupKey ?? null,
     } as any);
 
     // Push it live to whichever tabs/devices this user has open right now.
@@ -92,6 +96,13 @@ export const adminUserIds = async (): Promise<number[]> => {
   return users.map((u) => u.id);
 };
 
+/** Every active user of the current company: lead events are shared with the whole sales team. */
+export const teamUserIds = async (): Promise<number[]> => {
+  if (currentCompanyId() == null) return [];
+  const users = await User.findAll({ where: { isActive: true } as any, attributes: ['id'] });
+  return users.map((u) => u.id);
+};
+
 /** "Rahul Patil", or the mobile number when the lead has no name. */
 export const leadLabel = (lead: { firstName?: string | null; lastName?: string | null; mobile?: string | null; leadNumber?: string | null }) =>
   [lead.firstName, lead.lastName].map((v) => String(v ?? '').trim()).filter(Boolean).join(' ') ||
@@ -115,14 +126,16 @@ interface LeadTeamParams {
 
 /**
  * One lead event (new lead, assigned, follow-up changed, import finished) told
- * to the lead's sales person / owner and to every admin, once each.
+ * to the whole team (every active user, admins and sales people), once each.
+ * The copies share a groupKey, so reading it once marks it read for everyone.
  * Never throws: a failed notification must not fail the lead change.
  */
 export const notifyLeadTeam = async (p: LeadTeamParams): Promise<void> => {
   try {
     const people = new Set((p.people || []).filter((id): id is number => !!id).map(Number));
-    const everyone = new Set<number>([...people, ...(await adminUserIds())]);
+    const everyone = new Set<number>([...people, ...(await teamUserIds()), ...(await adminUserIds())]);
     if (p.actorId) everyone.add(Number(p.actorId));
+    const groupKey = crypto.randomUUID();
     await Promise.all(
       [...everyone].map((userId) => {
         const personal = people.has(userId) && p.personalTitle;
@@ -134,6 +147,7 @@ export const notifyLeadTeam = async (p: LeadTeamParams): Promise<void> => {
           entityType: p.leadId ? 'Lead' : undefined,
           entityId: p.leadId,
           sendEmail: !!(p.emailPeople && people.has(userId) && userId !== p.actorId),
+          groupKey,
         }).catch(() => undefined);
       })
     );

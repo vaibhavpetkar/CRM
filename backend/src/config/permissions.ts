@@ -98,6 +98,16 @@ const modules: { module: string; label: string; appModule?: ModuleKey; hidden?: 
     ],
   },
   {
+    module: 'activity_logs',
+    label: 'Activity Logs page',
+    actions: [{ action: 'read', label: 'See the activity log of every change' }],
+  },
+  {
+    module: 'recycle_bin',
+    label: 'Recycle Bin page',
+    actions: [{ action: 'manage', label: 'See and restore deleted records' }],
+  },
+  {
     module: 'quotes',
     appModule: 'quotes',
     label: 'Quotes',
@@ -220,7 +230,7 @@ export const PERMISSION_CATALOG: PermissionDef[] = modules.flatMap((m) =>
 );
 
 // Same order as the sidebar, so the role editor reads like the menu.
-const SIDEBAR_ORDER = ['reports', 'leads', 'calls', 'ai', 'sales', 'site_visits', 'tasks', 'meetings', 'deals', 'contacts', 'quotes', 'invoices', 'marketing', 'items', 'item_categories', 'taxes', 'expenses', 'document_templates', 'users', 'company', 'integrations', 'roles'];
+const SIDEBAR_ORDER = ['reports', 'leads', 'calls', 'ai', 'sales', 'site_visits', 'tasks', 'meetings', 'deals', 'contacts', 'quotes', 'invoices', 'marketing', 'items', 'item_categories', 'taxes', 'expenses', 'document_templates', 'users', 'company', 'integrations', 'roles', 'activity_logs', 'recycle_bin'];
 const rank = (module: string) => {
   const i = SIDEBAR_ORDER.indexOf(module);
   return i === -1 ? SIDEBAR_ORDER.length : i;
@@ -295,4 +305,7 @@ export const PERMISSION_GRANTS: { name: string; ifHas: string; grant: string[] }
   { name: 'perm-2026-11-leads-update', ifHas: 'leads:update', grant: ['site_visits:create', 'site_visits:update', 'site_visits:delete'] },
   { name: 'perm-2026-11-sales-view', ifHas: 'leads:read', grant: ['sales:view'] },
   { name: 'perm-2026-11-team', ifHas: 'users:read', grant: ['sales:team', 'sales:export'] },
+  // Activity Logs and Recycle Bin were open to roles named Administrator or
+  // Sales Manager; they are now permissions, given to roles that manage the team.
+  { name: 'perm-2026-11-admin-pages', ifHas: 'users:read', grant: ['activity_logs:read', 'recycle_bin:manage'] },
 ];

@@ -194,6 +194,21 @@ const SCHEMA_PATCHES: { name: string; sql: string }[] = [
       CREATE INDEX IF NOT EXISTS "calls_company_created" ON "calls" ("companyId", "createdAt" DESC);
     `,
   },
+  {
+    // When the team was last reminded about a Not Interested lead (weekly).
+    name: 'leads.reengageRemindedAt',
+    sql: `ALTER TABLE "leads" ADD COLUMN IF NOT EXISTS "reengageRemindedAt" TIMESTAMPTZ;`,
+  },
+  {
+    // One lead event goes to the whole team as one row per person, sharing a
+    // groupKey: when anyone reads it, it is read for everyone.
+    name: 'notifications.groupKey',
+    sql: `
+      ALTER TABLE "notifications" ADD COLUMN IF NOT EXISTS "groupKey" VARCHAR(64);
+      CREATE INDEX IF NOT EXISTS "notifications_group_key" ON "notifications" ("groupKey");
+      CREATE INDEX IF NOT EXISTS "notifications_user_read" ON "notifications" ("userId", "isRead", "createdAt" DESC);
+    `,
+  },
 ];
 
 export const runSchemaPatches = async (sequelize: Sequelize): Promise<void> => {

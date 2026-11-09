@@ -6,7 +6,7 @@ export const ACTIVE_LEAD_STATUSES = [
   'new',
   'cnr', 'call-busy', 'switch-off', 'call-later', 'not-interested', 'invalid-number', 'wrong-number',
   'whatsapp-done', 'details-shared', 'site-visit-done', 'revisit-done', 'ready-possession', 'budget-issue',
-  'loan-problem', 'final-rate-given', 'plan-dropped', 'plan-on-hold', 'postponed', 'nearing-possession',
+  'loan-problem', 'final-rate-given', 'booking-done', 'plan-dropped', 'plan-on-hold', 'postponed', 'nearing-possession',
 ];
 
 // The earlier statuses are no longer offered, but leads saved with them stay
@@ -19,7 +19,7 @@ export const LEAD_STATUSES = [...ACTIVE_LEAD_STATUSES, ...LEGACY_LEAD_STATUSES];
 // as lost; lead rotation skips them).
 export const DEAD_LEAD_STATUSES = ['lost', 'unqualified', 'not-interested', 'invalid-number', 'wrong-number', 'plan-dropped'];
 // Statuses that mean the buyer is engaged (reports count these as qualified).
-export const ENGAGED_LEAD_STATUSES = ['qualified', 'converted', 'details-shared', 'site-visit-done', 'revisit-done', 'final-rate-given'];
+export const ENGAGED_LEAD_STATUSES = ['qualified', 'converted', 'details-shared', 'site-visit-done', 'revisit-done', 'final-rate-given', 'booking-done'];
 
 /** "+91 98765-43210", "098765 43210" or 9876543210 -> "9876543210"; anything else is left as typed for the error. */
 export const normalizeIndianMobile = (value: unknown) => {

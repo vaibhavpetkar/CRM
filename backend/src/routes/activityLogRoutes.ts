@@ -5,7 +5,7 @@ import { protect, authorize } from '../middleware/authMiddleware';
 const router = Router();
 
 // Only admin can view the full, unscoped activity log
-router.get('/', protect, authorize('Administrator'), getActivityLogs);
+router.get('/', protect, authorize('Administrator', 'activity_logs:read'), getActivityLogs);
 
 // Any authenticated user can view the timeline for a specific record they can access
 router.get('/timeline/:entityType/:entityId', protect, getEntityTimeline);

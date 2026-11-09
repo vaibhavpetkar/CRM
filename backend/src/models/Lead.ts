@@ -84,6 +84,7 @@ interface LeadAttributes {
   followUpRemark?: string | null; // remark for the current Next Follow-up; earlier ones live in lead_follow_ups
   // The latest call note ("06/11/26 SWITCH OFF (SHABINA)"); every note lives in lead_notes.
   lastNoteDate?: string | null; // YYYY-MM-DD
+  reengageRemindedAt?: Date | null; // last weekly Not Interested reminder
   lastNoteStatus?: string | null;
   lastNoteText?: string | null;
   lastNoteBy?: string | null; // sales person's name as written on the note
@@ -179,6 +180,7 @@ class Lead extends Model<LeadAttributes, LeadCreationAttributes> implements Lead
   public subSource?: string | null;
   public followUpRemark?: string | null;
   public lastNoteDate?: string | null;
+  public reengageRemindedAt?: Date | null;
   public lastNoteStatus?: string | null;
   public lastNoteText?: string | null;
   public lastNoteBy?: string | null;
@@ -458,6 +460,7 @@ Lead.init(
     subSource: { type: DataTypes.STRING(255), allowNull: true },
     followUpRemark: { type: DataTypes.TEXT, allowNull: true },
     lastNoteDate: { type: DataTypes.DATEONLY, allowNull: true },
+    reengageRemindedAt: { type: DataTypes.DATE, allowNull: true },
     lastNoteStatus: { type: DataTypes.STRING(40), allowNull: true },
     lastNoteText: { type: DataTypes.TEXT, allowNull: true },
     lastNoteBy: { type: DataTypes.STRING(100), allowNull: true },

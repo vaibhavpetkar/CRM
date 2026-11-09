@@ -404,7 +404,7 @@ export const getNotesActivity = async (user: any, query: Record<string, unknown>
 
 // ─── Lead sources ───────────────────────────────────────────────────────────
 
-const WON = ['converted'];
+const WON = ['converted', 'booking-done']; // a booked flat is a won lead
 const QUALIFIED = ENGAGED_LEAD_STATUSES;
 
 export const getLeadSources = async (query: Record<string, unknown>) => {

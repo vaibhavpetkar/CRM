@@ -47,6 +47,7 @@ export const NOTE_STATUS_KEYWORDS: { status: string; phrases: string[] }[] = [
   { status: 'ready-possession', phrases: ['ready possession', 'ready to move', 'ready possesion', 'looking for ready'] },
   { status: 'budget-issue', phrases: ['budget issue', 'budget problem', 'low budget', 'budget', 'too costly', 'costly', 'expensive', 'high price'] },
   { status: 'loan-problem', phrases: ['loan problem', 'loan issue', 'loan not approved', 'loan'] },
+  { status: 'booking-done', phrases: ['booking done', 'booked', 'booking confirmed', 'flat booked', 'unit booked', 'token paid', 'token amount paid', 'token received', 'booking amount paid'] },
   { status: 'final-rate-given', phrases: ['final rate given', 'final rate', 'final price', 'rate given', 'best rate given'] },
   { status: 'plan-dropped', phrases: ['plan dropped', 'plan drop', 'dropped', 'drop the plan', 'already purchased', 'already bought', 'not planning'] },
   { status: 'plan-on-hold', phrases: ['plan on hold', 'plan is on hold', 'on hold', 'hold'] },
@@ -81,7 +82,7 @@ const words = (text: string) => {
 // words just before them say it is still to come or didn't happen
 // ("will come for revisit done", "not visited yet", "visit pending"), or
 // when someone else did it ("his friend visited").
-const DONE_STATUSES = new Set(['whatsapp-done', 'details-shared', 'site-visit-done', 'revisit-done']);
+const DONE_STATUSES = new Set(['whatsapp-done', 'details-shared', 'site-visit-done', 'revisit-done', 'booking-done']);
 const NOT_YET_BEFORE = new Set(['will', 'wil', 'shall', 'going', 'gonna', 'plan', 'planning', 'planned', 'coming', 'come', 'not', 'no', 'yet', 'tomorrow', 'next', 'may', 'might', 'should', 'want', 'wants', 'to']);
 const NOT_YET_AFTER = new Set(['pending', 'remaining', 'tomorrow', 'later', 'planned', 'scheduled']);
 

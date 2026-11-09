@@ -1,5 +1,7 @@
 import { Request, Response } from 'express';
+import { Op } from 'sequelize';
 import Notification from '../models/Notification';
+import { emitToUser } from '../realtime/socket';
 
 export const getMyNotifications = async (req: Request & { user?: any }, res: Response) => {
   try {
@@ -26,12 +28,28 @@ export const getMyNotifications = async (req: Request & { user?: any }, res: Res
   }
 };
 
+/** Marks these groups read for every teammate who got a copy, and tells their open tabs. */
+const markGroupsRead = async (groupKeys: string[], exceptUserId?: number) => {
+  const keys = [...new Set(groupKeys.filter(Boolean))];
+  if (!keys.length) return;
+  const others = await Notification.findAll({
+    where: { groupKey: { [Op.in]: keys }, isRead: false },
+    attributes: ['userId'],
+  });
+  await Notification.update({ isRead: true, readAt: new Date() }, { where: { groupKey: { [Op.in]: keys }, isRead: false } });
+  for (const userId of new Set(others.map((n) => n.userId))) {
+    if (userId !== exceptUserId) emitToUser(userId, 'notification:read', { groupKeys: keys });
+  }
+};
+
 export const markNotificationRead = async (req: Request & { user?: any }, res: Response) => {
   try {
     const notification = await Notification.findOne({ where: { id: req.params.id, userId: req.user?.id } });
     if (!notification) return res.status(404).json({ message: 'Notification not found' });
 
     await notification.update({ isRead: true, readAt: new Date() });
+    // A team notification read by one person is read for the whole team.
+    if (notification.groupKey) await markGroupsRead([notification.groupKey], req.user?.id);
     return res.json({ message: 'Notification marked as read', notification });
   } catch (error) {
     console.error('Mark notification read error:', error);
@@ -41,10 +59,15 @@ export const markNotificationRead = async (req: Request & { user?: any }, res: R
 
 export const markAllNotificationsRead = async (req: Request & { user?: any }, res: Response) => {
   try {
+    const unread = await Notification.findAll({
+      where: { userId: req.user?.id, isRead: false },
+      attributes: ['groupKey'],
+    });
     await Notification.update(
       { isRead: true, readAt: new Date() },
       { where: { userId: req.user?.id, isRead: false } }
     );
+    await markGroupsRead(unread.map((n) => n.groupKey || '').filter(Boolean), req.user?.id);
     return res.json({ message: 'All notifications marked as read' });
   } catch (error) {
     console.error('Mark all notifications read error:', error);

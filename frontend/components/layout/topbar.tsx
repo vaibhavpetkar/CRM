@@ -148,11 +148,16 @@ export default function Topbar({ onMobileMenuClick }: { onMobileMenuClick?: () =
       toast.info(incoming.message, { title: incoming.title });
     };
 
+    // A teammate read a shared team notification: it is read here too.
+    const handleRead = () => loadNotifications();
+
     socket.on('notification:new', handleNewNotification);
+    socket.on('notification:read', handleRead);
     socket.on('connect_error', (err) => console.error('Notification socket error', err.message));
 
     return () => {
       socket.off('notification:new', handleNewNotification);
+      socket.off('notification:read', handleRead);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
