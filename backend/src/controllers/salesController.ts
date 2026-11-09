@@ -53,8 +53,8 @@ export const saveRotation = asyncHandler(async (req: AuthRequest, res: Response)
   return res.json(await leadRotation.saveRotationSettings(req.body || {}, req.user.id));
 });
 
-export const distributeUnassigned = asyncHandler(async (_req: AuthRequest, res: Response) => {
-  return res.json(await leadRotation.distributeUnassigned());
+export const distributeUnassigned = asyncHandler(async (req: AuthRequest, res: Response) => {
+  return res.json(await leadRotation.distributeUnassigned(500, req.user?.id));
 });
 
 // Public: the telephony provider asks whose turn it is for an incoming call.

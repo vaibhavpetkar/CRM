@@ -15,7 +15,7 @@ import { ListQueryParams } from '../repositories/BaseRepository';
 import { generateCode } from '../utils/codeGenerator';
 import { logActivity, getTimeline, diffFields, computeChanges } from './activityLogger';
 import { sanitizeDateFields, sanitizeNumericFields } from '../utils/sanitize';
-import { notifyUser } from '../utils/notificationService';
+import { notifyLeadTeam, leadLabel } from '../utils/notificationService';
 import { getOrSetCache } from '../utils/cache';
 import { assigneeForNewLead } from './leadRotation';
 import { NotFoundError, ConflictError, ValidationError } from '../errors/AppError';
@@ -73,6 +73,16 @@ export interface CreateLeadInput {
 // generic "updated" one, because they represent a meaningful business event.
 const STATUS_FIELD = 'status';
 const ASSIGNEE_FIELD = 'assignedToId';
+
+/** "Mon, 10 Nov 2026, 11:30 am" in India time (date only when no time was set). */
+const followUpText = (value: Date | string) => {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return String(value);
+  const opts: Intl.DateTimeFormatOptions = { timeZone: 'Asia/Kolkata', weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' };
+  const hasTime = d.getUTCHours() !== 0 || d.getUTCMinutes() !== 0;
+  if (hasTime) Object.assign(opts, { hour: 'numeric', minute: '2-digit' });
+  return d.toLocaleString('en-IN', opts);
+};
 
 // User-reference fields on Lead (all FK -> users.id). Left unchecked, a bad
 // value here (a non-numeric string from a search box the user never picked a
@@ -187,7 +197,7 @@ class LeadService {
     return { duplicate: existing ? serializeLead(existing) : null };
   }
 
-  async create(data: CreateLeadInput, userId?: number | null) {
+  async create(data: CreateLeadInput, userId?: number | null, options: { quiet?: boolean } = {}) {
     // First and last name are optional; the columns are NOT NULL, so blanks are stored as ''.
     data.firstName = String(data.firstName ?? '').trim();
     data.lastName = String(data.lastName ?? '').trim();
@@ -326,24 +336,29 @@ class LeadService {
 
       const fullLead = await leadRepository.getByIdWithDetails(lead.id, t);
 
-      if (lead.assignedToId && lead.assignedToId !== userId) {
-        // Fire-and-forget outside the transaction boundary concerns — notification
-        // failure shouldn't roll back lead creation, so we don't await inside `t`.
-        notifyUser({
-          userId: lead.assignedToId,
-          type: 'lead_assigned',
-          title: 'New lead assigned to you',
-          message: `You've been assigned the lead ${lead.firstName} ${lead.lastName}${lead.company ? ` (${lead.company})` : ''}.`,
-          entityType: 'Lead',
-          entityId: lead.id,
-        }).catch(() => {});
+      // Fire-and-forget: a failed notification must not roll back the lead.
+      // An import tells everyone once at the end instead (quiet).
+      if (!options.quiet) {
+        const name = leadLabel(lead);
+        const source = lead.leadSource ? ` from ${lead.leadSource}` : '';
+        notifyLeadTeam({
+          type: 'lead_created',
+          title: 'New lead',
+          message: `${name}${lead.company ? ` (${lead.company})` : ''}${source} was added (${lead.leadNumber}).`,
+          leadId: lead.id,
+          people: [lead.assignedToId, lead.leadOwnerId],
+          personalTitle: 'New lead assigned to you',
+          personalMessage: `You've been assigned the new lead ${name}${lead.company ? ` (${lead.company})` : ''}${source}.`,
+          actorId: userId,
+          emailPeople: true,
+        });
       }
 
       return serializeLead(fullLead!);
     });
   }
 
-  async update(id: number | string, data: Record<string, unknown>, userId?: number | null) {
+  async update(id: number | string, data: Record<string, unknown>, userId?: number | null, options: { quiet?: boolean } = {}) {
     const lead = await leadRepository.findById(id);
     if (!lead) throw new NotFoundError('Lead', id);
 
@@ -522,15 +537,21 @@ class LeadService {
           t
         );
 
-        if (after[ASSIGNEE_FIELD] !== userId) {
-          notifyUser({
-            userId: after[ASSIGNEE_FIELD] as number,
+        if (!options.quiet) {
+          const name = leadLabel(lead);
+          const assignee = await User.findByPk(after[ASSIGNEE_FIELD] as number, { attributes: ['firstName', 'lastName'], transaction: t });
+          const assigneeName = assignee ? `${assignee.firstName} ${assignee.lastName}`.trim() : `user #${after[ASSIGNEE_FIELD]}`;
+          notifyLeadTeam({
             type: 'lead_assigned',
-            title: 'Lead assigned to you',
-            message: `You've been assigned the lead ${lead.firstName} ${lead.lastName}${lead.company ? ` (${lead.company})` : ''}.`,
-            entityType: 'Lead',
-            entityId: lead.id,
-          }).catch(() => {});
+            title: 'Lead assigned',
+            message: `${name}${lead.company ? ` (${lead.company})` : ''} was assigned to ${assigneeName}.`,
+            leadId: lead.id,
+            people: [after[ASSIGNEE_FIELD] as number],
+            personalTitle: 'Lead assigned to you',
+            personalMessage: `You've been assigned the lead ${name}${lead.company ? ` (${lead.company})` : ''}.`,
+            actorId: userId,
+            emailPeople: true,
+          });
         }
       }
 
@@ -587,16 +608,22 @@ class LeadService {
             t
           );
 
-          if (ownerId !== userId) {
-            notifyUser({
-              userId: ownerId,
-              type: 'task_assigned',
-              title: 'Follow-up task assigned to you',
-              message: `A follow-up task was created for lead ${lead.firstName} ${lead.lastName}, due ${new Date(after.nextFollowUp as Date).toLocaleDateString()}.`,
-              entityType: 'Task',
-              entityId: task.id,
-            }).catch(() => {});
-          }
+        }
+
+        if (!options.quiet) {
+          const name = leadLabel(lead);
+          const when = after.nextFollowUp ? followUpText(after.nextFollowUp as Date) : null;
+          const remark = after.followUpRemark ? ` Remark: ${after.followUpRemark}` : '';
+          notifyLeadTeam({
+            type: 'lead_follow_up',
+            title: when ? 'Follow-up updated' : 'Follow-up cleared',
+            message: when ? `Next follow-up for ${name} is ${when}.${remark}` : `The next follow-up for ${name} was removed.`,
+            leadId: lead.id,
+            people: [after.assignedToId as number | null, after.leadOwnerId as number | null],
+            personalTitle: when ? 'Your follow-up was updated' : undefined,
+            personalMessage: when ? `Follow up with ${name} on ${when}.${remark}` : undefined,
+            actorId: userId,
+          });
         }
       }
 

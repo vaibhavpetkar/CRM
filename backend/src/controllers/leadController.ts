@@ -10,6 +10,7 @@ import { validationResult } from 'express-validator';
 import { createLeadValidation } from '../validations/leadValidation';
 import { ConflictError, ValidationError } from '../errors/AppError';
 import * as leadNotes from '../services/leadNoteService';
+import { notifyUser, notifyLeadTeam } from '../utils/notificationService';
 import { NOTE_STATUS_KEYWORDS } from '../utils/leadNotes';
 import leadRepository from '../repositories/LeadRepository';
 import SiteVisit, { DONE_VISIT_STATUSES } from '../models/SiteVisit';
@@ -93,6 +94,39 @@ const saveImportedVisits = async (lead: Lead, visits: ImportedVisit[], importerI
     added += 1;
   }
   return added;
+};
+
+/** One notification per import batch (not one per row): a summary for the
+ * importer and admins, and "N new leads assigned to you" for each sales person. */
+const notifyImport = async (summary: { created: number; updated: number; failed: number }, createdIds: number[], importerId?: number) => {
+  if (!summary.created && !summary.updated) return;
+  const parts = [
+    summary.created && `${summary.created} new lead${summary.created === 1 ? '' : 's'} added`,
+    summary.updated && `${summary.updated} existing lead${summary.updated === 1 ? '' : 's'} updated`,
+    summary.failed && `${summary.failed} row${summary.failed === 1 ? '' : 's'} failed`,
+  ].filter(Boolean);
+  await notifyLeadTeam({ type: 'lead_import', title: 'Leads imported', message: `${parts.join(', ')}.`, actorId: importerId });
+
+  if (!createdIds.length) return;
+  const leads = await Lead.findAll({ where: { id: createdIds }, attributes: ['id', 'assignedToId'] });
+  const perUser = new Map<number, number[]>();
+  for (const l of leads) {
+    if (!l.assignedToId) continue;
+    perUser.set(l.assignedToId, [...(perUser.get(l.assignedToId) || []), l.id]);
+  }
+  await Promise.all(
+    [...perUser].map(([userId, ids]) =>
+      notifyUser({
+        userId,
+        type: 'lead_assigned',
+        title: ids.length === 1 ? 'New lead assigned to you' : `${ids.length} new leads assigned to you`,
+        message: `${ids.length === 1 ? 'A lead' : `${ids.length} leads`} from an import ${ids.length === 1 ? 'was' : 'were'} assigned to you.`,
+        entityType: ids.length === 1 ? 'Lead' : undefined,
+        entityId: ids.length === 1 ? ids[0] : undefined,
+        sendEmail: false,
+      }).catch(() => undefined)
+    )
+  );
 };
 
 export const importLeads = asyncHandler(async (req: AuthRequest, res: Response) => {
@@ -187,7 +221,7 @@ export const importLeads = asyncHandler(async (req: AuthRequest, res: Response) 
         results.push({ ok: false, error: invalid.array()[0].msg });
         continue;
       }
-      const created = await leadService.create(body as any, importerId);
+      const created = await leadService.create(body as any, importerId, { quiet: true });
       const lead = prepared?.notes.length || visits.length ? await Lead.findByPk(created.id) : null;
       const notesAdded = lead && prepared?.notes.length ? await leadNotes.saveImportedNotes(lead, prepared.notes, importerId, undefined, !sheetStatus) : undefined;
       const visitsAdded = lead && visits.length ? await saveImportedVisits(lead, visits, importerId) : undefined;
@@ -213,7 +247,7 @@ export const importLeads = asyncHandler(async (req: AuthRequest, res: Response) 
         if (!isBlank(body.assignedToId) && !lead.assignedToId) patch.assignedToId = body.assignedToId;
         if (sheetStatus && sheetStatus !== lead.status) patch.status = sheetStatus;
         if (Object.keys(patch).length) {
-          await leadService.update(lead.id, patch as any, importerId);
+          await leadService.update(lead.id, patch as any, importerId, { quiet: true });
           await lead.reload();
         }
         const notesAdded = prepared?.notes.length ? await leadNotes.saveImportedNotes(lead, prepared.notes, importerId, undefined, !sheetStatus) : 0;
@@ -229,12 +263,13 @@ export const importLeads = asyncHandler(async (req: AuthRequest, res: Response) 
     }
   }
 
-  return res.json({
+  const summary = {
     created: results.filter((r) => r.ok && !r.updated).length,
     updated: results.filter((r) => r.updated).length,
     failed: results.filter((r) => !r.ok).length,
-    results,
-  });
+  };
+  await notifyImport(summary, results.filter((r) => r.ok && !r.updated && r.id).map((r) => r.id!), importerId);
+  return res.json({ ...summary, results });
 });
 
 export const createLead = asyncHandler(async (req: AuthRequest, res: Response) => {
