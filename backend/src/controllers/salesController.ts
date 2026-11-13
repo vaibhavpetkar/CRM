@@ -19,6 +19,10 @@ export const heartbeat = asyncHandler(async (req: AuthRequest, res: Response) =>
   return res.json(await salesService.recordHeartbeat(req.user));
 });
 
+export const getChannelPartners = asyncHandler(async (req: AuthRequest, res: Response) => {
+  return res.json(await salesService.getChannelPartners(req.query as Record<string, unknown>));
+});
+
 export const getLeadSources = asyncHandler(async (req: AuthRequest, res: Response) => {
   return res.json(await salesService.getLeadSources(req.query as Record<string, unknown>));
 });

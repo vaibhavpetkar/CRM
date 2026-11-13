@@ -209,6 +209,15 @@ const SCHEMA_PATCHES: { name: string; sql: string }[] = [
       CREATE INDEX IF NOT EXISTS "notifications_user_read" ON "notifications" ("userId", "isRead", "createdAt" DESC);
     `,
   },
+  {
+    // Channel partner (broker) who brought the lead: typed on the lead form,
+    // suggested from earlier leads, filtered on and counted on the dashboard.
+    name: 'leads.channelPartner',
+    sql: `
+      ALTER TABLE "leads" ADD COLUMN IF NOT EXISTS "channelPartner" VARCHAR(255);
+      CREATE INDEX IF NOT EXISTS "leads_company_channel_partner" ON "leads" ("companyId", LOWER("channelPartner"));
+    `,
+  },
 ];
 
 export const runSchemaPatches = async (sequelize: Sequelize): Promise<void> => {

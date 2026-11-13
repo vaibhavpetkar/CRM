@@ -9,7 +9,7 @@ import LoadingSpinner from '@/components/ui/loading-spinner';
 import { KpiCard, Panel, PanelLink, PeriodSelect, SelectPill, OwnerChip } from '@/components/ui/analytics';
 import { DAY_MS as DAY, dayEnds, dailyCounts, dealMeasures, dealTrend, parseDeals, percentChange } from '@/lib/analytics';
 import { formatCurrency, getCurrencySymbol } from '@/lib/utils';
-import { leadsApi, dealsApi, contactsApi, tasksApi, salesApi, getStoredUser } from '@/lib/api';
+import { leadsApi, dealsApi, contactsApi, tasksApi, salesApi, getStoredUser, type ChannelPartnerRow } from '@/lib/api';
 import { isModuleEnabled } from '@/lib/modules';
 
 const DEALS_ON = isModuleEnabled('deals');
@@ -203,6 +203,7 @@ export default function DashboardPage() {
   const [contactTimes, setContactTimes] = useState<number[]>([]);
   const [recentLeads, setRecentLeads] = useState<any[]>([]);
   const [recentActivity, setRecentActivity] = useState<Activity[]>([]);
+  const [partners, setPartners] = useState<ChannelPartnerRow[] | null>(null);
 
   const days = Number(range);
   const compareLabel = RANGES.find((r) => r.value === range)?.compare;
@@ -222,6 +223,12 @@ export default function DashboardPage() {
       // Newest contacts, for the activity feed and the contacts trend.
       CONTACTS_ON ? contactsApi.getContacts({ limit: 200 }) : OFF(),
     ]);
+
+    // Channel partner table: all leads, like Leads by Source.
+    salesApi
+      .getChannelPartners()
+      .then((r) => setPartners(r.partners || []))
+      .catch(() => setPartners([]));
 
     const next = { totalLeads: 0, totalContacts: 0, pipelineValue: 0, winRate: 0 };
     if (leadStats.status === 'fulfilled') {
@@ -575,6 +582,8 @@ export default function DashboardPage() {
         </Panel>
       </div>
 
+      <ChannelPartnerTable partners={partners} />
+
       <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-xs">
         <div className="flex items-center justify-between px-5 py-4">
           <h2 className="text-base font-bold text-slate-900">Recent Leads</h2>
@@ -639,5 +648,77 @@ export default function DashboardPage() {
         )}
       </section>
     </div>
+  );
+}
+
+/** Leads per channel partner, each row opening the Leads page filtered to that partner. */
+function ChannelPartnerTable({ partners }: { partners: ChannelPartnerRow[] | null }) {
+  const [showAll, setShowAll] = useState(false);
+  const list = partners || [];
+  const rows = showAll ? list : list.slice(0, 10);
+  const total = list.reduce((n, p) => n + p.total, 0);
+  const max = Math.max(1, ...list.map((p) => p.total));
+  return (
+    <section className="mb-6 overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-xs">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-4">
+        <div>
+          <h2 className="text-base font-bold text-slate-900">Leads by Channel Partner</h2>
+          <p className="text-xs text-slate-500">
+            {partners === null
+              ? 'Loading…'
+              : list.length
+                ? `${total.toLocaleString('en-IN')} lead${total === 1 ? '' : 's'} from ${list.length} channel partner${list.length === 1 ? '' : 's'}`
+                : 'No lead has a channel partner yet. Add one on the lead form.'}
+          </p>
+        </div>
+        <Link href="/leads?channelPartner=none" className="text-xs font-medium text-[var(--primary)] hover:underline">
+          Leads without a partner
+        </Link>
+      </div>
+      {list.length > 0 && (
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[640px] text-sm">
+            <thead className="border-y border-slate-100 bg-slate-50/60 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+              <tr>
+                <th className="px-5 py-2">Channel partner</th>
+                <th className="px-3 py-2 text-right">Leads</th>
+                <th className="px-3 py-2 text-right">Open</th>
+                <th className="px-3 py-2 text-right">Site visits</th>
+                <th className="px-3 py-2 text-right">Booked</th>
+                <th className="px-3 py-2 text-right">Lost</th>
+                <th className="px-5 py-2 text-right">Conversion</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {rows.map((p) => (
+                <tr key={p.name} className="hover:bg-slate-50/60">
+                  <td className="px-5 py-2.5">
+                    <Link href={`/leads?channelPartner=${encodeURIComponent(p.name)}`} className="font-medium text-slate-900 hover:text-[var(--primary)]">
+                      {p.name}
+                    </Link>
+                    <div className="mt-1 h-1.5 w-full max-w-[220px] rounded-full bg-slate-100">
+                      <div className="h-1.5 rounded-full bg-[var(--primary)]" style={{ width: `${(p.total / max) * 100}%` }} />
+                    </div>
+                  </td>
+                  <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-slate-900">{p.total.toLocaleString('en-IN')}</td>
+                  <td className="px-3 py-2.5 text-right tabular-nums text-slate-600">{p.open.toLocaleString('en-IN')}</td>
+                  <td className="px-3 py-2.5 text-right tabular-nums text-slate-600">{p.siteVisits.toLocaleString('en-IN')}</td>
+                  <td className="px-3 py-2.5 text-right tabular-nums text-emerald-700">{p.booked.toLocaleString('en-IN')}</td>
+                  <td className="px-3 py-2.5 text-right tabular-nums text-slate-500">{p.lost.toLocaleString('en-IN')}</td>
+                  <td className="px-5 py-2.5 text-right tabular-nums text-slate-600">{p.conversionRate}%</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {list.length > 10 && (
+        <div className="border-t border-slate-100 px-5 py-2.5 text-center">
+          <button type="button" onClick={() => setShowAll((v) => !v)} className="text-xs font-medium text-[var(--primary)] hover:underline">
+            {showAll ? 'Show top 10' : `Show all ${list.length}`}
+          </button>
+        </div>
+      )}
+    </section>
   );
 }

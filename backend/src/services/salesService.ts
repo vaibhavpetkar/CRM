@@ -452,6 +452,62 @@ export const getLeadSources = async (query: Record<string, unknown>) => {
   };
 };
 
+// ─── Channel partners ───────────────────────────────────────────────────────
+
+/**
+ * Leads per channel partner (dashboard): how many, how many are still open,
+ * visited the site, booked or lost. All time unless from/to are given.
+ * Names are grouped regardless of case or extra spaces.
+ */
+const VISIT_DONE_LEAD_STATUSES = ['site-visit-done', 'revisit-done'];
+
+export const getChannelPartners = async (query: Record<string, unknown>) => {
+  const where: any = { channelPartner: { [Op.and]: [{ [Op.ne]: null }, { [Op.ne]: '' }] } };
+  const dated = typeof query.from === 'string' || typeof query.to === 'string';
+  if (dated) {
+    const { start, end } = parseRange(query.from, query.to);
+    where.createdAt = { [Op.gte]: start, [Op.lt]: end };
+  }
+  const rows = (await Lead.findAll({
+    where,
+    attributes: ['id', 'channelPartner', 'status', 'isConverted', 'createdAt'],
+    raw: true,
+  })) as unknown as { id: number; channelPartner: string; status: string; isConverted: boolean; createdAt: Date }[];
+
+  const visited = new Set<number>();
+  if (rows.length) {
+    const visits = (await SiteVisit.findAll({
+      where: { leadId: { [Op.in]: rows.map((r) => r.id) }, status: DONE_VISIT_STATUSES } as any,
+      attributes: ['leadId'],
+      raw: true,
+    })) as unknown as { leadId: number }[];
+    visits.forEach((v) => visited.add(v.leadId));
+  }
+
+  const partners = new Map<string, { name: string; total: number; open: number; siteVisits: number; booked: number; lost: number; lastLeadAt: Date | null }>();
+  for (const r of rows) {
+    const name = String(r.channelPartner).replace(/\s+/g, ' ').trim();
+    if (!name) continue;
+    const key = name.toLowerCase();
+    if (!partners.has(key)) partners.set(key, { name, total: 0, open: 0, siteVisits: 0, booked: 0, lost: 0, lastLeadAt: null });
+    const p = partners.get(key)!;
+    p.total += 1;
+    const won = WON.includes(r.status) || r.isConverted;
+    const lost = DEAD_LEAD_STATUSES.includes(r.status);
+    if (won) p.booked += 1;
+    else if (lost) p.lost += 1;
+    else p.open += 1;
+    if (visited.has(r.id) || VISIT_DONE_LEAD_STATUSES.includes(r.status)) p.siteVisits += 1;
+    const at = new Date(r.createdAt);
+    if (!p.lastLeadAt || at > p.lastLeadAt) p.lastLeadAt = at;
+  }
+
+  const list = [...partners.values()]
+    .map((p) => ({ ...p, conversionRate: p.total ? Math.round((p.booked / p.total) * 1000) / 10 : 0 }))
+    .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
+  return { total: rows.length, partners: list };
+};
+
 // ─── Call tracking (call log) ───────────────────────────────────────────────
 
 export const listCallLog = async (user: any, query: Record<string, unknown>) => {
@@ -572,6 +628,18 @@ export const listVisits = async (user: any, query: Record<string, unknown>) => {
     const onlyUserId = scopedUserId(user, query.userId);
     if (onlyUserId) where.userId = onlyUserId;
   }
+  // Every visit in the period by status (before the status tab is applied),
+  // so the page shows the total and each tab's count, not just the rows loaded.
+  const grouped = (await SiteVisit.findAll({
+    where: { ...where },
+    attributes: ['status', [fn('COUNT', col('id')), 'count']],
+    group: ['status'],
+    raw: true,
+  })) as unknown as { status: SiteVisitStatus; count: string | number }[];
+  const counts = Object.fromEntries(SITE_VISIT_STATUSES.map((s) => [s, 0])) as Record<SiteVisitStatus, number>;
+  for (const g of grouped) if (g.status in counts) counts[g.status] = Number(g.count) || 0;
+  const total = Object.values(counts).reduce((a, b) => a + b, 0);
+
   const status = String(query.status || '');
   if ((SITE_VISIT_STATUSES as string[]).includes(status)) where.status = status;
 
@@ -580,7 +648,8 @@ export const listVisits = async (user: any, query: Record<string, unknown>) => {
   if (limit > 500 && !userCan(user, 'site_visits:export')) throw new ForbiddenError('You are not allowed to export site visits.');
   const visits = await SiteVisit.findAll({ where, order: [['scheduledAt', 'DESC']], limit });
   const names = await lookups(visits);
-  return { visits: visits.map((v) => serializeVisit(v, names)) };
+  const matching = where.status ? counts[where.status as SiteVisitStatus] ?? visits.length : total;
+  return { total, counts, matching, visits: visits.map((v) => serializeVisit(v, names)) };
 };
 
 const validStatus = (value: unknown): SiteVisitStatus | undefined => {

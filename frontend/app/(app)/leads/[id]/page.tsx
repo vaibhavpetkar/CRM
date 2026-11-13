@@ -23,6 +23,7 @@ import SiteVisitsCard from '@/components/sales/site-visits-card';
 import SiteVisitModal from '@/components/sales/site-visit-modal';
 import FollowUpHistoryDrawer from '@/components/leads/follow-up-history-drawer';
 import { LeadNotesField, lastNoteLine } from '@/components/leads/lead-notes';
+import ChannelPartnerInput from '@/components/leads/channel-partner-input';
 
 // Today as YYYY-MM-DD in the browser's time zone, for the follow-up date picker's minimum.
 const todayStr = () => {
@@ -422,16 +423,13 @@ export default function LeadDetailsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700">Telephone</label>
-                  <div className="mt-1 flex items-center gap-2">
-                    <input
-                      type="tel"
-                      value={formData.phone || ''}
-                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                      className="w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
-                    />
-                    <CallButton number={lead?.phone || ''} leadId={lead?.id} name={leadName} />
-                  </div>
+                  <label className="block text-sm font-medium text-slate-700">Channel Partner</label>
+                  <ChannelPartnerInput
+                    className="mt-1"
+                    value={formData.channelPartner || ''}
+                    onChange={(v) => setFormData({ ...formData, channelPartner: v })}
+                    placeholder="Type or pick a channel partner"
+                  />
                 </div>
 <div>
                       <label className="block text-sm font-medium text-slate-700">Mobile Number <span className="text-red-500">*</span></label>

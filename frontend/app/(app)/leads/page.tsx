@@ -38,6 +38,8 @@ export default function LeadsPage() {
   const [configFilter, setConfigFilter] = useState<string[]>([]);
   const [propertyTypeFilter, setPropertyTypeFilter] = useState('all');
   const [locationFilter, setLocationFilter] = useState('');
+  const [partnerFilter, setPartnerFilter] = useState('all');
+  const [partnerOptions, setPartnerOptions] = useState<{ name: string; leads: number }[]>([]);
   const [budgetFilter, setBudgetFilter] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
@@ -114,6 +116,7 @@ export default function LeadsPage() {
     take('dateFrom', setDateFrom);
     take('dateTo', setDateTo);
     take('location', setLocationFilter);
+    take('channelPartner', setPartnerFilter);
     take('noteFrom', setNoteFrom);
     take('noteTo', setNoteTo);
     take('noteStatus', setNoteStatus);
@@ -199,6 +202,7 @@ export default function LeadsPage() {
       configuration: configFilter.join(','),
       propertyType: propertyTypeFilter,
       location: debouncedLocation,
+      channelPartner: partnerFilter,
       budgetFrom: budgetFilter !== '' ? budget?.from : undefined,
       budgetTo: budgetFilter !== '' ? budget?.to : undefined,
       dateFrom,
@@ -212,7 +216,7 @@ export default function LeadsPage() {
       sortBy: sort?.field,
       order: sort ? sort.direction.toUpperCase() : undefined,
     };
-  }, [sort, debouncedSearch, filter, sourceFilter, assigneeFilter, configFilter, propertyTypeFilter, debouncedLocation, budgetFilter, dateFrom, dateTo, noteFiltersOn, noteScope, noteFrom, noteTo, debouncedNoteSearch, noteStatus, noteBy]);
+  }, [sort, debouncedSearch, filter, sourceFilter, assigneeFilter, configFilter, propertyTypeFilter, debouncedLocation, partnerFilter, budgetFilter, dateFrom, dateTo, noteFiltersOn, noteScope, noteFrom, noteTo, debouncedNoteSearch, noteStatus, noteBy]);
 
   // Ignores answers to an older filter once the filters have changed.
   const requestSeq = useRef(0);
@@ -268,6 +272,7 @@ export default function LeadsPage() {
     propertyTypeFilter !== 'all',
     !!locationFilter.trim(),
     budgetFilter !== '',
+    partnerFilter !== 'all',
     !!dateFrom || !!dateTo,
     !!noteFrom || !!noteTo,
     !!noteSearch.trim(),
@@ -281,6 +286,7 @@ export default function LeadsPage() {
     setConfigFilter([]);
     setPropertyTypeFilter('all');
     setLocationFilter('');
+    setPartnerFilter('all');
     setBudgetFilter('');
     setDateFrom('');
     setDateTo('');
@@ -291,6 +297,14 @@ export default function LeadsPage() {
     setNoteBy('all');
     setNoteScope('last');
   };
+
+  // Channel partners for the filter: loaded when the filters open (and again on focus, so new ones show).
+  const loadPartners = useCallback(() => {
+    leadsApi.getChannelPartners('', 500).then((r) => setPartnerOptions(r.partners || [])).catch(() => {});
+  }, []);
+  useEffect(() => {
+    if (showFilters) loadPartners();
+  }, [showFilters, loadPartners]);
 
   const toggleConfig = (c: string) => setConfigFilter((prev) => (prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]));
 
@@ -435,11 +449,11 @@ export default function LeadsPage() {
     // Task 2.16 removed these from the default view, but they're still real
     // lead fields — available on request via "Arrange & Hide Columns" -> Add.
     {
-      header: 'Phone',
-      id: 'phone',
-      sortField: 'phone',
+      header: 'Channel Partner',
+      id: 'channelPartner',
+      sortField: 'channelPartner',
       optional: true,
-      accessor: (lead) => <span className="text-slate-600">{lead.phone || '—'}</span>,
+      accessor: (lead) => <span className="text-slate-600">{lead.channelPartner || '—'}</span>,
     },
     {
       header: 'Mobile',
@@ -664,6 +678,26 @@ export default function LeadsPage() {
             <div>
               <label className="block text-xs font-medium text-slate-500">Area / locality</label>
               <input value={locationFilter} onChange={(e) => setLocationFilter(e.target.value)} placeholder="e.g. Baner, Wakad" className={filterField} />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-500">Channel partner</label>
+              <select
+                value={partnerFilter}
+                onFocus={loadPartners}
+                onChange={(e) => setPartnerFilter(e.target.value)}
+                className={filterField}
+              >
+                <option value="all">All channel partners</option>
+                <option value="none">No channel partner</option>
+                {partnerFilter !== 'all' && partnerFilter !== 'none' && !partnerOptions.some((p) => p.name.toLowerCase() === partnerFilter.toLowerCase()) && (
+                  <option value={partnerFilter}>{partnerFilter}</option>
+                )}
+                {partnerOptions.map((p) => (
+                  <option key={p.name} value={p.name}>
+                    {p.name} ({p.leads})
+                  </option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-500">Lead date from</label>

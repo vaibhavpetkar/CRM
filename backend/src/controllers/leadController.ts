@@ -1,7 +1,7 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/authMiddleware';
 import { asyncHandler } from '../utils/errorHandler';
-import leadService from '../services/LeadService';
+import leadService, { listChannelPartners } from '../services/LeadService';
 import Company from '../models/Company';
 import Contact from '../models/Contact';
 import Lead from '../models/Lead';
@@ -55,7 +55,7 @@ const rowErrorMessage = (err: unknown) => {
 // (only where the lead has nothing yet; what the team typed is kept).
 const IMPORT_FILL_FIELDS = [
   'firstName', 'lastName', 'email', 'alternateMobile', 'phone', 'company', 'leadSource', 'subSource',
-  'configuration', 'propertyType', 'projectName', 'preferredLocation', 'budgetMin', 'budgetMax',
+  'configuration', 'propertyType', 'projectName', 'preferredLocation', 'channelPartner', 'budgetMin', 'budgetMax',
   'city', 'state', 'country', 'street', 'zipCode', 'territory', 'industry', 'jobTitle',
 ] as const;
 
@@ -290,6 +290,12 @@ export const deleteLead = asyncHandler(async (req: AuthRequest, res: Response) =
 export const convertLead = asyncHandler(async (req: AuthRequest, res: Response) => {
   const result = await leadService.convert(req.params.id, req.body || {}, req.user?.id);
   return res.json({ message: 'Lead converted successfully', ...result });
+});
+
+// Channel partners on earlier leads, for the lead form suggestions and the filter.
+export const getChannelPartners = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const { search, limit } = req.query as { search?: string; limit?: string };
+  return res.json({ partners: await listChannelPartners(search, Number(limit) || 20) });
 });
 
 export const getLeadStats = asyncHandler(async (req: AuthRequest, res: Response) => {

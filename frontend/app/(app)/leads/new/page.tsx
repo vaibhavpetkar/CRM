@@ -27,6 +27,7 @@ import { hasPermission } from '@/lib/permissions';
 import SiteVisitModal, { SiteVisitInput } from '@/components/sales/site-visit-modal';
 import { cn } from '@/lib/utils';
 import { LeadSourceSelect, LeadStatusSelect } from '@/components/leads/lead-status';
+import ChannelPartnerInput from '@/components/leads/channel-partner-input';
 import { VISIT_LEAD_STATUSES, leadStatusLabel, CONFIGURATION_OPTIONS, PROPERTY_TYPE_OPTIONS } from '@/lib/lead-options';
 
 // Today as YYYY-MM-DD in the browser's time zone.
@@ -46,7 +47,7 @@ const leadSchema = z.object({
   email: z.string().trim().refine((v) => !v || z.string().email().safeParse(v).success, 'Enter a valid email address').optional(),
   mobile: z.string().regex(/^\d{10}$/, 'Mobile number must be 10 digits'),
   alternateMobile: tenDigits('Alternate mobile'),
-  phone: z.string().optional(),
+  channelPartner: z.string().max(255).optional(),
   jobTitle: z.string().optional(),
   leadSource: z.string().optional(),
   status: z.string().optional(),
@@ -260,8 +261,13 @@ export default function NewLeadPage() {
         <Field label="Alternate Mobile" error={errors.alternateMobile?.message}>
           <IconInput icon={<PhoneIcon />} type="tel" inputMode="numeric" maxLength={10} placeholder="10-digit mobile number" invalid={!!errors.alternateMobile} {...register('alternateMobile')} />
         </Field>
-        <Field label="Telephone">
-          <IconInput icon={<PhoneIcon />} type="tel" placeholder="Landline (optional)" {...register('phone')} />
+        <Field label="Channel Partner">
+          <ChannelPartnerInput
+            value={watch('channelPartner') || ''}
+            onChange={(v) => setValue('channelPartner', v)}
+            inputClassName={INPUT}
+            placeholder="Type or pick a channel partner"
+          />
         </Field>
         <Field label="Lead Source">
           <LeadSourceSelect value={watch('leadSource') || 'website'} onChange={(v) => setValue('leadSource', v)} />

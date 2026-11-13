@@ -25,6 +25,7 @@ export const LEAD_FIELDS: ImportExportField[] = [
   { key: 'budgetMax', label: 'Budget Max', type: 'number', aliases: ['Budget'] },
   { key: 'leadSource', label: 'Lead Source', type: 'select', options: LEAD_SOURCE_OPTIONS.map((o) => o.value), aliases: ['Source'] },
   { key: 'subSource', label: 'Sub Source', type: 'text' },
+  { key: 'channelPartner', label: 'Channel Partner', type: 'text', aliases: ['CP', 'CP Name', 'Channel Partner Name', 'Broker', 'Broker Name', 'Partner'] },
   { key: 'status', label: 'Status', type: 'select', options: LEAD_STATUS_VALUES, aliases: ['Lead Status'] },
   // A date here means the visit happened: the lead shows on the Site Visits page.
   { key: 'siteVisitDate', label: 'Site Visit Date', type: 'date', defaultExport: false, aliases: ['Visit Date', 'SV Date', 'Site Visit Done Date'] },

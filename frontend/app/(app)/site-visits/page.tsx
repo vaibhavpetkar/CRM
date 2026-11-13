@@ -51,6 +51,8 @@ export default function SiteVisitsPage() {
   const [userId, setUserId] = useState('all');
   const [status, setStatus] = useState<'all' | SiteVisitStatus>('all');
   const [visits, setVisits] = useState<SiteVisitRow[] | null>(null);
+  // Every visit in the period (all statuses) and per status, from the server.
+  const [totals, setTotals] = useState<{ total: number; matching: number; counts: Record<SiteVisitStatus, number> } | null>(null);
   const [agents, setAgents] = useState<{ id: number; name: string }[]>([]);
   const [states, setStates] = useState<Map<number, PresenceState>>(new Map());
   const [editing, setEditing] = useState<SiteVisitRow | 'new' | null>(null);
@@ -61,6 +63,7 @@ export default function SiteVisitsPage() {
     try {
       const res = await salesApi.listVisits({ ...range, userId, status });
       setVisits(res.visits);
+      setTotals(res.counts ? { total: res.total ?? res.visits.length, matching: res.matching ?? res.visits.length, counts: res.counts } : null);
       // Keep only selections that are still on the page.
       setSelected((prev) => new Set(res.visits.filter((v) => prev.has(v.id)).map((v) => v.id)));
     } catch (err: any) {
@@ -83,10 +86,13 @@ export default function SiteVisitsPage() {
   }, [canPickAgent]);
 
   const counts = useMemo(() => {
+    if (totals) return totals.counts;
     const c = { scheduled: 0, completed: 0, 'revisit-done': 0, cancelled: 0, 'no-show': 0 } as Record<SiteVisitStatus, number>;
     for (const v of visits || []) c[v.status] += 1;
     return c;
-  }, [visits]);
+  }, [visits, totals]);
+  const totalVisits = totals ? totals.total : (visits || []).length;
+  const shownTotal = totals ? totals.matching : (visits || []).length;
 
   const update = async (v: SiteVisitRow, next: SiteVisitStatus) => {
     try {
@@ -204,11 +210,18 @@ export default function SiteVisitsPage() {
               >
                 {s !== 'all' && <span className="mr-1.5 inline-block h-2 w-2 rounded-full" style={{ backgroundColor: leadStatusColor(`visit:${s}`) }} />}
                 {s === 'all' ? 'All' : VISIT_STATUS_LABEL[s]}
-                {s !== 'all' && status === 'all' && visits ? ` ${counts[s]}` : ''}
+                {visits ? ` ${(s === 'all' ? totalVisits : counts[s]).toLocaleString('en-IN')}` : ''}
               </button>
             ))}
           </div>
           <LeadStatusColorsButton kind="visit" />
+          {visits && (
+            <span className="text-sm text-slate-600 sm:ml-auto">
+              Total entries: <strong className="text-slate-900">{shownTotal.toLocaleString('en-IN')}</strong>
+              {status !== 'all' && <span className="text-slate-400"> of {totalVisits.toLocaleString('en-IN')}</span>}
+              {visits.length < shownTotal && <span className="text-slate-400"> (latest {visits.length.toLocaleString('en-IN')} shown, export for all)</span>}
+            </span>
+          )}
         </div>
       </div>
 
