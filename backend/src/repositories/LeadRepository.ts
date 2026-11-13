@@ -32,7 +32,7 @@ const childTableIncludes = [
 // plus the Series ID and company it always covered (Task 2.17).
 const TEXT_SEARCH_FIELDS = [
   'leadNumber', 'company', 'firstName', 'lastName', 'email',
-  'preferredLocation', 'city', 'territory', 'street', 'projectName', 'configuration', 'subSource',
+  'preferredLocation', 'city', 'territory', 'street', 'projectName', 'configuration', 'subSource', 'channelPartner',
 ];
 const PHONE_FIELDS = ['mobile', 'alternateMobile', 'phone'];
 
@@ -211,6 +211,7 @@ const LEAD_SORT_FIELDS: Record<string, string[]> = {
   email: ['email'],
   leadSource: ['leadSource'],
   subSource: ['subSource'],
+  channelPartner: ['channelPartner'],
   industry: ['industry'],
   score: ['score'],
   value: ['value'],
@@ -234,7 +235,7 @@ const leadSortOrder = (params: ListQueryParams): any[] => {
   if (!fields) return [['createdAt', 'DESC'], ['id', 'DESC']];
   // Blank text ('') sorts with the empties, last.
   const order: any[] = fields.map((f) =>
-    ['firstName', 'lastName', 'company', 'phone', 'mobile', 'alternateMobile', 'email', 'configuration', 'propertyType', 'preferredLocation', 'projectName', 'leadSource', 'subSource', 'industry', 'city', 'lastNoteBy'].includes(f)
+    ['firstName', 'lastName', 'company', 'phone', 'mobile', 'alternateMobile', 'email', 'configuration', 'propertyType', 'preferredLocation', 'projectName', 'leadSource', 'subSource', 'channelPartner', 'industry', 'city', 'lastNoteBy'].includes(f)
       ? [sequelize.fn('NULLIF', sequelize.fn('TRIM', sequelize.col(`Lead.${f}`)), ''), nulls]
       : [f, nulls]
   );
@@ -269,6 +270,19 @@ class LeadRepository extends BaseRepository<Lead> {
 
     const subSource = String(params.subSource ?? '').trim();
     if (subSource) and.push({ subSource: { [Op.iLike]: `%${escapeLike(subSource)}%` } });
+
+    // Channel partner: "none" for leads without one, otherwise exact names
+    // (comma separated, any case) or a partial name.
+    const partner = String(params.channelPartner ?? '').trim();
+    if (partner === 'none') and.push({ [Op.or]: [{ channelPartner: null }, { channelPartner: '' }] });
+    else if (partner) {
+      const names = csv(partner).map((n) => n.toLowerCase());
+      if (String(params.channelPartnerMatch ?? '') === 'contains') {
+        and.push({ channelPartner: { [Op.iLike]: `%${escapeLike(partner)}%` } });
+      } else if (names.length) {
+        and.push(sequelize.where(sequelize.fn('LOWER', sequelize.fn('TRIM', sequelize.col('Lead.channelPartner'))), { [Op.in]: names }));
+      }
+    }
 
     const configurations = csv(params.configuration);
     if (configurations.length) and.push({ configuration: { [Op.in]: configurations } });

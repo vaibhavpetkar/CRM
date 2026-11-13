@@ -357,6 +357,18 @@ export interface LeadListParams {
   noteSearch?: string;
   noteStatus?: string; // comma separated
   noteBy?: string; // a user id, or "name:SS" for a name that isn't a user
+  channelPartner?: string; // a partner's name, or 'none' for leads without one
+}
+
+export interface ChannelPartnerRow {
+  name: string;
+  total: number;
+  open: number;
+  siteVisits: number;
+  booked: number;
+  lost: number;
+  conversionRate: number;
+  lastLeadAt: string | null;
 }
 
 export const leadsApi = {
@@ -398,6 +410,12 @@ export const leadsApi = {
       body: JSON.stringify(leadData),
     });
   },
+
+  /** Channel partners already on leads (most leads first), optionally matching the typed text. */
+  getChannelPartners: async (search = '', limit = 20) =>
+    request<{ partners: { name: string; leads: number }[] }>(
+      `/leads/channel-partners?${new URLSearchParams({ ...(search.trim() ? { search: search.trim() } : {}), limit: String(limit) })}`
+    ),
 
   // Task 2.6: duplicate check by email/mobile, called before create to power
   // the "A lead with this email address or mobile number already exists"
@@ -1553,12 +1571,14 @@ export const salesApi = {
   getActivity: async (params: { from?: string; to?: string; userId?: number | string } = {}) =>
     request<SalesActivity>(`/sales/activity${qs(params)}`),
   heartbeat: async () => request<{ ok: boolean }>('/sales/heartbeat', { method: 'POST' }),
+  getChannelPartners: async (params: { from?: string; to?: string } = {}) =>
+    request<{ total: number; partners: ChannelPartnerRow[] }>(`/sales/channel-partners${qs(params)}`),
   getLeadSources: async (params: { from?: string; to?: string } = {}) =>
     request<LeadSourceReport>(`/sales/lead-sources${qs(params)}`),
   getCallLog: async (params: { from?: string; to?: string; userId?: number | string; status?: string; direction?: string; number?: string; page?: number; limit?: number } = {}) =>
     request<{ from: string; to: string; total: number; page: number; pages: number; calls: CallLogRow[] }>(`/sales/calls${qs(params)}`),
   listVisits: async (params: { from?: string; to?: string; userId?: number | string; status?: string; leadId?: number | string; limit?: number } = {}) =>
-    request<{ visits: SiteVisitRow[] }>(`/sales/visits${qs(params)}`),
+    request<{ visits: SiteVisitRow[]; total?: number; matching?: number; counts?: Record<SiteVisitStatus, number> }>(`/sales/visits${qs(params)}`),
   createVisit: async (payload: { leadId: number | string; userId?: number | string | null; scheduledAt: string; status?: SiteVisitStatus; projectName?: string; location?: string; notes?: string }) =>
     request<SiteVisitRow>('/sales/visits', { method: 'POST', body: JSON.stringify(payload) }),
   updateVisit: async (id: number, payload: Partial<{ userId: number | string; scheduledAt: string; status: SiteVisitStatus; projectName: string; location: string; notes: string }>) =>

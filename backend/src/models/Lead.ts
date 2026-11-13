@@ -80,6 +80,7 @@ interface LeadAttributes {
   configuration?: string | null; // '1 RK' | '1 BHK' | '2 BHK' | ... (see frontend lib/lead-options.ts)
   preferredLocation?: string | null; // area / locality the buyer wants
   projectName?: string | null; // project or listing the enquiry came for
+  channelPartner?: string | null; // broker / channel partner who brought the lead
   subSource?: string | null; // finer than leadSource: the campaign, form, project or listing it came from (set automatically by integrations)
   followUpRemark?: string | null; // remark for the current Next Follow-up; earlier ones live in lead_follow_ups
   // The latest call note ("06/11/26 SWITCH OFF (SHABINA)"); every note lives in lead_notes.
@@ -177,6 +178,7 @@ class Lead extends Model<LeadAttributes, LeadCreationAttributes> implements Lead
   public configuration?: string | null;
   public preferredLocation?: string | null;
   public projectName?: string | null;
+  public channelPartner?: string | null;
   public subSource?: string | null;
   public followUpRemark?: string | null;
   public lastNoteDate?: string | null;
@@ -457,6 +459,7 @@ Lead.init(
     configuration: { type: DataTypes.STRING(30), allowNull: true },
     preferredLocation: { type: DataTypes.STRING(255), allowNull: true },
     projectName: { type: DataTypes.STRING(255), allowNull: true },
+    channelPartner: { type: DataTypes.STRING(255), allowNull: true },
     subSource: { type: DataTypes.STRING(255), allowNull: true },
     followUpRemark: { type: DataTypes.TEXT, allowNull: true },
     lastNoteDate: { type: DataTypes.DATEONLY, allowNull: true },

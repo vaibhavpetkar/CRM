@@ -1,5 +1,6 @@
 import sequelize from '../config/database';
-import { Transaction, Op } from 'sequelize';
+import { Transaction, Op, QueryTypes } from 'sequelize';
+import { currentCompanyId } from '../tenancy/context';
 import Lead from '../models/Lead';
 import LeadProduct from '../models/LeadProduct';
 import LeadTax from '../models/LeadTax';
@@ -44,6 +45,57 @@ const cleanRemark = (value: unknown) => {
   if (value === null || value === undefined) return null;
   const text = String(value).trim();
   return text ? text : null;
+};
+
+// Channel partner names: trimmed, single-spaced, at most 255 characters.
+const cleanPartner = (value: unknown): string | null => {
+  if (value === null || value === undefined) return null;
+  const text = String(value).replace(/\s+/g, ' ').trim().slice(0, 255);
+  return text || null;
+};
+
+/**
+ * The channel partner name as the CRM already has it: "ram realty" typed on
+ * a new lead is saved as "Ram Realty" when an earlier lead has that partner,
+ * so one partner is never counted twice on the dashboard or the filter.
+ */
+export const canonicalPartner = async (value: unknown): Promise<string | null> => {
+  const name = cleanPartner(value);
+  if (!name) return null;
+  const match = await Lead.findOne({
+    where: sequelize.where(sequelize.fn('LOWER', sequelize.fn('TRIM', sequelize.col('channelPartner'))), name.toLowerCase()) as any,
+    attributes: ['channelPartner'],
+    order: [['createdAt', 'ASC']],
+    raw: true,
+  });
+  return cleanPartner(match?.channelPartner) || name;
+};
+
+/** Channel partners already on leads, most leads first, for the form suggestions and the filter. */
+export const listChannelPartners = async (search: unknown, limit = 20) => {
+  const text = cleanPartner(search);
+  const params: Record<string, unknown> = { limit: Math.min(Math.max(Number(limit) || 20, 1), 500) };
+  let filter = '';
+  if (text) {
+    filter = `AND LOWER(TRIM("channelPartner")) LIKE :like`;
+    params.like = `%${text.toLowerCase().replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+  }
+  const companyId = currentCompanyId();
+  let scope = '';
+  if (companyId) {
+    scope = `AND "companyId" = :companyId`;
+    params.companyId = companyId;
+  }
+  const rows = (await sequelize.query(
+    `SELECT MIN(TRIM("channelPartner")) AS name, COUNT(*)::int AS leads
+       FROM "leads"
+      WHERE "channelPartner" IS NOT NULL AND TRIM("channelPartner") <> '' AND "deletedAt" IS NULL ${scope} ${filter}
+      GROUP BY LOWER(TRIM("channelPartner"))
+      ORDER BY leads DESC, name ASC
+      LIMIT :limit`,
+    { replacements: params, type: QueryTypes.SELECT }
+  )) as { name: string; leads: number }[];
+  return rows;
 };
 
 interface ProductInput {
@@ -208,6 +260,7 @@ class LeadService {
       'latitude', 'longitude', 'value', 'score', 'budgetMin', 'budgetMax',
     ]);
     await validateUserReferences(data);
+    if (data.channelPartner !== undefined) data.channelPartner = await canonicalPartner(data.channelPartner);
     assertFollowUpNotPast(data.nextFollowUp);
 
     // '' is falsy but not null/undefined, so the `??` defaults below wouldn't
@@ -297,6 +350,7 @@ class LeadService {
           configuration: data.configuration ?? null,
           preferredLocation: data.preferredLocation ?? null,
           projectName: data.projectName ?? null,
+          channelPartner: cleanPartner(data.channelPartner),
           subSource: data.subSource ?? null,
           budgetMin: data.budgetMin ?? null,
           budgetMax: data.budgetMax ?? null,
@@ -367,6 +421,7 @@ class LeadService {
       'noOfEmployees', 'leadOwnerId', 'assignedToId', 'qualifiedById',
       'latitude', 'longitude', 'value', 'score', 'budgetMin', 'budgetMax',
     ]);
+    if (data.channelPartner !== undefined) data.channelPartner = await canonicalPartner(data.channelPartner);
     await validateUserReferences(data);
 
     if (data.email === '') data.email = null;
@@ -444,6 +499,7 @@ class LeadService {
         configuration: data.configuration !== undefined ? data.configuration : lead.configuration,
         preferredLocation: data.preferredLocation !== undefined ? data.preferredLocation : lead.preferredLocation,
         projectName: data.projectName !== undefined ? data.projectName : lead.projectName,
+        channelPartner: data.channelPartner !== undefined ? cleanPartner(data.channelPartner) : lead.channelPartner,
         subSource: data.subSource !== undefined ? data.subSource : lead.subSource,
         budgetMin: data.budgetMin !== undefined ? data.budgetMin : lead.budgetMin,
         budgetMax: data.budgetMax !== undefined ? data.budgetMax : lead.budgetMax,
