@@ -623,8 +623,11 @@ export const listVisits = async (user: any, query: Record<string, unknown>) => {
     const userId = Number(query.userId);
     if (Number.isInteger(userId) && userId > 0) where.userId = userId;
   } else {
-    const { start, end } = parseRange(query.from, query.to);
-    where.scheduledAt = { [Op.gte]: start, [Op.lt]: end };
+    // allTime=1 ("All" on the Site Visits page): every visit, no date limit.
+    if (String(query.allTime || '') !== '1') {
+      const { start, end } = parseRange(query.from, query.to);
+      where.scheduledAt = { [Op.gte]: start, [Op.lt]: end };
+    }
     const onlyUserId = scopedUserId(user, query.userId);
     if (onlyUserId) where.userId = onlyUserId;
   }

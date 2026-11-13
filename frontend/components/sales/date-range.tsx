@@ -33,10 +33,15 @@ export const PRESETS: { key: string; label: string; range: () => DateRange }[] =
   },
 ];
 
+/** "All": no date limit (pages that support it pass allowAll). */
+export const ALL_TIME: DateRange = { from: '', to: '' };
+export const isAllTime = (r: DateRange) => !r.from && !r.to;
+
 export const presetRange = (key: string) => (PRESETS.find((p) => p.key === key) || PRESETS[0]).range();
 
-export default function DateRangePicker({ value, onChange }: { value: DateRange; onChange: (r: DateRange) => void }) {
-  const active = PRESETS.find((p) => {
+export default function DateRangePicker({ value, onChange, allowAll }: { value: DateRange; onChange: (r: DateRange) => void; allowAll?: boolean }) {
+  const all = allowAll && isAllTime(value);
+  const active = all ? 'all' : PRESETS.find((p) => {
     const r = p.range();
     return r.from === value.from && r.to === value.to;
   })?.key;
@@ -58,11 +63,24 @@ export default function DateRangePicker({ value, onChange }: { value: DateRange;
             {p.label}
           </button>
         ))}
+        {allowAll && (
+          <button
+            type="button"
+            onClick={() => onChange(ALL_TIME)}
+            title="Every record, from the first one"
+            className={cn(
+              'rounded-lg px-2.5 py-1 text-xs font-semibold',
+              active === 'all' ? 'bg-[var(--primary)] text-white' : 'text-slate-500 hover:text-slate-800'
+            )}
+          >
+            All
+          </button>
+        )}
       </div>
       <div className="flex items-center gap-1">
-        <input type="date" value={value.from} max={value.to} onChange={(e) => e.target.value && onChange({ ...value, from: e.target.value })} className={input} aria-label="From" />
+        <input type="date" value={value.from} max={value.to} onChange={(e) => e.target.value && onChange({ from: e.target.value, to: value.to || iso(new Date()) })} className={input} aria-label="From" />
         <span className="text-xs text-slate-400">to</span>
-        <input type="date" value={value.to} min={value.from} onChange={(e) => e.target.value && onChange({ ...value, to: e.target.value })} className={input} aria-label="To" />
+        <input type="date" value={value.to} min={value.from} onChange={(e) => e.target.value && onChange({ from: value.from || e.target.value, to: e.target.value })} className={input} aria-label="To" />
       </div>
     </div>
   );
