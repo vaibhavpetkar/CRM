@@ -9,7 +9,7 @@ import Button from '@/components/ui/button';
 import ExportMenu from '@/components/ui/export-menu';
 import LoadingSpinner from '@/components/ui/loading-spinner';
 import { useToast } from '@/components/ui/toast';
-import DateRangePicker, { DateRange, presetRange } from '@/components/sales/date-range';
+import DateRangePicker, { DateRange, isAllTime, presetRange } from '@/components/sales/date-range';
 import { AgentStatusDot } from '@/components/sales/agent-status';
 import SiteVisitModal, { VISIT_STATUS_LABEL } from '@/components/sales/site-visit-modal';
 import { getStoredUser, PresenceState, salesApi, SiteVisitRow, SiteVisitStatus, usersApi } from '@/lib/api';
@@ -61,7 +61,7 @@ export default function SiteVisitsPage() {
 
   const load = useCallback(async () => {
     try {
-      const res = await salesApi.listVisits({ ...range, userId, status });
+      const res = await salesApi.listVisits({ ...range, allTime: isAllTime(range) ? 1 : undefined, userId, status });
       setVisits(res.visits);
       setTotals(res.counts ? { total: res.total ?? res.visits.length, matching: res.matching ?? res.visits.length, counts: res.counts } : null);
       // Keep only selections that are still on the page.
@@ -171,14 +171,14 @@ export default function SiteVisitsPage() {
           <>
             <Link href="/sales-activity"><Button size="sm" variant="secondary">Sales activity</Button></Link>
             {canExport && <ExportMenu
-              fileName={`site-visits-${range.from}-to-${range.to}`}
+              fileName={isAllTime(range) ? 'site-visits-all' : `site-visits-${range.from}-to-${range.to}`}
               columns={EXPORT_COLUMNS}
               disabled={!visits || visits.length === 0}
               label={selected.size ? `Export ${selected.size} selected` : 'Export'}
               getRows={async () => {
                 // Ticked rows only, or everything matching the filters (without the 500-row page cap).
                 if (selected.size) return (visits || []).filter((v) => selected.has(v.id)).map(toExportRow);
-                const { visits: all } = await salesApi.listVisits({ ...range, userId, status, limit: 10000 });
+                const { visits: all } = await salesApi.listVisits({ ...range, allTime: isAllTime(range) ? 1 : undefined, userId, status, limit: 10000 });
                 return all.map(toExportRow);
               }}
             />}
@@ -188,7 +188,7 @@ export default function SiteVisitsPage() {
       />
 
       <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs">
-        <DateRangePicker value={range} onChange={setRange} />
+        <DateRangePicker value={range} onChange={setRange} allowAll />
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
           {canPickAgent && (
             <select value={userId} onChange={(e) => setUserId(e.target.value)} className={select} aria-label="Sales person">
