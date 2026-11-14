@@ -12,7 +12,14 @@ import { useLeadStatusColors } from '@/components/leads/lead-status-colors';
 import { leadStatusColor } from '@/lib/lead-options';
 
 // Site visits for one lead (lead page, "Site Visits" tab).
-export default function SiteVisitsCard({ lead }: { lead: { id: number; name: string; projectName?: string | null; preferredLocation?: string | null } }) {
+export default function SiteVisitsCard({
+  lead,
+  onVisitDone,
+}: {
+  lead: { id: number; name: string; projectName?: string | null; preferredLocation?: string | null };
+  /** A visit was marked done: the lead's status moved to Site Visit Done / Revisit Done. */
+  onVisitDone?: () => void;
+}) {
   const toast = useToast();
   useLeadStatusColors();
   const user = getStoredUser();
@@ -45,6 +52,7 @@ export default function SiteVisitsCard({ lead }: { lead: { id: number; name: str
     try {
       await salesApi.updateVisit(v.id, { status });
       load();
+      onVisitDone?.();
     } catch (err: any) {
       toast.error(err.message || 'Could not update the visit.');
     }
@@ -110,9 +118,10 @@ export default function SiteVisitsCard({ lead }: { lead: { id: number; name: str
           canPickAgent={canPickAgent}
           currentUserId={user?.id}
           onClose={() => setEditing(null)}
-          onSaved={() => {
+          onSaved={(saved) => {
             setEditing(null);
             load();
+            if (saved.status === 'completed' || saved.status === 'revisit-done') onVisitDone?.();
           }}
         />
       )}

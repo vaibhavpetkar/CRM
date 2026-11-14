@@ -23,6 +23,7 @@ import { NotFoundError, ConflictError, ValidationError } from '../errors/AppErro
 import { isModuleEnabled } from '../middleware/moduleGate';
 import LeadFollowUp from '../models/LeadFollowUp';
 import { addNotesFromText, matchingNotes } from './leadNoteService';
+import { ensureVisitForLeadStatus } from './visitSync';
 import { localDay } from '../utils/reportTime';
 
 /** The calendar day ("2026-10-20") a follow-up date falls on, in the CRM's local time. */
@@ -390,6 +391,10 @@ class LeadService {
 
       const fullLead = await leadRepository.getByIdWithDetails(lead.id, t);
 
+      // Saved as Site Visit Done / Revisit Done: the visit shows on Site Visits
+      // too. Imports log their own visits (with the sheet's dates).
+      if (!options.quiet && fullLead) await ensureVisitForLeadStatus(fullLead, fullLead.status, userId, { transaction: t });
+
       // Fire-and-forget: a failed notification must not roll back the lead.
       // An import tells everyone once at the end instead (quiet).
       if (!options.quiet) {
@@ -693,6 +698,10 @@ class LeadService {
       }
 
       const fullLead = await leadRepository.getByIdWithDetails(lead.id, t);
+      // Moved to Site Visit Done / Revisit Done: the visit shows on Site Visits too.
+      if (!options.quiet && fullLead && fullLead.status !== before[STATUS_FIELD]) {
+        await ensureVisitForLeadStatus(fullLead, fullLead.status, userId, { transaction: t });
+      }
       return serializeLead(fullLead!);
     });
   }

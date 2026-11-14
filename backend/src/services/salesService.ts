@@ -3,6 +3,7 @@ import { Op, fn, col } from 'sequelize';
 import Call, { TERMINAL_CALL_STATUSES } from '../models/Call';
 import SiteVisit, { DONE_VISIT_STATUSES, SITE_VISIT_STATUSES, SiteVisitStatus } from '../models/SiteVisit';
 import Lead from '../models/Lead';
+import { findAutoVisit, syncLeadStatusFromVisit } from './visitSync';
 import LeadFollowUp from '../models/LeadFollowUp';
 import LeadNote from '../models/LeadNote';
 import { notesActivity } from './leadNoteService';
@@ -613,6 +614,45 @@ const lookups = async (visits: SiteVisit[]) => {
   return { agents: new Map(users.map((u) => [u.id, fullName(u)])), leads: new Map(leads.map((l) => [l.id, l])) };
 };
 
+/**
+ * Site Visits search box, like the Leads one: every word has to match the
+ * lead (name, mobile, alternate mobile, lead number), the sales person, the
+ * project, the location or the feedback. A number typed with spaces or +91
+ * still finds the mobile.
+ */
+const visitSearch = async (raw: unknown): Promise<any[] | null> => {
+  let text = String(raw ?? '').trim().slice(0, 200);
+  if (!text) return null;
+  const like = (w: string) => `%${w.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+  const words: string[] = [];
+  const compact = text.replace(/[\s\-()]/g, '');
+  if (/^\+?\d{4,}$/.test(compact)) words.push(compact.replace(/^\+?91(?=\d{10}$)/, '').replace(/^\+/, ''));
+  else words.push(...text.split(/\s+/).filter(Boolean).slice(0, 8));
+
+  const and: any[] = [];
+  for (const word of words) {
+    const w = like(word);
+    const [leads, users] = await Promise.all([
+      Lead.findAll({
+        where: { [Op.or]: ['firstName', 'lastName', 'mobile', 'alternateMobile', 'phone', 'leadNumber', 'email'].map((f) => ({ [f]: { [Op.iLike]: w } })) } as any,
+        attributes: ['id'],
+        limit: 5000,
+        raw: true,
+      }),
+      User.findAll({
+        where: { [Op.or]: ['firstName', 'lastName', 'email'].map((f) => ({ [f]: { [Op.iLike]: w } })) } as any,
+        attributes: ['id'],
+        raw: true,
+      }),
+    ]);
+    const or: any[] = ['projectName', 'location', 'notes'].map((f) => ({ [f]: { [Op.iLike]: w } }));
+    if (leads.length) or.push({ leadId: { [Op.in]: leads.map((l) => l.id) } });
+    if (users.length) or.push({ userId: { [Op.in]: users.map((u) => u.id) } });
+    and.push({ [Op.or]: or });
+  }
+  return and;
+};
+
 export const listVisits = async (user: any, query: Record<string, unknown>) => {
   if (!userCan(user, 'site_visits:read')) throw new ForbiddenError();
   const where: any = {};
@@ -631,6 +671,8 @@ export const listVisits = async (user: any, query: Record<string, unknown>) => {
     const onlyUserId = scopedUserId(user, query.userId);
     if (onlyUserId) where.userId = onlyUserId;
   }
+  const search = await visitSearch(query.search);
+  if (search) where[Op.and] = search;
   // Every visit in the period by status (before the status tab is applied),
   // so the page shows the total and each tab's count, not just the rows loaded.
   const grouped = (await SiteVisit.findAll({
@@ -642,6 +684,15 @@ export const listVisits = async (user: any, query: Record<string, unknown>) => {
   const counts = Object.fromEntries(SITE_VISIT_STATUSES.map((s) => [s, 0])) as Record<SiteVisitStatus, number>;
   for (const g of grouped) if (g.status in counts) counts[g.status] = Number(g.count) || 0;
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
+  // Different leads behind those visits (a lead can visit more than once).
+  const leadRows = (await SiteVisit.findAll({
+    where: { ...where },
+    attributes: ['status', [fn('COUNT', fn('DISTINCT', col('leadId'))), 'count']],
+    group: ['status'],
+    raw: true,
+  })) as unknown as { status: SiteVisitStatus; count: string | number }[];
+  const leadCounts = Object.fromEntries(SITE_VISIT_STATUSES.map((s) => [s, 0])) as Record<SiteVisitStatus, number>;
+  for (const g of leadRows) if (g.status in leadCounts) leadCounts[g.status] = Number(g.count) || 0;
 
   const status = String(query.status || '');
   if ((SITE_VISIT_STATUSES as string[]).includes(status)) where.status = status;
@@ -652,7 +703,7 @@ export const listVisits = async (user: any, query: Record<string, unknown>) => {
   const visits = await SiteVisit.findAll({ where, order: [['scheduledAt', 'DESC']], limit });
   const names = await lookups(visits);
   const matching = where.status ? counts[where.status as SiteVisitStatus] ?? visits.length : total;
-  return { total, counts, matching, visits: visits.map((v) => serializeVisit(v, names)) };
+  return { total, counts, leadCounts, matching, visits: visits.map((v) => serializeVisit(v, names)) };
 };
 
 const validStatus = (value: unknown): SiteVisitStatus | undefined => {
@@ -692,7 +743,7 @@ export const createVisit = async (user: any, body: Record<string, any>) => {
   const lead = await Lead.findByPk(leadId, { attributes: ['id', 'projectName', 'preferredLocation'] });
   if (!lead) throw new NotFoundError('Lead', leadId);
   const status = validStatus(body.status) || 'scheduled';
-  const visit = await SiteVisit.create({
+  const fields = {
     leadId,
     userId: await resolveAgent(user, body.userId),
     scheduledAt: validDate(body.scheduledAt),
@@ -702,7 +753,13 @@ export const createVisit = async (user: any, body: Record<string, any>) => {
     notes: text(body.notes, 5000) ?? null,
     completedAt: DONE_VISIT_STATUSES.includes(status as SiteVisitStatus) ? new Date() : null,
     createdById: user.id,
-  });
+  };
+  // The lead was just saved as Site Visit Done and the CRM logged the visit
+  // for it: this is that visit, with the details filled in, not a second one.
+  const auto = DONE_VISIT_STATUSES.includes(status) ? await findAutoVisit(leadId, status) : null;
+  const visit = auto ? await auto.update({ ...fields, autoCreated: false }) : await SiteVisit.create(fields);
+  // A visit logged as done moves the lead to Site Visit Done / Revisit Done.
+  if (DONE_VISIT_STATUSES.includes(status)) await syncLeadStatusFromVisit(leadId, status, user.id);
   await logActivity({
     action: 'meeting_logged',
     entityType: 'Lead',
@@ -746,6 +803,7 @@ export const updateVisit = async (user: any, id: number, body: Record<string, an
     if (value !== undefined) changes[field] = value;
   }
   await visit.update(changes);
+  if (status && status !== before && DONE_VISIT_STATUSES.includes(status)) await syncLeadStatusFromVisit(visit.leadId, status, user.id);
   if (status && status !== before && visit.leadId) {
     await logActivity({
       action: 'meeting_logged',

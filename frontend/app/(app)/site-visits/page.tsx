@@ -9,7 +9,8 @@ import Button from '@/components/ui/button';
 import ExportMenu from '@/components/ui/export-menu';
 import LoadingSpinner from '@/components/ui/loading-spinner';
 import { useToast } from '@/components/ui/toast';
-import DateRangePicker, { DateRange, isAllTime, presetRange } from '@/components/sales/date-range';
+import DateRangePicker, { ALL_TIME, DateRange, isAllTime, presetRange } from '@/components/sales/date-range';
+import SearchInput from '@/components/ui/search-input';
 import { AgentStatusDot } from '@/components/sales/agent-status';
 import SiteVisitModal, { VISIT_STATUS_LABEL } from '@/components/sales/site-visit-modal';
 import { getStoredUser, PresenceState, salesApi, SiteVisitRow, SiteVisitStatus, usersApi } from '@/lib/api';
@@ -49,10 +50,17 @@ export default function SiteVisitsPage() {
   const canPickAgent = hasPermission(user, 'sales:team');
   const [range, setRange] = useState<DateRange>(() => presetRange('7d'));
   const [userId, setUserId] = useState('all');
+  // Search box: lead name, mobile, lead number, sales person, project, feedback.
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => clearTimeout(t);
+  }, [search]);
   const [status, setStatus] = useState<'all' | SiteVisitStatus>('all');
   const [visits, setVisits] = useState<SiteVisitRow[] | null>(null);
   // Every visit in the period (all statuses) and per status, from the server.
-  const [totals, setTotals] = useState<{ total: number; matching: number; counts: Record<SiteVisitStatus, number> } | null>(null);
+  const [totals, setTotals] = useState<{ total: number; matching: number; counts: Record<SiteVisitStatus, number>; leadCounts?: Record<SiteVisitStatus, number> } | null>(null);
   const [agents, setAgents] = useState<{ id: number; name: string }[]>([]);
   const [states, setStates] = useState<Map<number, PresenceState>>(new Map());
   const [editing, setEditing] = useState<SiteVisitRow | 'new' | null>(null);
@@ -61,9 +69,9 @@ export default function SiteVisitsPage() {
 
   const load = useCallback(async () => {
     try {
-      const res = await salesApi.listVisits({ ...range, allTime: isAllTime(range) ? 1 : undefined, userId, status });
+      const res = await salesApi.listVisits({ ...range, allTime: isAllTime(range) ? 1 : undefined, userId, status, search: debouncedSearch || undefined });
       setVisits(res.visits);
-      setTotals(res.counts ? { total: res.total ?? res.visits.length, matching: res.matching ?? res.visits.length, counts: res.counts } : null);
+      setTotals(res.counts ? { total: res.total ?? res.visits.length, matching: res.matching ?? res.visits.length, counts: res.counts, leadCounts: res.leadCounts } : null);
       // Keep only selections that are still on the page.
       setSelected((prev) => new Set(res.visits.filter((v) => prev.has(v.id)).map((v) => v.id)));
     } catch (err: any) {
@@ -71,7 +79,7 @@ export default function SiteVisitsPage() {
       setVisits([]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [range, userId, status]);
+  }, [range, userId, status, debouncedSearch]);
 
   useEffect(() => {
     load();
@@ -178,7 +186,7 @@ export default function SiteVisitsPage() {
               getRows={async () => {
                 // Ticked rows only, or everything matching the filters (without the 500-row page cap).
                 if (selected.size) return (visits || []).filter((v) => selected.has(v.id)).map(toExportRow);
-                const { visits: all } = await salesApi.listVisits({ ...range, allTime: isAllTime(range) ? 1 : undefined, userId, status, limit: 10000 });
+                const { visits: all } = await salesApi.listVisits({ ...range, allTime: isAllTime(range) ? 1 : undefined, userId, status, search: debouncedSearch || undefined, limit: 10000 });
                 return all.map(toExportRow);
               }}
             />}
@@ -188,7 +196,15 @@ export default function SiteVisitsPage() {
       />
 
       <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs">
-        <DateRangePicker value={range} onChange={setRange} allowAll />
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            placeholder="Search name, mobile, lead no., sales person, project..."
+            className="w-full lg:max-w-sm"
+          />
+          <DateRangePicker value={range} onChange={setRange} allowAll />
+        </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
           {canPickAgent && (
             <select value={userId} onChange={(e) => setUserId(e.target.value)} className={select} aria-label="Sales person">
@@ -219,6 +235,9 @@ export default function SiteVisitsPage() {
             <span className="text-sm text-slate-600 sm:ml-auto">
               Total entries: <strong className="text-slate-900">{shownTotal.toLocaleString('en-IN')}</strong>
               {status !== 'all' && <span className="text-slate-400"> of {totalVisits.toLocaleString('en-IN')}</span>}
+              {status !== 'all' && totals?.leadCounts && totals.leadCounts[status] !== shownTotal && (
+                <span className="text-slate-400"> · {totals.leadCounts[status].toLocaleString('en-IN')} lead{totals.leadCounts[status] === 1 ? '' : 's'}</span>
+              )}
               {visits.length < shownTotal && <span className="text-slate-400"> (latest {visits.length.toLocaleString('en-IN')} shown, export for all)</span>}
             </span>
           )}
@@ -247,7 +266,14 @@ export default function SiteVisitsPage() {
         ) : visits.length === 0 ? (
           <div className="py-12 text-center text-sm text-slate-400">
             <MapPinIcon className="mx-auto mb-2 h-8 w-8 text-slate-300" />
-            No site visits in this period.
+            {debouncedSearch ? `No site visits match "${debouncedSearch}" in these dates.` : 'No site visits in this period.'}
+            {debouncedSearch && !isAllTime(range) && (
+              <div className="mt-3">
+                <button type="button" onClick={() => setRange(ALL_TIME)} className="text-sm font-semibold text-[var(--primary)] hover:underline">
+                  Search all dates
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           <div className="-mx-6 -my-6 overflow-x-auto">

@@ -771,6 +771,16 @@ export default function LeadDetailsPage() {
       {activeTab === 'visits' && hasPermission(getStoredUser(), 'site_visits:read') && (
         <SiteVisitsCard
           lead={{ id: Number(leadId), name: leadName, projectName: lead.projectName, preferredLocation: lead.preferredLocation }}
+          onVisitDone={() => {
+            // The visit moved the lead's status: show it, keeping any unsaved edits.
+            leadsApi
+              .getLead(leadId)
+              .then((fresh) => {
+                setLead((prev: any) => ({ ...prev, status: fresh.status }));
+                setFormData((prev: any) => ({ ...prev, status: fresh.status }));
+              })
+              .catch(() => {});
+          }}
         />
       )}
 

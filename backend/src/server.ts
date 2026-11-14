@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 import cors from 'cors';
 import bcrypt from 'bcryptjs';
 import sequelize from './config/database';
-import { runPermissionGrants, runSchemaPatches } from './utils/ensureSchema';
+import { runDataRepairs, runPermissionGrants, runSchemaPatches } from './utils/ensureSchema';
 import { PERMISSION_GRANTS } from './config/permissions';
 import User from './models/User';
 import logger from './utils/logger';
@@ -359,6 +359,7 @@ const startServer = async () => {
     // Roles made before a permission existed get it once, if they already
     // did the same thing (e.g. Site Visits used to follow the Leads permissions).
     await runPermissionGrants(sequelize, PERMISSION_GRANTS);
+    await runDataRepairs(sequelize);
 
     await initRealtime(httpServer);
 
