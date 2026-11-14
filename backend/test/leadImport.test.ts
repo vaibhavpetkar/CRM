@@ -44,6 +44,13 @@ test('numbers from abroad keep their country code; 10 digits stay Indian', async
   assert.equal(await mobileOf('6591234567'), '6591234567'); // 10 digits: India
   assert.equal(await mobileOf('+65 9123 4567'), '+6591234567');
   assert.equal(await mobileOf('0091 98765 43210'), '9876543210');
+  // Every country, without the +, as typed or imported.
+  assert.equal(await mobileOf('966501234567'), '+966501234567'); // Saudi Arabia
+  assert.equal(await mobileOf('97455123456'), '+97455123456'); // Qatar
+  assert.equal(await mobileOf('61412345678'), '+61412345678'); // Australia
+  assert.equal(await mobileOf('4915123456789'), '+4915123456789'); // Germany
+  assert.equal(await mobileOf('16475550123'), '+16475550123'); // Canada
+  assert.equal((await check(createLeadValidation, { ...lead, mobile: '971501234' })).errors.length, 1); // too short for the UAE
 });
 
 test('editing an older lead does not fail on a legacy mobile format', async () => {
