@@ -10,7 +10,6 @@ import {
   UserIcon,
   UserPlusIcon,
   EnvelopeIcon,
-  PhoneIcon,
   CalendarDaysIcon,
   ChevronDownIcon,
   HomeModernIcon,
@@ -28,6 +27,8 @@ import SiteVisitModal, { SiteVisitInput } from '@/components/sales/site-visit-mo
 import { cn } from '@/lib/utils';
 import { LeadSourceSelect, LeadStatusSelect } from '@/components/leads/lead-status';
 import ChannelPartnerInput from '@/components/leads/channel-partner-input';
+import { MobileFlag } from '@/components/ui/mobile-number';
+import { parseMobile } from '@/lib/phone-country';
 import { VISIT_LEAD_STATUSES, leadStatusLabel, CONFIGURATION_OPTIONS, PROPERTY_TYPE_OPTIONS } from '@/lib/lead-options';
 
 // Today as YYYY-MM-DD in the browser's time zone.
@@ -36,8 +37,10 @@ const todayStr = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
+// 10 digits = India; a number from abroad needs its country code (+971 ...).
+const MOBILE_HINT = 'Enter a 10-digit mobile, or + and the country code for other countries';
 const tenDigits = (label: string) =>
-  z.string().optional().refine((v) => !v || /^\d{10}$/.test(v), `${label} must be 10 digits`);
+  z.string().optional().refine((v) => !v || !!parseMobile(v), `${label}: ${MOBILE_HINT}`);
 
 const leadSchema = z.object({
   // Customer Details
@@ -45,7 +48,7 @@ const leadSchema = z.object({
   firstName: z.string().trim().optional().or(z.literal('')),
   lastName: z.string().trim().optional().or(z.literal('')),
   email: z.string().trim().refine((v) => !v || z.string().email().safeParse(v).success, 'Enter a valid email address').optional(),
-  mobile: z.string().regex(/^\d{10}$/, 'Mobile number must be 10 digits'),
+  mobile: z.string().trim().min(1, 'Mobile number is required').refine((v) => !!parseMobile(v), MOBILE_HINT),
   alternateMobile: tenDigits('Alternate mobile'),
   channelPartner: z.string().max(255).optional(),
   jobTitle: z.string().optional(),
@@ -256,10 +259,10 @@ export default function NewLeadPage() {
           <IconInput icon={<EnvelopeIcon />} type="email" placeholder="Enter email address" invalid={!!errors.email} {...register('email')} />
         </Field>
         <Field label="Mobile Number" required error={errors.mobile?.message}>
-          <IconInput icon={<PhoneIcon />} type="tel" inputMode="numeric" maxLength={10} placeholder="10-digit mobile number" invalid={!!errors.mobile} {...register('mobile')} />
+          <IconInput icon={<MobileFlag value={watch('mobile')} />} type="tel" maxLength={20} placeholder="10 digits, or +971 50 123 4567" invalid={!!errors.mobile} {...register('mobile')} />
         </Field>
         <Field label="Alternate Mobile" error={errors.alternateMobile?.message}>
-          <IconInput icon={<PhoneIcon />} type="tel" inputMode="numeric" maxLength={10} placeholder="10-digit mobile number" invalid={!!errors.alternateMobile} {...register('alternateMobile')} />
+          <IconInput icon={<MobileFlag value={watch('alternateMobile')} />} type="tel" maxLength={20} placeholder="10 digits, or +971 50 123 4567" invalid={!!errors.alternateMobile} {...register('alternateMobile')} />
         </Field>
         <Field label="Channel Partner">
           <ChannelPartnerInput

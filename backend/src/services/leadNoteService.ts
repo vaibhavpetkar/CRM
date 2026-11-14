@@ -1,4 +1,5 @@
 import { Op, QueryTypes, Transaction } from 'sequelize';
+import { ensureVisitForLeadStatus } from './visitSync';
 import sequelize from '../config/database';
 import Lead from '../models/Lead';
 import LeadNote from '../models/LeadNote';
@@ -121,6 +122,8 @@ export const addNote = async (leadId: number | string, user: any, body: Record<s
       t
     );
     const result = await refreshLeadNoteSummary(lead, { applyStatus: true, userId: user?.id ?? null, transaction: t });
+    // "Site visit done" in a note: the visit shows on Site Visits too.
+    if (result.statusChanged) await ensureVisitForLeadStatus(lead, lead.status, user?.id ?? null, { transaction: t, day: noteDate, notes: text });
     return { note: serializeNote(note), ...result, lead: { id: lead.id, status: lead.status, lastNoteDate: lead.lastNoteDate, lastNoteBy: lead.lastNoteBy, notesCount: lead.notesCount } };
   });
 };

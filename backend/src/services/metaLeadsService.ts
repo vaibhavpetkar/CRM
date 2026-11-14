@@ -1,4 +1,4 @@
-import { normalizeIndianMobile } from '../validations/leadValidation';
+import { parseMobile } from '../utils/phoneCountry';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { Op, UniqueConstraintError } from 'sequelize';
@@ -433,9 +433,9 @@ const importLead = async (page: MetaPage, leadgenId: string, prefetched?: any): 
       submittedAt: metaLead?.created_time ? new Date(metaLead.created_time) : null,
     });
 
-    // Save Indian numbers as 10 digits, like the Add Lead form and imports do.
-    const tenDigits = normalizeIndianMobile(mapped.mobile);
-    if (typeof tenDigits === 'string' && /^\d{10}$/.test(tenDigits)) mapped.mobile = tenDigits;
+    // Save Indian numbers as 10 digits and others as +<code>..., like the Add Lead form and imports do.
+    const stored = parseMobile(mapped.mobile)?.value;
+    if (stored) mapped.mobile = stored;
     const existing = await leadRepository.findDuplicate({ email: mapped.email, mobile: mapped.mobile });
     let leadId: number;
     let result: ProcessResult;

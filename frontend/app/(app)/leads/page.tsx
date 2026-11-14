@@ -1,5 +1,6 @@
 'use client';
 
+import MobileNumber from '@/components/ui/mobile-number';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import PageHeader from '@/components/ui/page-header';
 import SearchInput from '@/components/ui/search-input';
@@ -386,9 +387,12 @@ export default function LeadsPage() {
       accessor: (lead) => {
         const leadName = lead.name || `${lead.firstName || ''} ${lead.lastName || ''}`.trim() || 'Unnamed';
         return (
-          <Link href={`/leads/${lead.id}`} className="text-slate-600 hover:text-[var(--primary)] hover:underline">
-            {leadName}
-          </Link>
+          <div className="min-w-0">
+            <Link href={`/leads/${lead.id}`} className="text-slate-600 hover:text-[var(--primary)] hover:underline">
+              {leadName === lead.mobile ? 'Unnamed' : leadName}
+            </Link>
+            {lead.mobile && <MobileNumber value={lead.mobile} className="flex text-xs text-slate-400" />}
+          </div>
         );
       },
     },
@@ -460,7 +464,7 @@ export default function LeadsPage() {
       id: 'mobile',
       sortField: 'mobile',
       optional: true,
-      accessor: (lead) => <span className="text-slate-600">{lead.mobile || '—'}</span>,
+      accessor: (lead) => <MobileNumber value={lead.mobile} className="text-slate-600" />,
     },
     {
       header: 'Email',

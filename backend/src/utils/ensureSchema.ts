@@ -218,6 +218,18 @@ const SCHEMA_PATCHES: { name: string; sql: string }[] = [
       CREATE INDEX IF NOT EXISTS "leads_company_channel_partner" ON "leads" ("companyId", LOWER("channelPartner"));
     `,
   },
+  {
+    // Visits the CRM logs itself because a lead's status says the visit
+    // happened (a note, the API): the popup's visit replaces it.
+    name: 'site_visits.autoCreated',
+    sql: `ALTER TABLE "site_visits" ADD COLUMN IF NOT EXISTS "autoCreated" BOOLEAN NOT NULL DEFAULT FALSE;`,
+  },
+  {
+    // Duplicate check by the last 10 digits of the mobile (Indian and
+    // international numbers typed with or without the country code).
+    name: 'leads mobile last 10 digits index',
+    sql: `CREATE INDEX IF NOT EXISTS "leads_mobile_last10" ON "leads" (RIGHT(regexp_replace("mobile", '\\D', '', 'g'), 10));`,
+  },
 ];
 
 export const runSchemaPatches = async (sequelize: Sequelize): Promise<void> => {
@@ -299,5 +311,58 @@ export const runPermissionGrants = async (
     }
   } catch (err) {
     console.error('[data-migration] Permission grants failed:', err);
+  }
+};
+
+/**
+ * One-time data repairs, recorded in "data_migrations" so each runs once per
+ * database (after sync, across every company).
+ */
+const DATA_REPAIRS: { name: string; sql: string }[] = [
+  {
+    // Leads saved as Site Visit Done / Revisit Done before the visit had to
+    // be logged (or through a note) had no visit on the Site Visits page, so
+    // the two counts didn't match. Each such lead gets its visit, dated by
+    // its latest note (else its last update), for its sales person.
+    name: 'repair-2026-11-missing-site-visits',
+    sql: `
+      INSERT INTO "site_visits" ("leadId", "userId", "scheduledAt", "status", "projectName", "location", "notes", "completedAt", "createdById", "autoCreated", "companyId", "createdAt", "updatedAt")
+      SELECT l."id", COALESCE(l."assignedToId", l."createdById"), x.at, x.vstatus, l."projectName", l."preferredLocation",
+             'Added by the CRM to match the lead''s status', x.at, NULL, FALSE, l."companyId", NOW(), NOW()
+        FROM "leads" l
+        CROSS JOIN LATERAL (
+          SELECT CASE l."status" WHEN 'site-visit-done' THEN 'completed' ELSE 'revisit-done' END AS vstatus,
+                 COALESCE((l."lastNoteDate"::timestamp + INTERVAL '12 hours') AT TIME ZONE 'Asia/Kolkata', l."updatedAt") AS at
+        ) x
+       WHERE l."deletedAt" IS NULL
+         AND l."status" IN ('site-visit-done', 'revisit-done')
+         AND COALESCE(l."assignedToId", l."createdById") IS NOT NULL
+         AND NOT EXISTS (SELECT 1 FROM "site_visits" v WHERE v."leadId" = l."id" AND v."status" = x.vstatus);
+    `,
+  },
+];
+
+export const runDataRepairs = async (sequelize: Sequelize): Promise<void> => {
+  try {
+    await sequelize.query(
+      `CREATE TABLE IF NOT EXISTS "data_migrations" ("name" VARCHAR(100) PRIMARY KEY, "ranAt" TIMESTAMPTZ NOT NULL DEFAULT NOW());`,
+      { type: QueryTypes.RAW }
+    );
+    const done = new Set(
+      (await sequelize.query<{ name: string }>(`SELECT "name" FROM "data_migrations";`, { type: QueryTypes.SELECT })).map((r) => r.name)
+    );
+    for (const r of DATA_REPAIRS) {
+      if (done.has(r.name)) continue;
+      await sequelize.transaction(async (transaction) => {
+        const [, meta] = await sequelize.query(r.sql, { transaction });
+        await sequelize.query(`INSERT INTO "data_migrations" ("name") VALUES (:name) ON CONFLICT DO NOTHING;`, {
+          replacements: { name: r.name },
+          transaction,
+        });
+        console.log(`[data-repair] ${r.name}: ${typeof meta === 'number' ? meta : (meta as any)?.rowCount ?? 0} row(s).`);
+      });
+    }
+  } catch (err) {
+    console.error('[data-repair] failed:', err);
   }
 };

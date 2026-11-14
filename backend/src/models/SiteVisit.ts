@@ -19,6 +19,7 @@ interface SiteVisitAttributes {
   notes?: string | null; // feedback after the visit
   completedAt?: Date | null;
   createdById?: number | null;
+  autoCreated?: boolean; // logged by the CRM because the lead's status says the visit happened
 }
 
 interface SiteVisitCreationAttributes extends Optional<SiteVisitAttributes, 'id' | 'status'> {}
@@ -34,6 +35,7 @@ class SiteVisit extends Model<SiteVisitAttributes, SiteVisitCreationAttributes> 
   public notes?: string | null;
   public completedAt?: Date | null;
   public createdById?: number | null;
+  public autoCreated?: boolean;
 
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
@@ -51,6 +53,7 @@ SiteVisit.init(
     notes: { type: DataTypes.TEXT, allowNull: true },
     completedAt: { type: DataTypes.DATE, allowNull: true },
     createdById: { type: DataTypes.INTEGER, allowNull: true },
+    autoCreated: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
   },
   {
     tableName: 'site_visits',

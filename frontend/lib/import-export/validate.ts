@@ -1,4 +1,5 @@
 import type { ImportExportField } from './types';
+import { parseMobile } from '../phone-country';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -10,12 +11,9 @@ function isValidDate(value: string) {
   return date.getUTCFullYear() === y && date.getUTCMonth() === m - 1 && date.getUTCDate() === d;
 }
 
-/** "+91 98765-43210", "098765 43210" -> "9876543210"; null when it isn't a 10 digit Indian mobile. */
+/** "+91 98765-43210" -> "9876543210"; "+971 50 123 4567" -> "+971501234567"; null when it isn't a mobile. */
 export function normalizeMobile(raw: unknown): string | null {
-  let digits = String(raw ?? '').replace(/\D/g, '');
-  if (digits.length === 12 && digits.startsWith('91')) digits = digits.slice(2);
-  else if (digits.length === 11 && digits.startsWith('0')) digits = digits.slice(1);
-  return digits.length === 10 ? digits : null;
+  return parseMobile(raw)?.value ?? null;
 }
 
 /** Checks one cell against its field definition, so a bad value is reported
@@ -33,7 +31,7 @@ export function validateCell(field: ImportExportField, raw: unknown): string | n
     case 'email':
       return EMAIL_RE.test(value) ? null : `${field.label} must be an email address (got "${value}")`;
     case 'mobile':
-      return normalizeMobile(value) ? null : `${field.label} must be a 10 digit mobile number (got "${value}")`;
+      return normalizeMobile(value) ? null : `${field.label} must be a 10 digit mobile, or a number with its country code (got "${value}")`;
     case 'select':
       if (field.strict && field.options && !field.options.includes(value)) {
         return `${field.label} must be one of: ${field.options.join(', ')} (got "${value}")`;

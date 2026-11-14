@@ -1577,8 +1577,8 @@ export const salesApi = {
     request<LeadSourceReport>(`/sales/lead-sources${qs(params)}`),
   getCallLog: async (params: { from?: string; to?: string; userId?: number | string; status?: string; direction?: string; number?: string; page?: number; limit?: number } = {}) =>
     request<{ from: string; to: string; total: number; page: number; pages: number; calls: CallLogRow[] }>(`/sales/calls${qs(params)}`),
-  listVisits: async (params: { from?: string; to?: string; allTime?: number; userId?: number | string; status?: string; leadId?: number | string; limit?: number } = {}) =>
-    request<{ visits: SiteVisitRow[]; total?: number; matching?: number; counts?: Record<SiteVisitStatus, number> }>(`/sales/visits${qs(params)}`),
+  listVisits: async (params: { from?: string; to?: string; allTime?: number; search?: string; userId?: number | string; status?: string; leadId?: number | string; limit?: number } = {}) =>
+    request<{ visits: SiteVisitRow[]; total?: number; matching?: number; counts?: Record<SiteVisitStatus, number>; leadCounts?: Record<SiteVisitStatus, number> }>(`/sales/visits${qs(params)}`),
   createVisit: async (payload: { leadId: number | string; userId?: number | string | null; scheduledAt: string; status?: SiteVisitStatus; projectName?: string; location?: string; notes?: string }) =>
     request<SiteVisitRow>('/sales/visits', { method: 'POST', body: JSON.stringify(payload) }),
   updateVisit: async (id: number, payload: Partial<{ userId: number | string; scheduledAt: string; status: SiteVisitStatus; projectName: string; location: string; notes: string }>) =>

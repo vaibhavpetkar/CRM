@@ -1,4 +1,5 @@
 import { body } from 'express-validator';
+import { isStoredMobile, normalizeMobile } from '../utils/phoneCountry';
 
 // Lead statuses a user can pick (keep in sync with LEAD_STATUS_OPTIONS in
 // frontend/lib/lead-options.ts). 'new' is the starting status of every lead.
@@ -30,7 +31,9 @@ export const normalizeIndianMobile = (value: unknown) => {
   else if (digits.length === 11 && digits.startsWith('0')) digits = digits.slice(1);
   return digits.length === 10 ? digits : raw;
 };
-const TEN_DIGITS = /^\d{10}$/;
+// Mobile numbers: 10 digits = India; numbers from abroad keep their code.
+const validMobile = (v: unknown) => isStoredMobile(v);
+const MOBILE_HINT = 'must be 10 digits, or + and the country code (e.g. +971 50 123 4567)';
 
 export const createLeadValidation = [
   // Names are optional: many sheets and walk-ins only have a mobile number.
@@ -38,11 +41,11 @@ export const createLeadValidation = [
   body('lastName').optional({ nullable: true }).isString().trim(),
   body('email').optional({ nullable: true, values: 'falsy' }).trim().isEmail().withMessage('Email must be valid').bail().toLowerCase(),
   body('mobile')
-    .customSanitizer(normalizeIndianMobile)
+    .customSanitizer(normalizeMobile)
     .notEmpty().withMessage('Mobile Number is required')
     .bail()
-    .matches(TEN_DIGITS).withMessage('Mobile number must be 10 digits'),
-  body('alternateMobile').optional({ nullable: true, values: 'falsy' }).customSanitizer(normalizeIndianMobile).matches(TEN_DIGITS).withMessage('Alternate mobile must be 10 digits'),
+    .custom(validMobile).withMessage(`Mobile number ${MOBILE_HINT}`),
+  body('alternateMobile').optional({ nullable: true, values: 'falsy' }).customSanitizer(normalizeMobile).custom(validMobile).withMessage(`Alternate mobile ${MOBILE_HINT}`),
   body('status').optional().isIn(LEAD_STATUSES).withMessage(`status must be one of: ${ACTIVE_LEAD_STATUSES.join(', ')}`),
   body('leadSource').optional().isString(),
   body('products').optional().isArray().withMessage('products must be an array'),
@@ -57,8 +60,8 @@ export const createLeadValidation = [
 export const updateLeadValidation = [
   body('email').optional({ nullable: true, values: 'falsy' }).trim().isEmail().withMessage('Email must be valid').bail().toLowerCase(),
   // Edits only tidy the format: older leads from portals may hold numbers that aren't 10 digits.
-  body('mobile').optional({ nullable: true }).customSanitizer(normalizeIndianMobile),
-  body('alternateMobile').optional({ nullable: true }).customSanitizer(normalizeIndianMobile),
+  body('mobile').optional({ nullable: true }).customSanitizer(normalizeMobile),
+  body('alternateMobile').optional({ nullable: true }).customSanitizer(normalizeMobile),
   body('status').optional().isIn(LEAD_STATUSES).withMessage(`status must be one of: ${ACTIVE_LEAD_STATUSES.join(', ')}`),
   body('products').optional().isArray().withMessage('products must be an array'),
   body('taxes').optional().isArray().withMessage('taxes must be an array'),
