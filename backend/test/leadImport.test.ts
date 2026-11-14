@@ -29,9 +29,21 @@ test('mobile numbers are tidied to 10 digits and anything else is rejected', asy
   assert.equal(normalizeIndianMobile('+91 98765-43210'), '9876543210');
   assert.equal(normalizeIndianMobile('098765 43210'), '9876543210');
   assert.equal((await check(createLeadValidation, { ...lead, mobile: '+91 98765 43210' })).body.mobile, '9876543210');
-  assert.deepEqual((await check(createLeadValidation, { ...lead, mobile: '12345' })).errors, ['Mobile number must be 10 digits']);
+  assert.deepEqual((await check(createLeadValidation, { ...lead, mobile: '12345' })).errors, ['Mobile number must be 10 digits, or + and the country code (e.g. +971 50 123 4567)']);
   assert.deepEqual((await check(createLeadValidation, { ...lead, mobile: '' })).errors, ['Mobile Number is required']);
-  assert.deepEqual((await check(createLeadValidation, { ...lead, alternateMobile: '99' })).errors, ['Alternate mobile must be 10 digits']);
+  assert.deepEqual((await check(createLeadValidation, { ...lead, alternateMobile: '99' })).errors, ['Alternate mobile must be 10 digits, or + and the country code (e.g. +971 50 123 4567)']);
+});
+
+test('numbers from abroad keep their country code; 10 digits stay Indian', async () => {
+  const mobileOf = async (mobile: string) => (await check(createLeadValidation, { ...lead, mobile })).body.mobile;
+  assert.equal(await mobileOf('+971 50 123 4567'), '+971501234567');
+  assert.equal(await mobileOf('00971501234567'), '+971501234567');
+  assert.equal(await mobileOf('971501234567'), '+971501234567'); // old data typed without the +
+  assert.equal(await mobileOf('+1 (415) 555-2671'), '+14155552671');
+  assert.equal(await mobileOf('447911123456'), '+447911123456');
+  assert.equal(await mobileOf('6591234567'), '6591234567'); // 10 digits: India
+  assert.equal(await mobileOf('+65 9123 4567'), '+6591234567');
+  assert.equal(await mobileOf('0091 98765 43210'), '9876543210');
 });
 
 test('editing an older lead does not fail on a legacy mobile format', async () => {

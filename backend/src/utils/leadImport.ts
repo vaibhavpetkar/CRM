@@ -3,13 +3,10 @@
 // an "Executive Name" that should become the lead's sales person.
 import { LEAD_STATUSES } from '../validations/leadValidation';
 import { detectNoteStatus } from './leadNotes';
+import { parseMobile } from './phoneCountry';
 
-const tenDigits = (raw: string): string | null => {
-  let d = raw.replace(/\D/g, '');
-  if (d.length === 12 && d.startsWith('91')) d = d.slice(2);
-  else if (d.length === 11 && d.startsWith('0')) d = d.slice(1);
-  return d.length === 10 ? d : null;
-};
+// One number as it is stored: 10 digits for India, +<code>... from abroad.
+const tenDigits = (raw: string): string | null => parseMobile(raw)?.value ?? null;
 
 /** "9822675337/  9175444667" -> ["9822675337", "9175444667"]. One number stays as written. */
 export const splitMobiles = (raw: unknown): string[] => {

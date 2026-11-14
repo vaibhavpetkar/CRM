@@ -402,6 +402,11 @@ class LeadRepository extends BaseRepository<Lead> {
       const ten = digits.length === 12 && digits.startsWith('91') ? digits.slice(2) : digits.length === 11 && digits.startsWith('0') ? digits.slice(1) : digits;
       const forms = ten.length === 10 ? [ten, `91${ten}`, `+91${ten}`, `0${ten}`, `+91 ${ten}`] : [];
       orConditions.push({ mobile: { [Op.in]: [...new Set([String(mobile), ...forms])] } });
+      // And by the last 10 digits, so "+971 50 123 4567" finds "971501234567"
+      // typed into old data, and "+91 98765 43210" finds "9876543210".
+      if (digits.length >= 10) {
+        orConditions.push(sequelize.where(sequelize.fn('RIGHT', sequelize.fn('regexp_replace', sequelize.col('mobile'), '\\D', '', 'g'), 10), digits.slice(-10)));
+      }
     }
     if (orConditions.length === 0) return null;
 

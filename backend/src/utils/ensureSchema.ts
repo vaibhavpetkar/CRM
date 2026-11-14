@@ -224,6 +224,12 @@ const SCHEMA_PATCHES: { name: string; sql: string }[] = [
     name: 'site_visits.autoCreated',
     sql: `ALTER TABLE "site_visits" ADD COLUMN IF NOT EXISTS "autoCreated" BOOLEAN NOT NULL DEFAULT FALSE;`,
   },
+  {
+    // Duplicate check by the last 10 digits of the mobile (Indian and
+    // international numbers typed with or without the country code).
+    name: 'leads mobile last 10 digits index',
+    sql: `CREATE INDEX IF NOT EXISTS "leads_mobile_last10" ON "leads" (RIGHT(regexp_replace("mobile", '\\D', '', 'g'), 10));`,
+  },
 ];
 
 export const runSchemaPatches = async (sequelize: Sequelize): Promise<void> => {

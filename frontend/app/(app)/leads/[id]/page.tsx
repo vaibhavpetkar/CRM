@@ -24,6 +24,8 @@ import SiteVisitModal from '@/components/sales/site-visit-modal';
 import FollowUpHistoryDrawer from '@/components/leads/follow-up-history-drawer';
 import { LeadNotesField, lastNoteLine } from '@/components/leads/lead-notes';
 import ChannelPartnerInput from '@/components/leads/channel-partner-input';
+import MobileNumber, { MobileFlag } from '@/components/ui/mobile-number';
+import { parseMobile } from '@/lib/phone-country';
 
 // Today as YYYY-MM-DD in the browser's time zone, for the follow-up date picker's minimum.
 const todayStr = () => {
@@ -209,6 +211,15 @@ export default function LeadDetailsPage() {
       return;
     }
 
+    // 10 digits = India; other countries need + and the country code.
+    for (const [key, label] of [['mobile', 'Mobile number'], ['alternateMobile', 'Alternate mobile']] as const) {
+      const v = String(formData[key] ?? '').trim();
+      if (v && v !== String(lead?.[key] ?? '') && !parseMobile(v)) {
+        toast.warning(`${label}: enter 10 digits, or + and the country code for other countries.`);
+        return;
+      }
+    }
+
     // A new note that means Site Visit Done / Revisit Done: log the visit first,
     // like picking that status (the note decides the status when none was picked).
     const newNote = String(formData.notes || '').trim();
@@ -281,9 +292,12 @@ export default function LeadDetailsPage() {
         <button onClick={() => router.push('/leads')} className="text-slate-400 hover:text-slate-600">
           <ArrowLeftIcon className="h-5 w-5" />
         </button>
-        <h1 className="text-2xl font-bold text-slate-900 flex-1">
-          {`${lead.firstName || ''} ${lead.lastName || ''}`.trim() || lead.mobile || lead.leadNumber || 'Unnamed lead'}
-        </h1>
+        <div className="min-w-0 flex-1">
+          <h1 className="text-2xl font-bold text-slate-900">
+            {`${lead.firstName || ''} ${lead.lastName || ''}`.trim() || lead.leadNumber || 'Unnamed lead'}
+          </h1>
+          {lead.mobile && <MobileNumber value={lead.mobile} className="mt-0.5 text-sm text-slate-500" />}
+        </div>
         {hasPermission(getStoredUser(), 'calls:make') && (
           <Button type="button" size="sm" variant="secondary" onClick={() => setLogCallOpen(true)}>
             <PhoneIcon className="h-4 w-4" /> Log Call
@@ -434,29 +448,35 @@ export default function LeadDetailsPage() {
 <div>
                       <label className="block text-sm font-medium text-slate-700">Mobile Number <span className="text-red-500">*</span></label>
                       <div className="mt-1 flex items-center gap-2">
-                        <input
-                          type="tel"
-                          required
-                          maxLength={10}
-                          value={formData.mobile || ''}
-                          onChange={(e) => setFormData({ ...formData, mobile: e.target.value.replace(/\D/g, '') })}
-                          placeholder="10-digit number"
-                          className="w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
-                        />
+                        <div className="relative w-full">
+                          <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2"><MobileFlag value={formData.mobile} /></span>
+                          <input
+                            type="tel"
+                            required
+                            maxLength={20}
+                            value={formData.mobile || ''}
+                            onChange={(e) => setFormData({ ...formData, mobile: e.target.value.replace(/[^\d+\s()-]/g, '') })}
+                            placeholder="10 digits, or +971 50 123 4567"
+                            className="w-full rounded-lg border border-slate-200 p-2 pl-9 text-sm focus:border-[var(--primary)] focus:outline-none"
+                          />
+                        </div>
                         <CallButton number={lead?.mobile || ''} leadId={lead?.id} name={leadName} />
                       </div>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-700">Alternate Mobile</label>
                       <div className="mt-1 flex items-center gap-2">
-                        <input
-                          type="tel"
-                          maxLength={10}
-                          value={formData.alternateMobile || ''}
-                          onChange={(e) => setFormData({ ...formData, alternateMobile: e.target.value.replace(/\D/g, '') })}
-                          placeholder="10-digit number"
-                          className="w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-[var(--primary)] focus:outline-none"
-                        />
+                        <div className="relative w-full">
+                          <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2"><MobileFlag value={formData.alternateMobile} /></span>
+                          <input
+                            type="tel"
+                            maxLength={20}
+                            value={formData.alternateMobile || ''}
+                            onChange={(e) => setFormData({ ...formData, alternateMobile: e.target.value.replace(/[^\d+\s()-]/g, '') })}
+                            placeholder="10 digits, or +971 50 123 4567"
+                            className="w-full rounded-lg border border-slate-200 p-2 pl-9 text-sm focus:border-[var(--primary)] focus:outline-none"
+                          />
+                        </div>
                         <CallButton number={lead?.alternateMobile || ''} leadId={lead?.id} name={leadName} />
                       </div>
                     </div>

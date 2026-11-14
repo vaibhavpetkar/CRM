@@ -11,6 +11,7 @@ import LoadingSpinner from '@/components/ui/loading-spinner';
 import { useToast } from '@/components/ui/toast';
 import DateRangePicker, { ALL_TIME, DateRange, isAllTime, presetRange } from '@/components/sales/date-range';
 import SearchInput from '@/components/ui/search-input';
+import MobileNumber from '@/components/ui/mobile-number';
 import { AgentStatusDot } from '@/components/sales/agent-status';
 import SiteVisitModal, { VISIT_STATUS_LABEL } from '@/components/sales/site-visit-modal';
 import { getStoredUser, PresenceState, salesApi, SiteVisitRow, SiteVisitStatus, usersApi } from '@/lib/api';
@@ -305,7 +306,7 @@ export default function SiteVisitsPage() {
                       {v.leadId ? (
                         <Link href={`/leads/${v.leadId}`} className="font-medium text-slate-800 hover:text-[var(--primary)] hover:underline">{v.leadName || v.leadNumber}</Link>
                       ) : '—'}
-                      {v.leadMobile && <p className="text-xs text-slate-400">{v.leadMobile}</p>}
+                      {v.leadMobile && <MobileNumber value={v.leadMobile} className="flex text-xs text-slate-400" />}
                     </td>
                     <td className="px-3 py-3 text-slate-600">{[v.projectName, v.location].filter(Boolean).join(' · ') || '—'}</td>
                     <td className="px-3 py-3">
